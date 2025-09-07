@@ -169,6 +169,27 @@ func main() {
 				taxReturns.PUT("/:id", handlers.UpdateTaxReturn)
 				taxReturns.DELETE("/:id", handlers.DeleteTaxReturn)
 			}
+
+			// Capital asset routes
+			capitalAssets := protected.Group("/capital-assets")
+			{
+				capitalAssets.GET("", handlers.ListCapitalAssets)
+				capitalAssets.POST("", handlers.CreateCapitalAsset)
+				capitalAssets.GET("/:id", handlers.GetCapitalAsset)
+				capitalAssets.PUT("/:id", handlers.UpdateCapitalAsset)
+				capitalAssets.DELETE("/:id", handlers.DeleteCapitalAsset)
+				capitalAssets.GET("/:id/calculate-depreciation", handlers.CalculateDepreciation)
+				capitalAssets.POST("/:id/depreciation-entries", handlers.CreateDepreciationEntry)
+			}
+
+			// CCA classes route
+			protected.GET("/cca-classes", handlers.GetCCAClasses)
+
+			// Reports routes
+			reports := protected.Group("/reports")
+			{
+				reports.POST("/tax-report", handlers.GenerateTaxReport)
+			}
 		}
 	}
 

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import Clients from './pages/Clients';
 import Expenses from './pages/Expenses';
+import CapitalAssets from './pages/CapitalAssets';
 import Income from './pages/Income';
 import Dividends from './pages/Dividends';
 import Reports from './pages/Reports';
@@ -66,6 +67,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Expenses />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/capital-assets"
+              element={
+                <ProtectedRoute>
+                  <CapitalAssets />
                 </ProtectedRoute>
               }
             />

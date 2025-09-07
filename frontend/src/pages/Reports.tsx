@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Invoice, type Expense, type Dividend } from '../lib/api';
-import { Download, Calendar, TrendingUp, DollarSign, Receipt } from 'lucide-react';
+import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [selectedReport, setSelectedReport] = useState<'pl' | 'hst' | 'retained'>('pl');
+    const [selectedReport, setSelectedReport] = useState<'pl' | 'hst' | 'retained' | 'comprehensive'>('pl');
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Fetch tax return data for the selected year
     const { data: _taxReturn } = useQuery({
@@ -155,6 +156,34 @@ const Reports: React.FC = () => {
         window.URL.revokeObjectURL(url);
     };
 
+    const generatePDFReport = async () => {
+        if (!user?.company_id) return;
+
+        setIsGeneratingPDF(true);
+        try {
+            const blob = await api.generateTaxReport({
+                company_id: user.company_id,
+                fiscal_year: selectedYear,
+                report_type: selectedReport === 'pl' ? 'pandl' : selectedReport === 'hst' ? 'hst' : selectedReport === 'retained' ? 'retained' : 'comprehensive'
+            });
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${selectedReport.toUpperCase()}_Tax_Report_${selectedYear}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to generate PDF report:', error);
+            alert('Failed to generate PDF report. Please try again.');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const generatePandLReport = (data: any) => {
         return `
 PROFIT & LOSS STATEMENT
@@ -286,15 +315,29 @@ ${formatCurrency(data.retainedEarnings)}
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-                    <p className="text-gray-600">Generate financial reports for your business</p>
+                    <p className="text-gray-600">Generate financial reports for your business and tax submission</p>
                 </div>
-                <button
-                    onClick={generateReport}
-                    className="btn btn-primary flex items-center gap-2"
-                >
-                    <Download className="h-4 w-4" />
-                    Download Report
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={generateReport}
+                        className="btn btn-secondary flex items-center gap-2"
+                    >
+                        <FileText className="h-4 w-4" />
+                        Download TXT
+                    </button>
+                    <button
+                        onClick={generatePDFReport}
+                        disabled={isGeneratingPDF}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        {isGeneratingPDF ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                            <FileSpreadsheet className="h-4 w-4" />
+                        )}
+                        {isGeneratingPDF ? 'Generating...' : 'Download PDF'}
+                    </button>
+                </div>
             </div>
 
             {/* Report Controls */}
@@ -318,16 +361,43 @@ ${formatCurrency(data.retainedEarnings)}
                         <label className="text-sm font-medium text-gray-700">Report Type:</label>
                         <select
                             value={selectedReport}
-                            onChange={(e) => setSelectedReport(e.target.value as 'pl' | 'hst' | 'retained')}
+                            onChange={(e) => setSelectedReport(e.target.value as 'pl' | 'hst' | 'retained' | 'comprehensive')}
                             className="input w-auto"
                         >
                             <option value="pl">Profit & Loss</option>
                             <option value="hst">HST Report</option>
                             <option value="retained">Retained Earnings</option>
+                            <option value="comprehensive">Comprehensive Tax Report</option>
                         </select>
                     </div>
                 </div>
             </div>
+
+            {/* Comprehensive Tax Report Info */}
+            {selectedReport === 'comprehensive' && (
+                <div className="card bg-blue-50 border-blue-200">
+                    <div className="flex items-start gap-3">
+                        <FileSpreadsheet className="h-6 w-6 text-blue-600 mt-1" />
+                        <div>
+                            <h3 className="text-lg font-semibold text-blue-900 mb-2">Comprehensive Tax Report</h3>
+                            <p className="text-blue-800 mb-3">
+                                This comprehensive report includes all financial data needed for tax submission to your accountant:
+                            </p>
+                            <ul className="text-blue-800 text-sm space-y-1 ml-4">
+                                <li>• Complete Profit & Loss Statement</li>
+                                <li>• Detailed HST Summary with monthly breakdown</li>
+                                <li>• Capital Assets and Depreciation (CCA)</li>
+                                <li>• Dividend distributions</li>
+                                <li>• Retained earnings calculation</li>
+                                <li>• All supporting transaction details</li>
+                            </ul>
+                            <p className="text-blue-800 text-sm mt-3 font-medium">
+                                Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Report Summary */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -156,6 +156,54 @@ export interface TaxReturn {
     updated_at: string;
 }
 
+export interface DepreciationEntry {
+    id: number;
+    capital_asset_id: number;
+    capital_asset?: CapitalAsset;
+    fiscal_year: number;
+    depreciation_amount: number;
+    is_half_year_rule: boolean;
+    entry_date: string;
+    company_id: number;
+    company?: Company;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CapitalAsset {
+    id: number;
+    description: string;
+    category_id: number;
+    category?: ExpenseCategory;
+    purchase_date: string;
+    purchase_amount: number;
+    hst_paid: number;
+    total_cost: number;
+    cca_class: string;
+    cca_rate: number;
+    depreciable_amount: number;
+    accumulated_depreciation: number;
+    book_value: number;
+    disposal_date?: string;
+    disposal_amount?: number;
+    paid_by: 'corp' | 'owner';
+    receipt_attached: boolean;
+    company_id: number;
+    company?: Company;
+    depreciation_entries?: DepreciationEntry[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CCAClass {
+    id: number;
+    class_number: string;
+    description: string;
+    rate: number;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface LoginRequest {
     email: string;
     password: string;
@@ -605,6 +653,104 @@ class ApiClient {
         await this.request(`/hst-payments/${id}`, {
             method: 'DELETE',
         });
+    }
+
+    // Capital Assets
+    async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string }): Promise<PaginatedResponse<CapitalAsset>> {
+        const searchParams = new URLSearchParams();
+        if (params?.page) searchParams.set('page', params.page.toString());
+        if (params?.limit) searchParams.set('limit', params.limit.toString());
+        if (params?.search) searchParams.set('search', params.search);
+        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
+        if (params?.category_id) searchParams.set('category_id', params.category_id.toString());
+        if (params?.cca_class) searchParams.set('cca_class', params.cca_class);
+
+        const query = searchParams.toString();
+        return this.request<PaginatedResponse<CapitalAsset>>(`/capital-assets${query ? `?${query}` : ''}`);
+    }
+
+    async getCapitalAsset(id: number): Promise<CapitalAsset> {
+        return this.request<CapitalAsset>(`/capital-assets/${id}`);
+    }
+
+    async createCapitalAsset(capitalAsset: {
+        description: string;
+        category_id: number;
+        purchase_date: string;
+        purchase_amount: number;
+        hst_paid: number;
+        cca_class: string;
+        paid_by: 'corp' | 'owner';
+        receipt_attached: boolean;
+        company_id: number;
+    }): Promise<CapitalAsset> {
+        return this.request<CapitalAsset>('/capital-assets', {
+            method: 'POST',
+            body: JSON.stringify(capitalAsset),
+        });
+    }
+
+    async updateCapitalAsset(id: number, capitalAsset: Partial<CapitalAsset> & { purchase_date?: string; disposal_date?: string }): Promise<CapitalAsset> {
+        return this.request<CapitalAsset>(`/capital-assets/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(capitalAsset),
+        });
+    }
+
+    async deleteCapitalAsset(id: number): Promise<void> {
+        await this.request(`/capital-assets/${id}`, {
+            method: 'DELETE',
+        });
+    }
+
+    async calculateDepreciation(id: number, fiscalYear: number): Promise<{
+        capital_asset_id: number;
+        fiscal_year: number;
+        depreciation_amount: number;
+        is_half_year_rule: boolean;
+        remaining_book_value: number;
+    }> {
+        return this.request(`/capital-assets/${id}/calculate-depreciation?fiscal_year=${fiscalYear}`);
+    }
+
+    async createDepreciationEntry(id: number, entry: {
+        fiscal_year: number;
+        entry_date: string;
+    }): Promise<DepreciationEntry> {
+        return this.request<DepreciationEntry>(`/capital-assets/${id}/depreciation-entries`, {
+            method: 'POST',
+            body: JSON.stringify(entry),
+        });
+    }
+
+    // CCA Classes
+    async getCCAClasses(): Promise<CCAClass[]> {
+        return this.request<CCAClass[]>('/cca-classes');
+    }
+
+    // Tax Reports
+    async generateTaxReport(request: {
+        company_id: number;
+        fiscal_year: number;
+        start_date?: string;
+        end_date?: string;
+        report_type: 'comprehensive' | 'pandl' | 'hst' | 'retained';
+    }): Promise<Blob> {
+        const response = await fetch(`${this.baseURL}/reports/tax-report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`,
+            },
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to generate tax report');
+        }
+
+        return response.blob();
     }
 }
 

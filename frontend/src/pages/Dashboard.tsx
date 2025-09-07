@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend } from '../lib/api';
+import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type CapitalAsset } from '../lib/api';
 import {
     DollarSign,
     Receipt,
@@ -11,7 +11,9 @@ import {
     Check,
     Percent,
     Banknote,
-    FileText
+    FileText,
+    Building2,
+    Calculator
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -37,12 +39,18 @@ const Dashboard: React.FC = () => {
         smallBusinessTaxPaid: 0,
         taxDeductibleExpenses: 0,
         netIncomeAfterTax: 0,
+        // Capital asset information
+        totalCapitalAssets: 0,
+        totalAssetCost: 0,
+        totalAccumulatedDepreciation: 0,
+        totalAssetBookValue: 0,
     });
     const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
     const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
     const [recentIncomeEntries, setRecentIncomeEntries] = useState<IncomeEntry[]>([]);
     const [recentHSTPayments, setRecentHSTPayments] = useState<HSTPayment[]>([]);
     const [recentDividends, setRecentDividends] = useState<Dividend[]>([]);
+    const [recentCapitalAssets, setRecentCapitalAssets] = useState<CapitalAsset[]>([]);
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>('month');
@@ -145,6 +153,13 @@ const Dashboard: React.FC = () => {
                 return dividendDate >= startDate && dividendDate <= endDate;
             });
 
+            // Get capital assets
+            const capitalAssetsResponse = await api.getCapitalAssets({
+                company_id: companyId,
+                limit: 1000
+            });
+            const capitalAssets = capitalAssetsResponse.data;
+
             // Calculate stats
             const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
             const clientIncome = incomeEntries
@@ -205,6 +220,11 @@ const Dashboard: React.FC = () => {
             // Tax deductible expenses (all business expenses reduce taxable income)
             const taxDeductibleExpenses = totalExpenses;
 
+            // Calculate capital asset stats
+            const totalAssetCost = capitalAssets.reduce((sum, asset) => sum + asset.total_cost, 0);
+            const totalAccumulatedDepreciation = capitalAssets.reduce((sum, asset) => sum + asset.accumulated_depreciation, 0);
+            const totalAssetBookValue = capitalAssets.reduce((sum, asset) => sum + asset.book_value, 0);
+
             setStats({
                 totalRevenue,
                 totalExpenses,
@@ -226,6 +246,11 @@ const Dashboard: React.FC = () => {
                 smallBusinessTaxPaid,
                 taxDeductibleExpenses,
                 netIncomeAfterTax,
+                // Capital asset information
+                totalCapitalAssets: capitalAssets.length,
+                totalAssetCost,
+                totalAccumulatedDepreciation,
+                totalAssetBookValue,
             });
 
             // Get recent invoices, expenses, income entries, and HST payments
@@ -254,11 +279,17 @@ const Dashboard: React.FC = () => {
                 limit: 5
             });
 
+            const recentCapitalAssetsResponse = await api.getCapitalAssets({
+                company_id: companyId,
+                limit: 5
+            });
+
             setRecentInvoices(recentInvoicesResponse.data);
             setRecentExpenses(recentExpensesResponse.data);
             setRecentIncomeEntries(recentIncomeEntriesResponse.data);
             setRecentHSTPayments(recentHSTPaymentsResponse.data);
             setRecentDividends(recentDividendsResponse.data);
+            setRecentCapitalAssets(recentCapitalAssetsResponse.data);
             setAllDividends(dividends);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -534,6 +565,67 @@ const Dashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* Capital Assets Section */}
+            {stats.totalCapitalAssets > 0 && (
+                <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Capital Assets</h2>
+
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="bg-gradient-to-br from-indigo-50 to-blue-100 border border-indigo-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-indigo-600 mb-1">Total Assets</p>
+                                    <p className="text-2xl font-bold text-indigo-800">{stats.totalCapitalAssets}</p>
+                                    <p className="text-xs text-indigo-600 mt-1">Capital assets</p>
+                                </div>
+                                <div className="bg-indigo-200 p-3 rounded-full">
+                                    <Building2 className="h-6 w-6 text-indigo-700" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-cyan-50 to-teal-100 border border-cyan-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-cyan-600 mb-1">Total Cost</p>
+                                    <p className="text-2xl font-bold text-cyan-800">{formatCurrency(stats.totalAssetCost)}</p>
+                                    <p className="text-xs text-cyan-600 mt-1">Original cost</p>
+                                </div>
+                                <div className="bg-cyan-200 p-3 rounded-full">
+                                    <DollarSign className="h-6 w-6 text-cyan-700" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-amber-600 mb-1">Depreciation</p>
+                                    <p className="text-2xl font-bold text-amber-800">{formatCurrency(stats.totalAccumulatedDepreciation)}</p>
+                                    <p className="text-xs text-amber-600 mt-1">Accumulated</p>
+                                </div>
+                                <div className="bg-amber-200 p-3 rounded-full">
+                                    <Calculator className="h-6 w-6 text-amber-700" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-emerald-50 to-green-100 border border-emerald-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-emerald-600 mb-1">Book Value</p>
+                                    <p className="text-2xl font-bold text-emerald-800">{formatCurrency(stats.totalAssetBookValue)}</p>
+                                    <p className="text-xs text-emerald-600 mt-1">Current value</p>
+                                </div>
+                                <div className="bg-emerald-200 p-3 rounded-full">
+                                    <TrendingUp className="h-6 w-6 text-emerald-700" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Alerts & Notifications Section */}
             {(stats.outstandingInvoices > 0 || stats.overdueInvoices > 0) && (
                 <div className="space-y-4">
@@ -567,7 +659,7 @@ const Dashboard: React.FC = () => {
             {/* Recent Activity Section */}
             <div className="space-y-6">
                 <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Recent Activity</h2>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
                     {/* Recent Invoices */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center mb-4">
@@ -727,6 +819,40 @@ const Dashboard: React.FC = () => {
                             ))}
                         </div>
                     </div>
+
+                    {/* Recent Capital Assets */}
+                    {stats.totalCapitalAssets > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center mb-4">
+                                <div className="bg-indigo-100 p-2 rounded-lg mr-3">
+                                    <Building2 className="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900">Recent Capital Assets</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentCapitalAssets.map((asset) => (
+                                    <div key={asset.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {asset.description}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                Class {asset.cca_class} • {(asset.cca_rate * 100).toFixed(1)}%
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {formatCurrency(asset.total_cost)}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                {formatDate(asset.purchase_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

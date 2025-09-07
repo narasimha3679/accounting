@@ -56,6 +56,9 @@ func Migrate() {
 		&models.TaxReturn{},
 		&models.HSTPayment{},
 		&models.IncomeEntry{},
+		&models.CapitalAsset{},
+		&models.DepreciationEntry{},
+		&models.CCAClass{},
 	)
 
 	if err != nil {

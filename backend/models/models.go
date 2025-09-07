@@ -282,6 +282,87 @@ type UpdateHSTPaymentRequest struct {
 	Notes       *string    `json:"notes,omitempty"`
 }
 
+// CapitalAsset represents a capital asset that must be depreciated
+type CapitalAsset struct {
+	ID                      uint                `json:"id" gorm:"primaryKey"`
+	Description             string              `json:"description" gorm:"not null"`
+	CategoryID              uint                `json:"category_id" gorm:"not null"`
+	Category                ExpenseCategory     `json:"category,omitempty" gorm:"foreignKey:CategoryID"`
+	PurchaseDate            time.Time           `json:"purchase_date" gorm:"not null"`
+	PurchaseAmount          float64             `json:"purchase_amount" gorm:"not null"`
+	HSTPaid                 float64             `json:"hst_paid" gorm:"not null"`
+	TotalCost               float64             `json:"total_cost" gorm:"not null"`         // Purchase amount + HST
+	CCAClass                string              `json:"cca_class" gorm:"not null"`          // CCA class (e.g., "10", "12", "50")
+	CCARate                 float64             `json:"cca_rate" gorm:"not null"`           // CCA rate as decimal (e.g., 0.20 for 20%)
+	DepreciableAmount       float64             `json:"depreciable_amount" gorm:"not null"` // Amount eligible for depreciation
+	AccumulatedDepreciation float64             `json:"accumulated_depreciation" gorm:"default:0"`
+	BookValue               float64             `json:"book_value" gorm:"not null"` // Total cost - accumulated depreciation
+	DisposalDate            *time.Time          `json:"disposal_date"`
+	DisposalAmount          *float64            `json:"disposal_amount"`
+	PaidBy                  string              `json:"paid_by" gorm:"not null;default:'corp'"` // "corp" or "owner"
+	ReceiptAttached         bool                `json:"receipt_attached" gorm:"default:false"`
+	CompanyID               uint                `json:"company_id" gorm:"not null"`
+	Company                 Company             `json:"company,omitempty" gorm:"foreignKey:CompanyID"`
+	DepreciationEntries     []DepreciationEntry `json:"depreciation_entries,omitempty" gorm:"foreignKey:CapitalAssetID"`
+	CreatedAt               time.Time           `json:"created_at"`
+	UpdatedAt               time.Time           `json:"updated_at"`
+	DeletedAt               gorm.DeletedAt      `json:"-" gorm:"index"`
+}
+
+// DepreciationEntry represents a depreciation entry for a capital asset
+type DepreciationEntry struct {
+	ID                 uint           `json:"id" gorm:"primaryKey"`
+	CapitalAssetID     uint           `json:"capital_asset_id" gorm:"not null"`
+	CapitalAsset       CapitalAsset   `json:"capital_asset,omitempty" gorm:"foreignKey:CapitalAssetID"`
+	FiscalYear         int            `json:"fiscal_year" gorm:"not null"`
+	DepreciationAmount float64        `json:"depreciation_amount" gorm:"not null"`
+	IsHalfYearRule     bool           `json:"is_half_year_rule" gorm:"default:false"`
+	EntryDate          time.Time      `json:"entry_date" gorm:"not null"`
+	CompanyID          uint           `json:"company_id" gorm:"not null"`
+	Company            Company        `json:"company,omitempty" gorm:"foreignKey:CompanyID"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// CCAClass represents a CCA class with its rate
+type CCAClass struct {
+	ID          uint           `json:"id" gorm:"primaryKey"`
+	ClassNumber string         `json:"class_number" gorm:"uniqueIndex;not null"` // e.g., "10", "12", "50"
+	Description string         `json:"description" gorm:"not null"`
+	Rate        float64        `json:"rate" gorm:"not null"` // Rate as decimal (e.g., 0.20 for 20%)
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// CreateCapitalAssetRequest represents a request to create a capital asset
+type CreateCapitalAssetRequest struct {
+	Description     string  `json:"description" binding:"required"`
+	CategoryID      uint    `json:"category_id" binding:"required"`
+	PurchaseDate    string  `json:"purchase_date" binding:"required"`
+	PurchaseAmount  float64 `json:"purchase_amount" binding:"required,min=0"`
+	HSTPaid         float64 `json:"hst_paid" binding:"min=0"`
+	CCAClass        string  `json:"cca_class" binding:"required"`
+	PaidBy          string  `json:"paid_by" binding:"required,oneof=corp owner"`
+	ReceiptAttached bool    `json:"receipt_attached"`
+	CompanyID       uint    `json:"company_id" binding:"required"`
+}
+
+// UpdateCapitalAssetRequest represents a request to update a capital asset
+type UpdateCapitalAssetRequest struct {
+	Description     *string  `json:"description,omitempty"`
+	CategoryID      *uint    `json:"category_id,omitempty"`
+	PurchaseDate    *string  `json:"purchase_date,omitempty"`
+	PurchaseAmount  *float64 `json:"purchase_amount,omitempty" binding:"omitempty,min=0"`
+	HSTPaid         *float64 `json:"hst_paid,omitempty" binding:"omitempty,min=0"`
+	CCAClass        *string  `json:"cca_class,omitempty"`
+	DisposalDate    *string  `json:"disposal_date,omitempty"`
+	DisposalAmount  *float64 `json:"disposal_amount,omitempty" binding:"omitempty,min=0"`
+	PaidBy          *string  `json:"paid_by,omitempty" binding:"omitempty,oneof=corp owner"`
+	ReceiptAttached *bool    `json:"receipt_attached,omitempty"`
+}
+
 // PaginatedResponse represents a paginated API response
 type PaginatedResponse[T any] struct {
 	Data       []T `json:"data"`

@@ -10,7 +10,8 @@ import {
     LogOut,
     Calculator,
     DollarSign,
-    Banknote
+    Banknote,
+    Building2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Invoices', href: '/invoices', icon: FileText },
         { name: 'Income', href: '/income', icon: DollarSign },
         { name: 'Expenses', href: '/expenses', icon: Receipt },
+        { name: 'Capital Assets', href: '/capital-assets', icon: Building2 },
         { name: 'Dividends', href: '/dividends', icon: Banknote },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
