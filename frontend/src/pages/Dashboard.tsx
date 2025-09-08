@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type CapitalAsset, type OwnerPayment } from '../lib/api';
+import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import {
     DollarSign,
     Receipt,
@@ -56,7 +57,11 @@ const Dashboard: React.FC = () => {
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [timePeriod, setTimePeriod] = useState<'month' | 'year'>('month');
+    const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
+        // Load saved preference on component mount
+        const preferences = loadDashboardPreferences();
+        return preferences.timePeriod;
+    });
     const [selectedDate, setSelectedDate] = useState(new Date());
 
     useEffect(() => {
@@ -351,7 +356,10 @@ const Dashboard: React.FC = () => {
                     <div className="flex rounded-md shadow-sm">
                         <button
                             type="button"
-                            onClick={() => setTimePeriod('month')}
+                            onClick={() => {
+                                setTimePeriod('month');
+                                updateDashboardPreference('timePeriod', 'month');
+                            }}
                             className={`px-3 py-2 text-sm font-medium border rounded-l-md ${timePeriod === 'month'
                                 ? 'bg-primary-600 text-white border-primary-600'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -361,7 +369,10 @@ const Dashboard: React.FC = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setTimePeriod('year')}
+                            onClick={() => {
+                                setTimePeriod('year');
+                                updateDashboardPreference('timePeriod', 'year');
+                            }}
                             className={`px-3 py-2 text-sm font-medium border rounded-r-md ${timePeriod === 'year'
                                 ? 'bg-primary-600 text-white border-primary-600'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'

@@ -181,6 +181,7 @@ const Expenses: React.FC = () => {
                                 <th>Category</th>
                                 <th>Amount</th>
                                 <th>HST Paid</th>
+                                <th>Total</th>
                                 <th>Paid By</th>
                                 <th>Receipt</th>
                                 <th>Actions</th>
@@ -194,6 +195,7 @@ const Expenses: React.FC = () => {
                                     <td>{expense.category?.name || 'Uncategorized'}</td>
                                     <td className="font-medium">{formatCurrency(expense.amount)}</td>
                                     <td>{formatCurrency(expense.hst_paid)}</td>
+                                    <td className="font-medium text-green-600">{formatCurrency(expense.amount + expense.hst_paid)}</td>
                                     <td>
                                         {expense.paid_by === 'corp' ? (
                                             <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
