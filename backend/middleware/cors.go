@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"log"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -14,13 +16,26 @@ func CORSMiddleware() gin.HandlerFunc {
 	// Get allowed origins from environment variable
 	allowedOrigins := os.Getenv("CORS_ORIGIN")
 	if allowedOrigins == "" {
-		allowedOrigins = "http://localhost:5173"
+		// Default origins for development and production
+		allowedOrigins = "http://localhost:5173,http://localhost,http://localhost:80"
 	}
 
-	config.AllowOrigins = []string{allowedOrigins}
+	// Split multiple origins if provided
+	origins := []string{}
+	if allowedOrigins != "" {
+		// Handle comma-separated origins
+		for _, origin := range strings.Split(allowedOrigins, ",") {
+			origins = append(origins, strings.TrimSpace(origin))
+		}
+	}
+
+	config.AllowOrigins = origins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 	config.AllowCredentials = true
+
+	// Log the configured origins for debugging
+	log.Printf("CORS configured with origins: %v", origins)
 
 	return cors.New(config)
 }

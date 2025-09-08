@@ -109,14 +109,14 @@ const Invoices: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
                     <p className="text-gray-600">Manage your client invoices</p>
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center gap-2"
+                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     <Plus className="h-4 w-4" />
                     Create Invoice
@@ -126,7 +126,7 @@ const Invoices: React.FC = () => {
             {/* Invoices Table */}
             <div className="card">
                 <div className="overflow-x-auto">
-                    <table className="table">
+                    <table className="table-mobile">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th>Invoice #</th>
@@ -141,28 +141,28 @@ const Invoices: React.FC = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {invoices?.map((invoice) => (
                                 <tr key={invoice.id}>
-                                    <td className="font-medium">{invoice.invoice_number}</td>
-                                    <td>{invoice.client?.name || 'Unknown Client'}</td>
-                                    <td>{formatDate(invoice.issue_date)}</td>
-                                    <td>{formatDate(invoice.due_date)}</td>
-                                    <td className="font-medium">{formatCurrency(invoice.total)}</td>
-                                    <td>
+                                    <td data-label="Invoice #" className="font-medium">{invoice.invoice_number}</td>
+                                    <td data-label="Client">{invoice.client?.name || 'Unknown Client'}</td>
+                                    <td data-label="Issue Date">{formatDate(invoice.issue_date)}</td>
+                                    <td data-label="Due Date">{formatDate(invoice.due_date)}</td>
+                                    <td data-label="Amount" className="font-medium">{formatCurrency(invoice.total)}</td>
+                                    <td data-label="Status">
                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
                                             {invoice.status}
                                         </span>
                                     </td>
-                                    <td>
-                                        <div className="flex items-center gap-2">
+                                    <td data-label="Actions">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <button
                                                 onClick={() => setEditingInvoice(invoice)}
-                                                className="text-blue-600 hover:text-blue-800"
+                                                className="text-blue-600 hover:text-blue-800 p-1"
                                                 title="Edit"
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => window.open(`/invoices/${invoice.id}/preview`, '_blank')}
-                                                className="text-gray-600 hover:text-gray-800"
+                                                className="text-gray-600 hover:text-gray-800 p-1"
                                                 title="Preview"
                                             >
                                                 <Eye className="h-4 w-4" />
@@ -170,7 +170,7 @@ const Invoices: React.FC = () => {
                                             {invoice.status === 'draft' && (
                                                 <button
                                                     onClick={() => handleStatusChange(invoice, 'sent')}
-                                                    className="text-green-600 hover:text-green-800"
+                                                    className="text-green-600 hover:text-green-800 p-1"
                                                     title="Send"
                                                 >
                                                     <Send className="h-4 w-4" />
@@ -179,7 +179,7 @@ const Invoices: React.FC = () => {
                                             {invoice.status === 'sent' && (
                                                 <button
                                                     onClick={() => handleStatusChange(invoice, 'paid')}
-                                                    className="text-green-600 hover:text-green-800"
+                                                    className="text-green-600 hover:text-green-800 p-1"
                                                     title="Mark as Paid"
                                                 >
                                                     <Check className="h-4 w-4" />
@@ -187,7 +187,7 @@ const Invoices: React.FC = () => {
                                             )}
                                             <button
                                                 onClick={() => handleDelete(invoice)}
-                                                className="text-red-600 hover:text-red-800"
+                                                className="text-red-600 hover:text-red-800 p-1"
                                                 title="Delete"
                                             >
                                                 <Trash2 className="h-4 w-4" />
@@ -353,8 +353,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
     const { subtotal, hstAmount, total } = calculateTotals();
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+        <div className="modal-mobile">
+            <div className="modal-content-mobile">
                 <div className="mt-3">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
                         {invoice ? 'Edit Invoice' : 'Create New Invoice'}
@@ -362,7 +362,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Basic Information */}
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div className="grid-mobile-2">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Client</label>
                                 <select
@@ -459,7 +459,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
 
                             {/* Items List */}
                             <div className="overflow-x-auto">
-                                <table className="table">
+                                <table className="table-mobile">
                                     <thead>
                                         <tr>
                                             <th>Description</th>
@@ -472,15 +472,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     <tbody>
                                         {items.map((item, index) => (
                                             <tr key={item.id}>
-                                                <td>{item.description}</td>
-                                                <td>{item.quantity}</td>
-                                                <td>${item.unit_price.toFixed(2)}</td>
-                                                <td>${item.total.toFixed(2)}</td>
-                                                <td>
+                                                <td data-label="Description">{item.description}</td>
+                                                <td data-label="Quantity">{item.quantity}</td>
+                                                <td data-label="Unit Price">${item.unit_price.toFixed(2)}</td>
+                                                <td data-label="Total">${item.total.toFixed(2)}</td>
+                                                <td data-label="Actions">
                                                     <button
                                                         type="button"
                                                         onClick={() => removeItem(index)}
-                                                        className="text-red-600 hover:text-red-800"
+                                                        className="text-red-600 hover:text-red-800 p-1"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </button>
@@ -513,7 +513,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                         </div>
 
                         {/* Actions */}
-                        <div className="flex justify-end gap-3">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}

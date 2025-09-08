@@ -243,7 +243,7 @@ func CreateExpense(c *gin.Context) {
 	}
 
 	// Load expense with related data
-	if err := database.DB.Preload("Category").Preload("Company").First(&expense, expense.ID).Error; err != nil {
+	if err := database.DB.Preload("Category").Preload("Company").Preload("Files").First(&expense, expense.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load expense data"})
 		return
 	}
@@ -256,7 +256,7 @@ func GetExpense(c *gin.Context) {
 	expenseID := c.Param("id")
 
 	var expense models.Expense
-	if err := database.DB.Preload("Category").Preload("Company").First(&expense, expenseID).Error; err != nil {
+	if err := database.DB.Preload("Category").Preload("Company").Preload("Files").First(&expense, expenseID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
 		return
 	}
@@ -322,7 +322,7 @@ func UpdateExpense(c *gin.Context) {
 	}
 
 	// Load updated expense with related data
-	if err := database.DB.Preload("Category").Preload("Company").First(&expense, expense.ID).Error; err != nil {
+	if err := database.DB.Preload("Category").Preload("Company").Preload("Files").First(&expense, expense.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load updated expense data"})
 		return
 	}
@@ -366,7 +366,7 @@ func ListExpenses(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 
-	query := database.DB.Preload("Category").Preload("Company").Model(&models.Expense{})
+	query := database.DB.Preload("Category").Preload("Company").Preload("Files").Model(&models.Expense{})
 
 	// Apply filters
 	if search != "" {

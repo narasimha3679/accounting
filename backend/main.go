@@ -40,6 +40,13 @@ func main() {
 	// Create default expense categories if they don't exist
 	createDefaultExpenseCategories()
 
+	// Initialize file storage service
+	expenseStoragePath := os.Getenv("EXPENSE_STORAGE_PATH")
+	if expenseStoragePath == "" {
+		expenseStoragePath = "C:\\Users\\venka\\Desktop\\Expenses"
+	}
+	handlers.InitializeFileStorage(expenseStoragePath)
+
 	// Initialize Gin router
 	r := gin.Default()
 
@@ -126,6 +133,12 @@ func main() {
 				expenses.GET("/:id", handlers.GetExpense)
 				expenses.PUT("/:id", handlers.UpdateExpense)
 				expenses.DELETE("/:id", handlers.DeleteExpense)
+
+				// Expense file routes
+				expenses.POST("/:id/files", handlers.UploadExpenseFile)
+				expenses.GET("/:id/files", handlers.GetExpenseFiles)
+				expenses.GET("/files/:fileId/download", handlers.DownloadExpenseFile)
+				expenses.DELETE("/files/:fileId", handlers.DeleteExpenseFile)
 			}
 
 			// Income entry routes
@@ -184,6 +197,17 @@ func main() {
 
 			// CCA classes route
 			protected.GET("/cca-classes", handlers.GetCCAClasses)
+
+			// Owner payment routes
+			ownerPayments := protected.Group("/owner-payments")
+			{
+				ownerPayments.GET("", handlers.GetOwnerPayments)
+				ownerPayments.POST("", handlers.CreateOwnerPayment)
+				ownerPayments.GET("/:id", handlers.GetOwnerPayment)
+				ownerPayments.PUT("/:id", handlers.UpdateOwnerPayment)
+				ownerPayments.DELETE("/:id", handlers.DeleteOwnerPayment)
+				ownerPayments.GET("/stats", handlers.GetOwnerPaymentStats)
+			}
 
 			// Reports routes
 			reports := protected.Group("/reports")

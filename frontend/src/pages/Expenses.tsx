@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Expense, type ExpenseCategory } from '../lib/api';
-import { Plus, Edit, Trash2, Receipt } from 'lucide-react';
+import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
+import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const Expenses: React.FC = () => {
@@ -82,14 +82,14 @@ const Expenses: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
                     <p className="text-gray-600">Track your business expenses</p>
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center gap-2"
+                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     <Plus className="h-4 w-4" />
                     Add Expense
@@ -98,12 +98,12 @@ const Expenses: React.FC = () => {
 
             {/* Category Filter */}
             <div className="card">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <label className="text-sm font-medium text-gray-700">Filter by category:</label>
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="input w-auto"
+                        className="input w-full sm:w-auto"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -287,12 +287,28 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
         receipt_attached: expense?.receipt_attached || false,
         paid_by: expense?.paid_by || 'corp',
     });
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [uploadingFiles, setUploadingFiles] = useState(false);
 
     const createExpenseMutation = useMutation({
         mutationFn: async (data: any) => {
             return api.createExpense(data);
         },
-        onSuccess: () => {
+        onSuccess: async (newExpense) => {
+            // Upload files if any were selected
+            if (selectedFiles.length > 0) {
+                setUploadingFiles(true);
+                try {
+                    for (const file of selectedFiles) {
+                        await uploadFileMutation.mutateAsync({ expenseId: newExpense.id, file });
+                    }
+                    setSelectedFiles([]);
+                } catch (error) {
+                    console.error('Failed to upload files:', error);
+                } finally {
+                    setUploadingFiles(false);
+                }
+            }
             onSave();
         },
     });
@@ -303,6 +319,21 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
         },
         onSuccess: () => {
             onSave();
+        },
+    });
+
+    const uploadFileMutation = useMutation({
+        mutationFn: async ({ expenseId, file }: { expenseId: number; file: File }) => {
+            return api.uploadExpenseFile(expenseId, file);
+        },
+    });
+
+    const deleteFileMutation = useMutation({
+        mutationFn: async (fileId: number) => {
+            return api.deleteExpenseFile(fileId);
+        },
+        onSuccess: () => {
+            onSave(); // Refresh the expense data
         },
     });
 
@@ -319,6 +350,62 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
         } else {
             createExpenseMutation.mutate(expenseData);
         }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        setSelectedFiles(prev => [...prev, ...files]);
+    };
+
+    const handleFileRemove = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleFileUpload = async (expenseId: number) => {
+        if (selectedFiles.length === 0) return;
+
+        setUploadingFiles(true);
+        try {
+            for (const file of selectedFiles) {
+                await uploadFileMutation.mutateAsync({ expenseId, file });
+            }
+            setSelectedFiles([]);
+            onSave(); // Refresh the expense data
+        } catch (error) {
+            console.error('Failed to upload files:', error);
+        } finally {
+            setUploadingFiles(false);
+        }
+    };
+
+    const handleFileDownload = async (file: ExpenseFile) => {
+        try {
+            const blob = await api.downloadExpenseFile(file.id);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.original_name;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Failed to download file:', error);
+        }
+    };
+
+    const handleFileDelete = (fileId: number) => {
+        if (confirm('Are you sure you want to delete this file?')) {
+            deleteFileMutation.mutate(fileId);
+        }
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
     return (
@@ -465,6 +552,106 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
                             </div>
                         </div>
 
+                        {/* File Upload Section */}
+                        <div className="border-t pt-6">
+                            <h4 className="text-lg font-medium text-gray-900 mb-4">Files & Receipts</h4>
+
+                            {/* Existing Files */}
+                            {expense?.files && expense.files.length > 0 && (
+                                <div className="mb-6">
+                                    <h5 className="text-sm font-medium text-gray-700 mb-3">Uploaded Files</h5>
+                                    <div className="space-y-2">
+                                        {expense.files.map((file) => (
+                                            <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                                <div className="flex items-center gap-3">
+                                                    <FileText className="h-5 w-5 text-gray-500" />
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-900">{file.original_name}</p>
+                                                        <p className="text-xs text-gray-500">{formatFileSize(file.file_size)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleFileDownload(file)}
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                        title="Download"
+                                                    >
+                                                        <Download className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleFileDelete(file.id)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                        title="Delete"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* File Upload */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                                    <input
+                                        type="file"
+                                        multiple
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                        id="file-upload"
+                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar"
+                                    />
+                                    <label htmlFor="file-upload" className="cursor-pointer">
+                                        <div className="text-center">
+                                            <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                                            <div className="mt-2">
+                                                <p className="text-sm text-gray-600">
+                                                    <span className="font-medium text-primary-600 hover:text-primary-500">
+                                                        Click to upload
+                                                    </span>
+                                                    {' '}or drag and drop
+                                                </p>
+                                                <p className="text-xs text-gray-500">PDF, images, documents up to 10MB each</p>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Selected Files */}
+                                {selectedFiles.length > 0 && (
+                                    <div className="mt-4">
+                                        <h6 className="text-sm font-medium text-gray-700 mb-2">Selected Files</h6>
+                                        <div className="space-y-2">
+                                            {selectedFiles.map((file, index) => (
+                                                <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                                                    <span className="text-sm text-gray-900">{file.name}</span>
+                                                    <button
+                                                        onClick={() => handleFileRemove(index)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {expense && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleFileUpload(expense.id)}
+                                                disabled={uploadingFiles}
+                                                className="mt-3 btn btn-primary btn-sm"
+                                            >
+                                                {uploadingFiles ? 'Uploading...' : 'Upload Files'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="flex justify-end gap-3">
                             <button
                                 type="button"
@@ -476,9 +663,9 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
                             <button
                                 type="submit"
                                 className="btn btn-primary"
-                                disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending}
+                                disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles}
                             >
-                                {createExpenseMutation.isPending || updateExpenseMutation.isPending
+                                {createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles
                                     ? 'Saving...'
                                     : expense
                                         ? 'Update Expense'

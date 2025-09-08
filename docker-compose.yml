@@ -1,0 +1,81 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: accounting-backend
+    restart: unless-stopped
+    environment:
+      - GIN_MODE=release
+      - PORT=8090
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-accounting}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost,http://localhost:80}
+      - EXPENSE_STORAGE_PATH=${EXPENSE_STORAGE_PATH:-/app/expenses}
+    ports:
+      - "8090:8090"
+    volumes:
+      - "C:/Users/venka/Desktop/Expenses:/app/expenses"
+    user: "1001:1001"
+    networks:
+      - accounting-network
+    # depends_on:
+    #   - db
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: accounting-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - accounting-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  # Database is already running externally - using existing PostgreSQL instance
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: accounting-db
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=${DB_NAME:-accounting}
+  #     - POSTGRES_USER=${DB_USER:-postgres}
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - accounting-network
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-accounting}" ]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  accounting-network:
+    driver: bridge
+
+# volumes:
+#   expense_storage:
+#     driver: local

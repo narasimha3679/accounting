@@ -4,7 +4,7 @@
     "description": "Custom accounting tool for incorporated contracting business",
     "main": "index.js",
     "scripts": {
-        "dev": "cd frontend && npm run dev",
+        "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
         "backend": "cd backend && go run main.go",
         "frontend": "cd frontend && npm run dev",
         "build": "cd frontend && npm run build",

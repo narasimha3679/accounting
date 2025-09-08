@@ -1,5 +1,18 @@
 // API client for the Go backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8090/api/v1';
+// Use environment variable if set, otherwise dynamically determine the API URL based on current host
+const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+
+    // Get the current host (localhost or Tailscale IP)
+    const currentHost = window.location.hostname;
+    const apiPort = '8090';
+
+    return `http://${currentHost}:${apiPort}/api/v1`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Types for our API responses
 export interface User {
@@ -79,6 +92,19 @@ export interface ExpenseCategory {
     updated_at: string;
 }
 
+export interface ExpenseFile {
+    id: number;
+    expense_id: number;
+    file_name: string;
+    original_name: string;
+    file_path: string;
+    file_size: number;
+    mime_type: string;
+    uploaded_at: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Expense {
     id: number;
     description: string;
@@ -91,6 +117,7 @@ export interface Expense {
     paid_by: 'corp' | 'owner';
     company_id: number;
     company?: Company;
+    files?: ExpenseFile[];
     created_at: string;
     updated_at: string;
 }
@@ -195,6 +222,20 @@ export interface CapitalAsset {
     updated_at: string;
 }
 
+export interface OwnerPayment {
+    id: number;
+    description: string;
+    amount: number;
+    payment_date: string;
+    payment_type: 'reimbursement' | 'loan_repayment' | 'other';
+    reference?: string;
+    notes?: string;
+    company_id: number;
+    company?: Company;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface CCAClass {
     id: number;
     class_number: string;
@@ -238,15 +279,24 @@ class ApiClient {
         this.token = localStorage.getItem('auth_token');
     }
 
+    getToken(): string | null {
+        return this.token;
+    }
+
     private async request<T>(
         endpoint: string,
         options: RequestInit = {}
     ): Promise<T> {
         const url = `${this.baseURL}${endpoint}`;
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            ...(options.headers as Record<string, string>),
-        };
+
+        // For FormData, don't set Content-Type to let browser set it with boundary
+        const isFormData = options.body instanceof FormData;
+        const headers: Record<string, string> = isFormData
+            ? { ...(options.headers as Record<string, string>) }
+            : {
+                'Content-Type': 'application/json',
+                ...(options.headers as Record<string, string>),
+            };
 
         if (this.token) {
             headers.Authorization = `Bearer ${this.token}`;
@@ -491,6 +541,41 @@ class ApiClient {
         });
     }
 
+    // Expense Files
+    async uploadExpenseFile(expenseId: number, file: File): Promise<ExpenseFile> {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return this.request<ExpenseFile>(`/expenses/${expenseId}/files`, {
+            method: 'POST',
+            body: formData,
+        });
+    }
+
+    async getExpenseFiles(expenseId: number): Promise<ExpenseFile[]> {
+        return this.request<ExpenseFile[]>(`/expenses/${expenseId}/files`);
+    }
+
+    async downloadExpenseFile(fileId: number): Promise<Blob> {
+        const response = await fetch(`${API_BASE_URL}/expenses/files/${fileId}/download`, {
+            headers: {
+                'Authorization': `Bearer ${this.getToken()}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.statusText}`);
+        }
+
+        return response.blob();
+    }
+
+    async deleteExpenseFile(fileId: number): Promise<void> {
+        await this.request(`/expenses/files/${fileId}`, {
+            method: 'DELETE',
+        });
+    }
+
     // Dividends
     async getDividends(params?: { page?: number; limit?: number; company_id?: number; status?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<Dividend>> {
         const searchParams = new URLSearchParams();
@@ -721,6 +806,77 @@ class ApiClient {
             method: 'POST',
             body: JSON.stringify(entry),
         });
+    }
+
+    // Owner Payments
+    async getOwnerPayments(params?: { page?: number; limit?: number; company_id?: number; start_date?: string; end_date?: string; payment_type?: string }): Promise<PaginatedResponse<OwnerPayment>> {
+        const searchParams = new URLSearchParams();
+        if (params?.page) searchParams.set('page', params.page.toString());
+        if (params?.limit) searchParams.set('limit', params.limit.toString());
+        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
+        if (params?.start_date) searchParams.set('start_date', params.start_date);
+        if (params?.end_date) searchParams.set('end_date', params.end_date);
+        if (params?.payment_type) searchParams.set('payment_type', params.payment_type);
+
+        const query = searchParams.toString();
+        return this.request<PaginatedResponse<OwnerPayment>>(`/owner-payments${query ? `?${query}` : ''}`);
+    }
+
+    async getOwnerPayment(id: number): Promise<OwnerPayment> {
+        return this.request<OwnerPayment>(`/owner-payments/${id}`);
+    }
+
+    async createOwnerPayment(ownerPayment: {
+        description: string;
+        amount: number;
+        payment_date: string;
+        payment_type: 'reimbursement' | 'loan_repayment' | 'other';
+        reference?: string;
+        notes?: string;
+        company_id: number;
+    }): Promise<OwnerPayment> {
+        return this.request<OwnerPayment>('/owner-payments', {
+            method: 'POST',
+            body: JSON.stringify(ownerPayment),
+        });
+    }
+
+    async updateOwnerPayment(id: number, ownerPayment: {
+        description?: string;
+        amount?: number;
+        payment_date?: string;
+        payment_type?: 'reimbursement' | 'dividend' | 'loan_repayment' | 'other';
+        reference?: string;
+        notes?: string;
+    }): Promise<OwnerPayment> {
+        return this.request<OwnerPayment>(`/owner-payments/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(ownerPayment),
+        });
+    }
+
+    async deleteOwnerPayment(id: number): Promise<void> {
+        return this.request<void>(`/owner-payments/${id}`, {
+            method: 'DELETE',
+        });
+    }
+
+    async getOwnerPaymentStats(params?: { company_id?: number; start_date?: string; end_date?: string }): Promise<{
+        total_paid: number;
+        reimbursement_total: number;
+        loan_repayment_total: number;
+        other_total: number;
+        payment_count: number;
+        start_date: string;
+        end_date: string;
+    }> {
+        const searchParams = new URLSearchParams();
+        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
+        if (params?.start_date) searchParams.set('start_date', params.start_date);
+        if (params?.end_date) searchParams.set('end_date', params.end_date);
+
+        const query = searchParams.toString();
+        return this.request(`/owner-payments/stats${query ? `?${query}` : ''}`);
     }
 
     // CCA Classes

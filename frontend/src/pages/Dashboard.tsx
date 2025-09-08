@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type CapitalAsset } from '../lib/api';
+import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type CapitalAsset, type OwnerPayment } from '../lib/api';
 import {
     DollarSign,
     Receipt,
@@ -33,6 +33,8 @@ const Dashboard: React.FC = () => {
         ownerExpenseCount: 0,
         corporateExpenseTotal: 0,
         corporateExpenseCount: 0,
+        ownerPaymentsTotal: 0,
+        netOwnerBalance: 0,
         // Tax information
         taxableIncome: 0,
         smallBusinessTaxOwed: 0,
@@ -52,6 +54,7 @@ const Dashboard: React.FC = () => {
     const [recentDividends, setRecentDividends] = useState<Dividend[]>([]);
     const [recentCapitalAssets, setRecentCapitalAssets] = useState<CapitalAsset[]>([]);
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
+    const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>('month');
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -160,6 +163,15 @@ const Dashboard: React.FC = () => {
             });
             const capitalAssets = capitalAssetsResponse.data;
 
+            // Get owner payments
+            const ownerPaymentsResponse = await api.getOwnerPayments({
+                company_id: companyId,
+                limit: 1000,
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: endDate.toISOString().split('T')[0]
+            });
+            const ownerPayments = ownerPaymentsResponse.data;
+
             // Calculate stats
             const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
             const clientIncome = incomeEntries
@@ -181,6 +193,12 @@ const Dashboard: React.FC = () => {
             const corporateExpenses = expenses.filter(expense => expense.paid_by === 'corp');
             const corporateExpenseTotal = corporateExpenses
                 .reduce((sum, expense) => sum + expense.amount + expense.hst_paid, 0);
+
+            // Calculate owner payments made by corporation
+            const ownerPaymentsTotal = ownerPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+            // Calculate net owner balance (amount owed to owner - amount paid to owner)
+            const netOwnerBalance = ownerReimbursementOwed - ownerPaymentsTotal;
 
             // Calculate HST collected from invoices and income entries
             const hstFromInvoices = paidInvoices.reduce((sum, invoice) => sum + invoice.hst_amount, 0);
@@ -240,6 +258,8 @@ const Dashboard: React.FC = () => {
                 ownerExpenseCount: ownerExpenses.length,
                 corporateExpenseTotal,
                 corporateExpenseCount: corporateExpenses.length,
+                ownerPaymentsTotal,
+                netOwnerBalance,
                 // Tax information
                 taxableIncome,
                 smallBusinessTaxOwed,
@@ -291,6 +311,7 @@ const Dashboard: React.FC = () => {
             setRecentDividends(recentDividendsResponse.data);
             setRecentCapitalAssets(recentCapitalAssetsResponse.data);
             setAllDividends(dividends);
+            setOwnerPayments(ownerPayments);
         } catch (error) {
             console.error('Error loading dashboard data:', error);
         } finally {
@@ -319,14 +340,14 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-600">Welcome back, {user?.name}</p>
                 </div>
 
                 {/* Time Period Selector */}
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
                     <div className="flex rounded-md shadow-sm">
                         <button
                             type="button"
@@ -377,7 +398,7 @@ const Dashboard: React.FC = () => {
                 <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Financial Overview</h2>
 
                 {/* Key Metrics Row */}
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid-mobile-4">
                     <div className="bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
                             <div>
@@ -431,22 +452,58 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Owner Reimbursement Alert */}
-                {stats.ownerReimbursementOwed > 0 && (
-                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-6 shadow-sm">
+                {/* Owner Balance Section */}
+                {(stats.ownerReimbursementOwed > 0 || stats.ownerPaymentsTotal > 0) && (
+                    <div className={`bg-gradient-to-r border rounded-lg p-6 shadow-sm ${stats.netOwnerBalance > 0
+                        ? 'from-orange-50 to-amber-50 border-orange-200'
+                        : stats.netOwnerBalance < 0
+                            ? 'from-green-50 to-emerald-50 border-green-200'
+                            : 'from-gray-50 to-slate-50 border-gray-200'
+                        }`}>
                         <div className="flex items-start">
                             <div className="flex-shrink-0">
-                                <AlertCircle className="h-6 w-6 text-orange-500" />
+                                {stats.netOwnerBalance > 0 ? (
+                                    <AlertCircle className="h-6 w-6 text-orange-500" />
+                                ) : stats.netOwnerBalance < 0 ? (
+                                    <Check className="h-6 w-6 text-green-500" />
+                                ) : (
+                                    <Banknote className="h-6 w-6 text-gray-500" />
+                                )}
                             </div>
                             <div className="ml-4 flex-1">
-                                <h3 className="text-lg font-semibold text-orange-900 mb-2">
-                                    Owner Reimbursement Required
+                                <h3 className={`text-lg font-semibold mb-2 ${stats.netOwnerBalance > 0
+                                    ? 'text-orange-900'
+                                    : stats.netOwnerBalance < 0
+                                        ? 'text-green-900'
+                                        : 'text-gray-900'
+                                    }`}>
+                                    {stats.netOwnerBalance > 0
+                                        ? 'Owner Reimbursement Required'
+                                        : stats.netOwnerBalance < 0
+                                            ? 'Owner Overpaid'
+                                            : 'Owner Balance Settled'
+                                    }
                                 </h3>
-                                <p className="text-orange-800 mb-4">
-                                    The owner has paid <span className="font-bold text-orange-900">{formatCurrency(stats.ownerReimbursementOwed)}</span> in business expenses that need to be reimbursed by the corporation.
-                                </p>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                {stats.netOwnerBalance > 0 && (
+                                    <p className="text-orange-800 mb-4">
+                                        The corporation owes the owner <span className="font-bold text-orange-900">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
+                                    </p>
+                                )}
+
+                                {stats.netOwnerBalance < 0 && (
+                                    <p className="text-green-800 mb-4">
+                                        The corporation has overpaid the owner by <span className="font-bold text-green-900">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
+                                    </p>
+                                )}
+
+                                {stats.netOwnerBalance === 0 && stats.ownerReimbursementOwed > 0 && (
+                                    <p className="text-gray-800 mb-4">
+                                        Owner balance is settled. All reimbursements have been paid.
+                                    </p>
+                                )}
+
+                                <div className="grid-mobile-3 mb-4">
                                     <div className="bg-orange-100 border border-orange-200 p-4 rounded-lg">
                                         <div className="flex items-center justify-between">
                                             <div>
@@ -460,24 +517,74 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                    <div className="bg-blue-100 border border-blue-200 p-4 rounded-lg">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className="font-semibold text-blue-900">Corporate Paid</div>
-                                                <div className="text-2xl font-bold text-blue-800">{formatCurrency(stats.corporateExpenseTotal)}</div>
-                                                <div className="text-sm text-blue-600">{stats.corporateExpenseCount} expenses</div>
+                                                <div className="font-semibold text-blue-900">Corp Paid Back</div>
+                                                <div className="text-2xl font-bold text-blue-800">{formatCurrency(stats.ownerPaymentsTotal)}</div>
+                                                <div className="text-sm text-blue-600">payments made</div>
                                             </div>
                                             <div className="text-blue-500">
-                                                <Receipt className="h-8 w-8" />
+                                                <Banknote className="h-8 w-8" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className={`border p-4 rounded-lg ${stats.netOwnerBalance > 0
+                                        ? 'bg-orange-100 border-orange-200'
+                                        : stats.netOwnerBalance < 0
+                                            ? 'bg-green-100 border-green-200'
+                                            : 'bg-gray-100 border-gray-200'
+                                        }`}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className={`font-semibold ${stats.netOwnerBalance > 0
+                                                    ? 'text-orange-900'
+                                                    : stats.netOwnerBalance < 0
+                                                        ? 'text-green-900'
+                                                        : 'text-gray-900'
+                                                    }`}>Net Balance</div>
+                                                <div className={`text-2xl font-bold ${stats.netOwnerBalance > 0
+                                                    ? 'text-orange-800'
+                                                    : stats.netOwnerBalance < 0
+                                                        ? 'text-green-800'
+                                                        : 'text-gray-800'
+                                                    }`}>{formatCurrency(stats.netOwnerBalance)}</div>
+                                                <div className={`text-sm ${stats.netOwnerBalance > 0
+                                                    ? 'text-orange-600'
+                                                    : stats.netOwnerBalance < 0
+                                                        ? 'text-green-600'
+                                                        : 'text-gray-600'
+                                                    }`}>
+                                                    {stats.netOwnerBalance > 0 ? 'owed to owner' : stats.netOwnerBalance < 0 ? 'overpaid' : 'settled'}
+                                                </div>
+                                            </div>
+                                            <div className={`${stats.netOwnerBalance > 0
+                                                ? 'text-orange-500'
+                                                : stats.netOwnerBalance < 0
+                                                    ? 'text-green-500'
+                                                    : 'text-gray-500'
+                                                }`}>
+                                                {stats.netOwnerBalance > 0 ? (
+                                                    <AlertCircle className="h-8 w-8" />
+                                                ) : stats.netOwnerBalance < 0 ? (
+                                                    <Check className="h-8 w-8" />
+                                                ) : (
+                                                    <Banknote className="h-8 w-8" />
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-orange-100 border border-orange-200 p-3 rounded-lg">
-                                    <p className="text-sm text-orange-800">
+                                <div className={`border p-3 rounded-lg ${stats.netOwnerBalance > 0
+                                    ? 'bg-orange-100 border-orange-200'
+                                    : 'bg-gray-100 border-gray-200'
+                                    }`}>
+                                    <p className={`text-sm ${stats.netOwnerBalance > 0 ? 'text-orange-800' : 'text-gray-800'
+                                        }`}>
                                         <strong>Note:</strong> Owner reimbursement includes both the expense amount and HST paid on owner-funded expenses.
-                                        This amount should be paid to the owner to reimburse their personal funds used for business expenses.
+                                        {stats.netOwnerBalance > 0 && ' This amount should be paid to the owner to reimburse their personal funds used for business expenses.'}
                                     </p>
                                 </div>
                             </div>
@@ -486,7 +593,7 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Dividend Summary */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid-mobile-2">
                     <div className="bg-gradient-to-br from-emerald-50 to-green-100 border border-emerald-200 rounded-xl p-6 shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
@@ -521,7 +628,7 @@ const Dashboard: React.FC = () => {
             <div className="space-y-6">
                 <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Tax & Compliance</h2>
 
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid-mobile">
                     <div className="bg-gradient-to-br from-orange-50 to-red-100 border border-orange-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
                             <div>
@@ -570,7 +677,7 @@ const Dashboard: React.FC = () => {
                 <div className="space-y-6">
                     <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Capital Assets</h2>
 
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid-mobile-4">
                         <div className="bg-gradient-to-br from-indigo-50 to-blue-100 border border-indigo-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -659,7 +766,7 @@ const Dashboard: React.FC = () => {
             {/* Recent Activity Section */}
             <div className="space-y-6">
                 <h2 className="text-xl font-bold text-gray-900 border-b-2 border-primary-200 pb-3">Recent Activity</h2>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {/* Recent Invoices */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center mb-4">

@@ -50,6 +50,7 @@ func Migrate() {
 		&models.Client{},
 		&models.ExpenseCategory{},
 		&models.Expense{},
+		&models.ExpenseFile{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
 		&models.Dividend{},
@@ -59,6 +60,7 @@ func Migrate() {
 		&models.CapitalAsset{},
 		&models.DepreciationEntry{},
 		&models.CCAClass{},
+		&models.OwnerPayment{},
 	)
 
 	if err != nil {

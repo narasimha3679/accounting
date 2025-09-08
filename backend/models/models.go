@@ -110,9 +110,26 @@ type Expense struct {
 	PaidBy          string          `json:"paid_by" gorm:"not null;default:'corp'"` // "corp" or "owner"
 	CompanyID       uint            `json:"company_id" gorm:"not null"`
 	Company         Company         `json:"company,omitempty" gorm:"foreignKey:CompanyID"`
+	Files           []ExpenseFile   `json:"files,omitempty" gorm:"foreignKey:ExpenseID"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt  `json:"-" gorm:"index"`
+}
+
+// ExpenseFile represents a file attached to an expense
+type ExpenseFile struct {
+	ID           uint           `json:"id" gorm:"primaryKey"`
+	ExpenseID    uint           `json:"expense_id" gorm:"not null"`
+	Expense      Expense        `json:"expense,omitempty" gorm:"foreignKey:ExpenseID"`
+	FileName     string         `json:"file_name" gorm:"not null"`
+	OriginalName string         `json:"original_name" gorm:"not null"`
+	FilePath     string         `json:"file_path" gorm:"not null"`
+	FileSize     int64          `json:"file_size" gorm:"not null"`
+	MimeType     string         `json:"mime_type" gorm:"not null"`
+	UploadedAt   time.Time      `json:"uploaded_at" gorm:"not null"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 // Dividend represents a dividend declaration/payment
@@ -361,6 +378,43 @@ type UpdateCapitalAssetRequest struct {
 	DisposalAmount  *float64 `json:"disposal_amount,omitempty" binding:"omitempty,min=0"`
 	PaidBy          *string  `json:"paid_by,omitempty" binding:"omitempty,oneof=corp owner"`
 	ReceiptAttached *bool    `json:"receipt_attached,omitempty"`
+}
+
+// OwnerPayment represents a payment made by the corporation to the owner
+type OwnerPayment struct {
+	ID          uint           `json:"id" gorm:"primaryKey"`
+	Description string         `json:"description" gorm:"not null"`
+	Amount      float64        `json:"amount" gorm:"not null"`
+	PaymentDate time.Time      `json:"payment_date" gorm:"not null"`
+	PaymentType string         `json:"payment_type" gorm:"not null"` // "reimbursement", "loan_repayment", "other"
+	Reference   *string        `json:"reference"`                    // Check number, transfer reference, etc.
+	Notes       *string        `json:"notes"`
+	CompanyID   uint           `json:"company_id" gorm:"not null"`
+	Company     Company        `json:"company,omitempty" gorm:"foreignKey:CompanyID"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// CreateOwnerPaymentRequest represents a request to create an owner payment
+type CreateOwnerPaymentRequest struct {
+	Description string  `json:"description" binding:"required"`
+	Amount      float64 `json:"amount" binding:"required,min=0"`
+	PaymentDate string  `json:"payment_date" binding:"required"`
+	PaymentType string  `json:"payment_type" binding:"required,oneof=reimbursement loan_repayment other"`
+	Reference   *string `json:"reference,omitempty"`
+	Notes       *string `json:"notes,omitempty"`
+	CompanyID   uint    `json:"company_id" binding:"required"`
+}
+
+// UpdateOwnerPaymentRequest represents a request to update an owner payment
+type UpdateOwnerPaymentRequest struct {
+	Description *string  `json:"description,omitempty"`
+	Amount      *float64 `json:"amount,omitempty" binding:"omitempty,min=0"`
+	PaymentDate *string  `json:"payment_date,omitempty"`
+	PaymentType *string  `json:"payment_type,omitempty" binding:"omitempty,oneof=reimbursement loan_repayment other"`
+	Reference   *string  `json:"reference,omitempty"`
+	Notes       *string  `json:"notes,omitempty"`
 }
 
 // PaginatedResponse represents a paginated API response
