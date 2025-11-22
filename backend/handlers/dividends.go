@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -83,6 +84,14 @@ func CreateDividend(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load dividend data"})
 		return
 	}
+
+	// Send dividend to personal finance system (async)
+	go func() {
+		if err := SendDividendToPersonalFinance(&dividend); err != nil {
+			// Log error but don't fail the request
+			fmt.Printf("Failed to send dividend to personal finance system: %v\n", err)
+		}
+	}()
 
 	c.JSON(http.StatusCreated, dividend)
 }

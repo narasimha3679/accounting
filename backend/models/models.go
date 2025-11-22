@@ -417,6 +417,19 @@ type UpdateOwnerPaymentRequest struct {
 	Notes       *string  `json:"notes,omitempty"`
 }
 
+// PersonalFinanceConfig represents configuration for personal finance integration
+type PersonalFinanceConfig struct {
+	ID                    uint           `json:"id" gorm:"primaryKey"`
+	PersonalFinanceAPIURL string         `json:"personal_finance_api_url" gorm:"not null"`
+	PersonalFinanceAPIKey string         `json:"personal_finance_api_key" gorm:"not null"`
+	UserID                uint           `json:"user_id" gorm:"not null"`
+	User                  User           `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	IsEnabled             bool           `json:"is_enabled" gorm:"default:true"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
+	DeletedAt             gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
 // PaginatedResponse represents a paginated API response
 type PaginatedResponse[T any] struct {
 	Data       []T `json:"data"`

@@ -14,7 +14,8 @@ import {
     Building2,
     Menu,
     X,
-    CreditCard
+    CreditCard,
+    Link as LinkIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },
+        { name: 'Integration', href: '/integration', icon: LinkIcon },
         { name: 'Settings', href: '/settings', icon: Settings },
     ];
 

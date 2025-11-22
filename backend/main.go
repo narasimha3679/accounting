@@ -172,6 +172,16 @@ func main() {
 				dividends.DELETE("/:id", handlers.DeleteDividend)
 			}
 
+			// Personal Finance Integration routes
+			integration := protected.Group("/integration")
+			{
+				integration.POST("/personal-finance/config", handlers.CreatePersonalFinanceConfig)
+				integration.GET("/personal-finance/config", handlers.GetPersonalFinanceConfig)
+				integration.GET("/personal-finance/test", handlers.TestPersonalFinanceConnection)
+				integration.GET("/status", handlers.GetIntegrationStatus)
+				integration.POST("/sync-dividends", handlers.SyncAllDividends)
+			}
+
 			// Tax return routes (admin only)
 			taxReturns := protected.Group("/tax-returns")
 			taxReturns.Use(middleware.RequireAdmin())

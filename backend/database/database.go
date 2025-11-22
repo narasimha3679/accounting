@@ -61,6 +61,7 @@ func Migrate() {
 		&models.DepreciationEntry{},
 		&models.CCAClass{},
 		&models.OwnerPayment{},
+		&models.PersonalFinanceConfig{},
 	)
 
 	if err != nil {
