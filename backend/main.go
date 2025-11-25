@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"accounting-backend/models"
 	"accounting-backend/utils"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -47,9 +49,10 @@ func main() {
 	}
 	handlers.InitializeFileStorage(expenseStoragePath)
 
-	// Initialize Gin router
-	r := gin.Default()
-
+	// Initialize Gin router with essential middleware only
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedExtensions([]string{".pdf"})))
 	// Add CORS middleware
 	r.Use(middleware.CORSMiddleware())
 
@@ -233,9 +236,18 @@ func main() {
 		port = "8090"
 	}
 
-	// Start server
+	// Start server with tuned timeouts to prevent slowloris-style load spikes
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal("Failed to start server:", err)
 	}
 }

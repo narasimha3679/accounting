@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"accounting-backend/models"
 
@@ -38,6 +39,15 @@ func Connect() {
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
+
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Fatal("Failed to get database instance:", err)
+	}
+
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(50)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
 	log.Println("Database connected successfully")
 }
