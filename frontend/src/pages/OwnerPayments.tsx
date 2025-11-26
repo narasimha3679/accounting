@@ -229,13 +229,25 @@ const OwnerPayments: React.FC = () => {
     const [dateFilter, setDateFilter] = useState('');
 
     useEffect(() => {
-        if (user) {
-            loadOwnerPayments();
+        if (!user) {
+            // No authenticated user – nothing to load
+            setIsLoading(false);
+            return;
         }
+
+        if (!user.company_id) {
+            // Authenticated but no company configured – stop loading and show message
+            setIsLoading(false);
+            return;
+        }
+
+        loadOwnerPayments();
     }, [user]);
 
     const loadOwnerPayments = async () => {
-        if (!user?.company_id) return;
+        if (!user?.company_id) {
+            return;
+        }
 
         try {
             setIsLoading(true);
@@ -324,6 +336,20 @@ const OwnerPayments: React.FC = () => {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
+
+    if (!user?.company_id) {
+        return (
+            <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-gray-900">Owner Payments</h1>
+                <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
+                    <p className="text-sm text-yellow-800">
+                        To track owner payments, please first set up your company details in the{' '}
+                        <span className="font-semibold">Settings</span> page.
+                    </p>
+                </div>
             </div>
         );
     }

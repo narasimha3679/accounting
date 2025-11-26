@@ -1,0 +1,34 @@
+# Cursor Rules for Corporate Accounting Project
+
+## Database Management
+
+This project uses **Supabase MCP** for all database operations and reference. When working with the database:
+
+- **Always use Supabase MCP tools** instead of local SQL files:
+  - `mcp_supabase_list_tables` - View database schema
+  - `mcp_supabase_apply_migration` - Apply schema changes
+  - `mcp_supabase_execute_sql` - Execute queries
+  - `mcp_supabase_get_advisors` - Check security/performance issues
+  - `mcp_supabase_search_docs` - Search Supabase documentation
+  - `mcp_supabase_list_migrations` - View migration history
+
+- **Do not create or reference local SQL files** - all schema information is managed through the Supabase MCP connection.
+
+- When making database changes:
+  1. Use `mcp_supabase_apply_migration` for DDL operations (CREATE, ALTER, DROP)
+  2. Use `mcp_supabase_execute_sql` for data queries and DML operations
+  3. Always check for security advisories after schema changes: `mcp_supabase_get_advisors type=security`
+
+## Project Structure
+
+- Frontend: React 18 + TypeScript + Vite
+- Backend: Supabase (PostgreSQL, Auth, Storage)
+- Database schema is managed via Supabase MCP, not local files
+
+## Code Style
+
+- Use TypeScript for all new code
+- Follow React best practices (hooks, functional components)
+- Use TanStack Query for data fetching
+- Supabase client is configured in `frontend/src/lib/supabaseClient.ts`
+

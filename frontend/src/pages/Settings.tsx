@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
 import { Save, Building2, Percent } from 'lucide-react';
 
 const Settings: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [company, setCompany] = useState<Company | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -12,14 +14,28 @@ const Settings: React.FC = () => {
     const [success, setSuccess] = useState('');
 
     useEffect(() => {
-        if (user?.company_id) {
-            loadCompanyData();
+        if (!user) {
+            // Not authenticated – stop loading to avoid infinite spinner
+            setIsLoading(false);
+            return;
         }
+
+        if (!user.company_id) {
+            // Authenticated but no company configured – stop loading and show message
+            setIsLoading(false);
+            return;
+        }
+
+        loadCompanyData();
     }, [user]);
 
     const loadCompanyData = async () => {
+        if (!user?.company_id) {
+            return;
+        }
+
         try {
-            const companyData = await api.getCompany(user!.company_id);
+            const companyData = await api.getCompany(user.company_id);
             setCompany(companyData);
         } catch (error) {
             console.error('Error loading company data:', error);
@@ -75,6 +91,35 @@ const Settings: React.FC = () => {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            </div>
+        );
+    }
+
+    if (!user?.company_id) {
+        return (
+            <div className="p-6 space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+                    <p className="text-gray-700">
+                        You don&apos;t have a company set up yet. You&apos;ll need to create one before you can manage
+                        settings.
+                    </p>
+                </div>
+                <div className="rounded-lg border border-dashed border-primary-200 bg-primary-50 p-4 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-primary-900">Create your company</h2>
+                        <p className="text-sm text-primary-800">
+                            Set up your corporation details once, and we&apos;ll use them across invoices, reports, and taxes.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/onboarding/company')}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    >
+                        Go to company setup
+                    </button>
+                </div>
             </div>
         );
     }

@@ -86,95 +86,82 @@ const Dashboard: React.FC = () => {
                 endDate = new Date(selectedDate.getFullYear(), 11, 31);
             }
 
-            // Get paid invoices for selected period
-            const paidInvoicesResponse = await api.getInvoices({
-                company_id: companyId,
-                status: 'paid',
-                limit: 1000
-            });
-            const paidInvoices = paidInvoicesResponse.data.filter(invoice => {
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+
+            // Fetch all data in parallel for better performance
+            const [
+                allInvoicesResponse,
+                expensesResponse,
+                incomeEntriesResponse,
+                hstPaymentsResponse,
+                dividendsResponse,
+                capitalAssetsResponse,
+                ownerPaymentsResponse
+            ] = await Promise.all([
+                // Fetch all invoices once (we'll filter by status and date client-side)
+                api.getInvoices({
+                    company_id: companyId,
+                    limit: 1000
+                }),
+                // Fetch expenses with date filtering
+                api.getExpenses({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
+                }),
+                // Fetch income entries with date filtering
+                api.getIncomeEntries({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
+                }),
+                // Fetch HST payments with date filtering
+                api.getHSTPayments({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
+                }),
+                // Fetch dividends with date filtering
+                api.getDividends({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
+                }),
+                // Fetch capital assets (no date filtering needed - all assets)
+                api.getCapitalAssets({
+                    company_id: companyId,
+                    limit: 1000
+                }),
+                // Fetch owner payments with date filtering
+                api.getOwnerPayments({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
+                })
+            ]);
+
+            // Filter invoices by status and date
+            const allInvoices = allInvoicesResponse.data;
+            const paidInvoices = allInvoices.filter(invoice => {
+                if (invoice.status !== 'paid') return false;
                 const invoiceDate = new Date(invoice.issue_date);
                 return invoiceDate >= startDate && invoiceDate <= endDate;
             });
+            const outstandingInvoices = allInvoices.filter(invoice => invoice.status === 'sent');
+            const overdueInvoices = allInvoices.filter(invoice => invoice.status === 'overdue');
 
-            // Get all expenses for selected period
-            const expensesResponse = await api.getExpenses({
-                company_id: companyId,
-                limit: 1000
-            });
-            const expenses = expensesResponse.data.filter(expense => {
-                const expenseDate = new Date(expense.expense_date);
-                return expenseDate >= startDate && expenseDate <= endDate;
-            });
-
-            // Get outstanding invoices
-            const outstandingInvoicesResponse = await api.getInvoices({
-                company_id: companyId,
-                status: 'sent',
-                limit: 1000
-            });
-            const outstandingInvoices = outstandingInvoicesResponse.data;
-
-            // Get overdue invoices
-            const overdueInvoicesResponse = await api.getInvoices({
-                company_id: companyId,
-                status: 'overdue',
-                limit: 1000
-            });
-            const overdueInvoices = overdueInvoicesResponse.data;
-
-            // Get tax return for selected year
-            const selectedYear = selectedDate.getFullYear();
-            await api.getTaxReturns({
-                company_id: companyId,
-                fiscal_year: selectedYear,
-                limit: 1
-            });
-
-            // Get income entries for selected period
-            const incomeEntriesResponse = await api.getIncomeEntries({
-                company_id: companyId,
-                limit: 1000
-            });
-            const incomeEntries = incomeEntriesResponse.data.filter(entry => {
-                const entryDate = new Date(entry.income_date);
-                return entryDate >= startDate && entryDate <= endDate;
-            });
-
-            // Get HST payments for selected period
-            const hstPaymentsResponse = await api.getHSTPayments({
-                company_id: companyId,
-                limit: 1000
-            });
-            const hstPayments = hstPaymentsResponse.data.filter(payment => {
-                const paymentDate = new Date(payment.payment_date);
-                return paymentDate >= startDate && paymentDate <= endDate;
-            });
-
-            // Get dividends for selected period
-            const dividendsResponse = await api.getDividends({
-                company_id: companyId,
-                limit: 1000
-            });
-            const dividends = dividendsResponse.data.filter(dividend => {
-                const dividendDate = new Date(dividend.declaration_date);
-                return dividendDate >= startDate && dividendDate <= endDate;
-            });
-
-            // Get capital assets
-            const capitalAssetsResponse = await api.getCapitalAssets({
-                company_id: companyId,
-                limit: 1000
-            });
+            // Data is already filtered by date from the API
+            const expenses = expensesResponse.data;
+            const incomeEntries = incomeEntriesResponse.data;
+            const hstPayments = hstPaymentsResponse.data;
+            const dividends = dividendsResponse.data;
             const capitalAssets = capitalAssetsResponse.data;
-
-            // Get owner payments
-            const ownerPaymentsResponse = await api.getOwnerPayments({
-                company_id: companyId,
-                limit: 1000,
-                start_date: startDate.toISOString().split('T')[0],
-                end_date: endDate.toISOString().split('T')[0]
-            });
             const ownerPayments = ownerPaymentsResponse.data;
 
             // Calculate stats
@@ -278,43 +265,28 @@ const Dashboard: React.FC = () => {
                 totalAssetBookValue,
             });
 
-            // Get recent invoices, expenses, income entries, and HST payments
-            const recentInvoicesResponse = await api.getInvoices({
-                company_id: companyId,
-                limit: 5
-            });
+            // Extract recent items from already-fetched data (sorted by date, take first 5)
+            // Recent invoices - all invoices sorted by issue_date descending
+            const sortedInvoices = [...allInvoices].sort((a, b) => 
+                new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime()
+            );
+            setRecentInvoices(sortedInvoices.slice(0, 5));
 
-            const recentExpensesResponse = await api.getExpenses({
-                company_id: companyId,
-                limit: 5
-            });
+            // Recent expenses - already sorted by expense_date descending from API
+            setRecentExpenses(expenses.slice(0, 5));
 
-            const recentIncomeEntriesResponse = await api.getIncomeEntries({
-                company_id: companyId,
-                limit: 5
-            });
+            // Recent income entries - already sorted by income_date descending from API
+            setRecentIncomeEntries(incomeEntries.slice(0, 5));
 
-            const recentHSTPaymentsResponse = await api.getHSTPayments({
-                company_id: companyId,
-                limit: 5
-            });
+            // Recent HST payments - already sorted by payment_date descending from API
+            setRecentHSTPayments(hstPayments.slice(0, 5));
 
-            const recentDividendsResponse = await api.getDividends({
-                company_id: companyId,
-                limit: 5
-            });
+            // Recent dividends - already sorted by declaration_date descending from API
+            setRecentDividends(dividends.slice(0, 5));
 
-            const recentCapitalAssetsResponse = await api.getCapitalAssets({
-                company_id: companyId,
-                limit: 5
-            });
+            // Recent capital assets - already sorted by purchase_date descending from API
+            setRecentCapitalAssets(capitalAssets.slice(0, 5));
 
-            setRecentInvoices(recentInvoicesResponse.data);
-            setRecentExpenses(recentExpensesResponse.data);
-            setRecentIncomeEntries(recentIncomeEntriesResponse.data);
-            setRecentHSTPayments(recentHSTPaymentsResponse.data);
-            setRecentDividends(recentDividendsResponse.data);
-            setRecentCapitalAssets(recentCapitalAssetsResponse.data);
             setAllDividends(dividends);
             setOwnerPayments(ownerPayments);
         } catch (error) {

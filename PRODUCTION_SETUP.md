@@ -7,17 +7,16 @@ This guide covers hosting the React frontend while Supabase provides the backend
 - Supabase project provisioned (hosted or self-hosted)
 - Docker Desktop (if using the provided `docker-compose.yml`)
 - Node.js 18+ (for building locally)
-- Supabase CLI (optional, recommended for schema management)
+- Supabase MCP connection in Cursor (for database management)
 
 ## 1. Configure Supabase
 
-1. Apply the schema and policies:
-   ```bash
-   cd supabase
-   supabase db push   # if using Supabase CLI linked to /supabase-mpc
-   ```
-   or copy the SQL from `supabase/sql/*.sql` into the Supabase dashboard.
-2. Create a storage bucket (default `expense-files`) and apply the storage policies.
+1. Use Supabase MCP tools in Cursor to manage the database:
+   - View current schema: `mcp_supabase_list_tables`
+   - Apply migrations: `mcp_supabase_apply_migration`
+   - Check for security issues: `mcp_supabase_get_advisors`
+   - Search documentation: `mcp_supabase_search_docs`
+2. Ensure a storage bucket (default: `expense-files`) exists with appropriate policies.
 3. Note your project URL and anon key from the Supabase dashboard – they will be needed by the frontend.
 
 ## 2. Prepare environment variables
@@ -90,6 +89,6 @@ docker-compose down               # stop and remove container
 
 - Use the Supabase dashboard metrics for database performance, auth activity, and storage usage.
 - Set up alerts for approaching plan limits (row count, bandwidth, etc.).
-- Regularly review Supabase advisories (`supabase projects list --advisory` via CLI) for security recommendations.
+- Regularly review Supabase advisories using `mcp_supabase_get_advisors` in Cursor for security recommendations.
 
 With Supabase handling the backend, deployment focuses solely on serving the React bundle and keeping the environment variables in sync with your Supabase project. Happy shipping!

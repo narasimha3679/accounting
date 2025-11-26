@@ -302,6 +302,20 @@ ${formatCurrency(data.retainedEarnings)}
         return breakdown;
     };
 
+    if (!user?.company_id) {
+        return (
+            <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+                <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
+                    <p className="text-sm text-yellow-800">
+                        Reports require a company to be configured. Please go to the{' '}
+                        <span className="font-semibold">Settings</span> page to set up your company details.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     if (!reportData) {
         return (
             <div className="flex items-center justify-center h-64">

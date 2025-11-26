@@ -49,11 +49,14 @@ See [Environment Variables](#environment-variables) for the full list.
 
 ### 3. Provision Supabase
 
-1. Run the SQL in `supabase/sql/schema.sql` against your Supabase project.
-2. Apply Row-Level Security policies from `supabase/sql/policies.sql`.
-3. Ensure a storage bucket (default: `expense-files`) exists with the policies in `supabase/storage/policies.sql`.
+The database schema, Row-Level Security policies, and storage policies are managed through the Supabase MCP connection. Use Cursor's Supabase MCP tools to:
 
-> The repository ships with scripts compatible with the `/supabase-mpc` project connection. You can use `supabase db push` or the Supabase dashboard to apply the schema.
+1. View the current database schema using `mcp_supabase_list_tables`
+2. Apply migrations using `mcp_supabase_apply_migration` when needed
+3. Check for security advisories using `mcp_supabase_get_advisors`
+4. Review documentation using `mcp_supabase_search_docs`
+
+> **Note**: This project uses Supabase MCP for database management. All schema and policy information is available through the MCP connection rather than local SQL files.
 
 ### 4. Start the frontend
 
@@ -76,13 +79,12 @@ Visit http://localhost:5173 and sign up with Supabase Auth. All CRUD operations 
 │   │   ├── pages/            # Route-level components
 │   │   └── main.tsx          # App bootstrap
 │   └── package.json
-├── supabase/
-│   ├── sql/                  # Schema + policy SQL files
-│   └── storage/              # Storage policy snippets
 ├── docker-compose.yml        # Optional nginx-based hosting for the built frontend
 ├── env.production.example    # Sample env vars for containerized builds
 └── package.json              # Convenience scripts for working with the frontend
 ```
+
+> **Database Management**: This project uses Supabase MCP for database schema and policy management. Use Cursor's Supabase MCP tools to interact with the database schema, apply migrations, and access documentation.
 
 ## Supabase Data Model
 

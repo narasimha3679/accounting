@@ -7,6 +7,7 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
+    refreshUser: () => Promise<void>;
     isLoading: boolean;
     isAuthenticated: boolean;
 }
@@ -206,11 +207,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
     };
 
+    const refreshUser = async () => {
+        await loadProfile();
+    };
+
     const value = {
         user,
         login,
         register,
         logout,
+        refreshUser,
         isLoading,
         isAuthenticated: !!user,
     };

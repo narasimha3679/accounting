@@ -14,13 +14,14 @@ import Dividends from './pages/Dividends';
 import OwnerPayments from './pages/OwnerPayments';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import CompanyOnboarding from './pages/CompanyOnboarding';
 
 // Create a client
 const queryClient = new QueryClient();
 
-// Protected Route Component
+// Protected Route Component (requires authentication and a company)
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -34,7 +35,34 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />;
   }
 
+  if (!user?.company_id) {
+    return <Navigate to="/onboarding/company" replace />;
+  }
+
   return <Layout>{children}</Layout>;
+};
+
+// Auth-only route that does NOT require a company (used for onboarding)
+const AuthOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.company_id) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 // Placeholder components for other pages
@@ -47,6 +75,14 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/onboarding/company"
+              element={
+                <AuthOnlyRoute>
+                  <CompanyOnboarding />
+                </AuthOnlyRoute>
+              }
+            />
             <Route
               path="/"
               element={

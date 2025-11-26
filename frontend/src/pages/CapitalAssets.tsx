@@ -26,17 +26,15 @@ const CapitalAssets: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch expense categories
+    // Fetch expense categories (global list, shared across companies)
     const { data: categories } = useQuery({
-        queryKey: ['expense_categories', user?.company_id],
+        queryKey: ['expense_categories'],
         queryFn: async () => {
             const result = await api.getExpenseCategories({
                 limit: 1000,
-                company_id: user?.company_id
             });
             return result.data;
         },
-        enabled: !!user?.company_id,
     });
 
     // Fetch CCA classes

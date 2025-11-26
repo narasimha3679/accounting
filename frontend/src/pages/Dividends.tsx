@@ -189,10 +189,10 @@ const Dividends: React.FC = () => {
                 </div>
                 <button
                     onClick={openModal}
-                    className="btn-primary flex items-center space-x-2"
+                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     <Plus className="h-4 w-4" />
-                    <span>Add Dividend</span>
+                    Create Dividend
                 </button>
             </div>
 
@@ -330,16 +330,18 @@ const Dividends: React.FC = () => {
                                         {dividend.notes || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
+                                        <div className="flex items-center gap-2 flex-wrap justify-end">
                                             <button
                                                 onClick={() => handleEdit(dividend)}
-                                                className="text-primary-600 hover:text-primary-900"
+                                                className="text-blue-600 hover:text-blue-800 p-1"
+                                                title="Edit"
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(dividend.id)}
-                                                className="text-red-600 hover:text-red-900"
+                                                className="text-red-600 hover:text-red-800 p-1"
+                                                title="Delete"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -362,10 +364,10 @@ const Dividends: React.FC = () => {
                             <div className="mt-6">
                                 <button
                                     onClick={openModal}
-                                    className="btn-primary"
+                                    className="btn btn-primary flex items-center justify-center gap-2 mx-auto"
                                 >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add Dividend
+                                    <Plus className="h-4 w-4" />
+                                    Create Dividend
                                 </button>
                             </div>
                         )}
@@ -379,14 +381,14 @@ const Dividends: React.FC = () => {
                             <button
                                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
-                                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                                className="btn btn-secondary disabled:opacity-50"
                             >
                                 Previous
                             </button>
                             <button
                                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage === totalPages}
-                                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                                className="btn btn-secondary disabled:opacity-50"
                             >
                                 Next
                             </button>
@@ -404,7 +406,7 @@ const Dividends: React.FC = () => {
                                     <button
                                         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                         disabled={currentPage === 1}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Previous
                                     </button>
@@ -423,7 +425,7 @@ const Dividends: React.FC = () => {
                                     <button
                                         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Next
                                     </button>
@@ -511,17 +513,17 @@ const Dividends: React.FC = () => {
                                     />
                                 </div>
 
-                                <div className="flex justify-end space-x-3 pt-4">
+                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={closeModal}
-                                        className="btn-secondary"
+                                        className="btn btn-secondary"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
-                                        className="btn-primary"
+                                        className="btn btn-primary"
                                     >
                                         {editingDividend ? 'Update' : 'Create'} Dividend
                                     </button>

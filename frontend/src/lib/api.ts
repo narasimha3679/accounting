@@ -348,6 +348,22 @@ class SupabaseApi {
         return profile;
     }
 
+    async assignCurrentUserCompany(companyId: number): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({ company_id: companyId })
+            .eq('auth_user_id', authUser.id);
+        if (error) {
+            throw new Error(error.message);
+        }
+    }
+
     // Companies -----------------------------------------------------------
     async getCompanies(params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Company>> {
         return this.paginatedSelect<Company>('companies', {
@@ -549,13 +565,16 @@ class SupabaseApi {
     }
 
     // Expense categories --------------------------------------------------
-    async getExpenseCategories(params?: { page?: number; limit?: number; search?: string; company_id?: number }): Promise<PaginatedResponse<ExpenseCategory>> {
+    /**
+     * Returns a global list of expense categories shared across all companies.
+     * Categories are treated as generic; no company_id scoping is applied.
+     */
+    async getExpenseCategories(params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<ExpenseCategory>> {
         return this.paginatedSelect<ExpenseCategory>('expense_categories', {
             page: params?.page,
             limit: params?.limit,
             order: { column: 'name', ascending: true },
             modify: (query) => {
-                if (params?.company_id) query = query.eq('company_id', params.company_id);
                 if (params?.search) query = query.ilike('name', `%${params.search}%`);
                 return query;
             },
