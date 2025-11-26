@@ -25,7 +25,10 @@ const Login: React.FC = () => {
             }
             navigate('/');
         } catch (err) {
-            setError(isRegistering ? 'Registration failed. Please try again.' : 'Invalid email or password');
+            const message = err instanceof Error
+                ? err.message
+                : (isRegistering ? 'Registration failed. Please try again.' : 'Invalid email or password');
+            setError(message);
         } finally {
             setIsLoading(false);
         }
@@ -39,7 +42,9 @@ const Login: React.FC = () => {
                         {isRegistering ? 'Create your account' : 'Sign in to your account'}
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600 px-4 sm:px-0">
-                        {isRegistering ? 'Start managing your contracting business accounting' : 'Access your contracting business accounting tool'}
+                        {isRegistering
+                            ? 'After creating an account, ask an admin to assign you to a company.'
+                            : 'Access your contracting business accounting tool'}
                     </p>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

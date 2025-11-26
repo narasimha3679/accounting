@@ -28,13 +28,15 @@ const CapitalAssets: React.FC = () => {
 
     // Fetch expense categories
     const { data: categories } = useQuery({
-        queryKey: ['expense_categories'],
+        queryKey: ['expense_categories', user?.company_id],
         queryFn: async () => {
             const result = await api.getExpenseCategories({
-                limit: 1000
+                limit: 1000,
+                company_id: user?.company_id
             });
             return result.data;
         },
+        enabled: !!user?.company_id,
     });
 
     // Fetch CCA classes

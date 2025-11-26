@@ -1,188 +1,95 @@
 # Production Setup Guide
 
-This guide will help you set up the Accounting Application for production use with Docker.
+This guide covers hosting the React frontend while Supabase provides the backend services (database, auth, storage).
 
 ## Prerequisites
 
-- Docker Desktop installed and running
-- Git (to clone the repository)
-- Windows PowerShell or Linux/Mac terminal
+- Supabase project provisioned (hosted or self-hosted)
+- Docker Desktop (if using the provided `docker-compose.yml`)
+- Node.js 18+ (for building locally)
+- Supabase CLI (optional, recommended for schema management)
 
-## Quick Start
+## 1. Configure Supabase
 
-### 1. Environment Setup
+1. Apply the schema and policies:
+   ```bash
+   cd supabase
+   supabase db push   # if using Supabase CLI linked to /supabase-mpc
+   ```
+   or copy the SQL from `supabase/sql/*.sql` into the Supabase dashboard.
+2. Create a storage bucket (default `expense-files`) and apply the storage policies.
+3. Note your project URL and anon key from the Supabase dashboard – they will be needed by the frontend.
 
-First, create your environment file:
+## 2. Prepare environment variables
+
+Copy the sample file and edit it with your Supabase values:
 
 ```bash
-# Copy the example environment file
-cp env.production.example .env
-
-# Edit the .env file with your production values
-# Important: Change the database password and JWT secret!
+cp env.production.example frontend/.env
 ```
 
-### 2. Build and Run
+`frontend/.env` must contain:
 
-**For Windows:**
-```powershell
-.\build-prod.ps1
+```
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon-key>
+VITE_SUPABASE_STORAGE_BUCKET=expense-files
 ```
 
-**For Linux/Mac:**
+> Never commit private keys. Use secrets management in your hosting provider for production deployments.
+
+## 3. Build the frontend
+
 ```bash
-./build-prod.sh
+npm run build
+# output: frontend/dist
 ```
 
-### 3. Access the Application
+You can deploy these static files to any CDN or run them via Docker.
 
-- **Frontend**: http://localhost
-- **Backend API**: http://localhost:8090
-- **Health Check**: http://localhost:8090/health
+## 4. Deploy with Docker (optional)
 
-## Default Login Credentials
+The included `docker-compose.yml` builds the frontend image and serves it through nginx.
 
-- **Email**: admin@example.com
-- **Password**: admin123
-
-⚠️ **IMPORTANT**: Change the default password after first login!
-
-## Tailscale Integration
-
-Since you have Tailscale set up, you can access the application from other devices:
-
-1. Find your Tailscale IP address
-2. Access the app using: `http://YOUR_TAILSCALE_IP`
-3. The backend will be available at: `http://YOUR_TAILSCALE_IP:8090`
-
-## Environment Variables
-
-Edit the `.env` file to configure your production environment:
-
-```env
-# Database Configuration
-DB_HOST=host.docker.internal
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your-secure-password-here
-DB_NAME=accounting
-
-# JWT Secret (CHANGE THIS IN PRODUCTION!)
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-# Application Configuration
-GIN_MODE=release
-PORT=8090
-
-# Frontend Configuration
-VITE_API_URL=http://localhost:8090/api/v1
-```
-
-## Docker Services
-
-The application consists of three Docker services:
-
-1. **Frontend** (nginx): Serves the React application
-2. **Backend** (Go): API server
-3. **Database** (PostgreSQL): Data storage
-
-## Management Commands
-
-### View Logs
 ```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f db
-```
-
-### Stop Services
-```bash
-docker-compose down
-```
-
-### Restart Services
-```bash
-docker-compose restart
-```
-
-### Update Application
-```bash
-# Pull latest changes
-git pull
-
-# Rebuild and restart
-docker-compose down
 docker-compose up --build -d
 ```
 
-### Backup Database
-```bash
-# Create backup
-docker exec accounting-db pg_dump -U postgres accounting > backup.sql
+Access the app at http://localhost. All API calls go directly from the browser to Supabase.
 
-# Restore backup
-docker exec -i accounting-db psql -U postgres accounting < backup.sql
+### Useful Docker commands
+
+```bash
+docker-compose logs -f frontend   # tail logs
+docker-compose restart frontend   # restart container
+docker-compose down               # stop and remove container
 ```
 
-## Security Considerations
+## 5. Post-deploy checklist
 
-1. **Change Default Passwords**: Update the default admin password and database password
-2. **JWT Secret**: Use a strong, random JWT secret
-3. **Database Security**: Ensure your database is not exposed to the internet
-4. **Firewall**: Configure your firewall to only allow necessary ports
-5. **SSL/TLS**: Consider setting up SSL certificates for production use
+- Create initial accounts through Supabase Auth (email magic link, password, etc.).
+- Seed baseline data using SQL scripts or the Supabase table editor.
+- Verify file uploads reach the configured storage bucket.
+- Enable a custom domain + HTTPS on your hosting provider.
 
 ## Troubleshooting
 
-### Services Not Starting
-```bash
-# Check service status
-docker-compose ps
+- **Auth failures**: Confirm the anon key matches the Supabase project and that email auth providers are enabled.
+- **RLS errors**: Review policies in the Supabase dashboard logs; make sure the `profiles` table links users to companies.
+- **Storage issues**: Check bucket policies and confirm the bucket name matches `VITE_SUPABASE_STORAGE_BUCKET`.
+- **Network errors**: Ensure the frontend is served over HTTPS when calling a Supabase project that enforces HTTPS.
 
-# Check logs
-docker-compose logs
+## Security Checklist
 
-# Check Docker resources
-docker system df
-```
+1. Enforce strong password policies and enable MFA in Supabase Auth.
+2. Keep Row-Level Security enabled on every table and review policies during changes.
+3. Limit storage bucket access to authenticated users and sanitize file names before upload.
+4. Rotate the anon key if it leaks and avoid exposing the service-role key in the frontend.
 
-### Database Connection Issues
-- Verify database credentials in `.env`
-- Check if PostgreSQL is running: `docker-compose logs db`
-- Ensure database container is healthy
+## Monitoring & Maintenance
 
-### Frontend Not Loading
-- Check if nginx is running: `docker-compose logs frontend`
-- Verify frontend build: `docker-compose logs frontend | grep -i error`
+- Use the Supabase dashboard metrics for database performance, auth activity, and storage usage.
+- Set up alerts for approaching plan limits (row count, bandwidth, etc.).
+- Regularly review Supabase advisories (`supabase projects list --advisory` via CLI) for security recommendations.
 
-### Backend API Issues
-- Check backend logs: `docker-compose logs backend`
-- Verify environment variables
-- Check database connectivity
-
-## Performance Optimization
-
-1. **Resource Limits**: Add resource limits to docker-compose.yml if needed
-2. **Database Tuning**: Configure PostgreSQL for your workload
-3. **Caching**: Consider adding Redis for session caching
-4. **Load Balancing**: Use nginx or similar for multiple backend instances
-
-## Monitoring
-
-The application includes health checks for all services:
-
-- Frontend: `http://localhost/health`
-- Backend: `http://localhost:8090/health`
-- Database: Built-in PostgreSQL health check
-
-## Support
-
-For issues or questions:
-1. Check the logs first: `docker-compose logs`
-2. Verify environment configuration
-3. Check Docker resource usage
-4. Review this documentation
+With Supabase handling the backend, deployment focuses solely on serving the React bundle and keeping the environment variables in sync with your Supabase project. Happy shipping!

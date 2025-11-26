@@ -13,7 +13,6 @@ import Income from './pages/Income';
 import Dividends from './pages/Dividends';
 import OwnerPayments from './pages/OwnerPayments';
 import Reports from './pages/Reports';
-import Integration from './pages/Integration';
 import Settings from './pages/Settings';
 
 // Create a client
@@ -125,14 +124,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TaxCalculator />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/integration"
-              element={
-                <ProtectedRoute>
-                  <Integration />
                 </ProtectedRoute>
               }
             />

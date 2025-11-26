@@ -1,20 +1,5 @@
-// API client for the Go backend
-// Use environment variable if set, otherwise dynamically determine the API URL based on current host
-const getApiBaseUrl = () => {
-    if (import.meta.env.VITE_API_URL) {
-        return import.meta.env.VITE_API_URL;
-    }
+import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
 
-    // Get the current host (localhost or Tailscale IP)
-    const currentHost = window.location.hostname;
-    const apiPort = '8090';
-
-    return `http://${currentHost}:${apiPort}/api/v1`;
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-// Types for our API responses
 export interface User {
     id: number;
     email: string;
@@ -30,7 +15,7 @@ export interface Company {
     id: number;
     name: string;
     business_number: string;
-    hst_number?: string;
+    hst_number?: string | null;
     hst_registered: boolean;
     fiscal_year_end: string;
     small_business_rate: number;
@@ -42,10 +27,10 @@ export interface Company {
 export interface Client {
     id: number;
     name: string;
-    contact_person?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
+    contact_person?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
     hst_exempt: boolean;
     company_id: number;
     company?: Company;
@@ -75,8 +60,8 @@ export interface Invoice {
     hst_amount: number;
     total: number;
     status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
-    paid_date?: string;
-    description?: string;
+    paid_date?: string | null;
+    description?: string | null;
     company_id: number;
     company?: Company;
     items?: InvoiceItem[];
@@ -87,7 +72,8 @@ export interface Invoice {
 export interface ExpenseCategory {
     id: number;
     name: string;
-    description?: string;
+    description?: string | null;
+    company_id?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -100,9 +86,8 @@ export interface ExpenseFile {
     file_path: string;
     file_size: number;
     mime_type: string;
-    uploaded_at: string;
+    company_id: number;
     created_at: string;
-    updated_at: string;
 }
 
 export interface Expense {
@@ -126,9 +111,9 @@ export interface Dividend {
     id: number;
     amount: number;
     declaration_date: string;
-    payment_date?: string;
+    payment_date?: string | null;
     status: 'declared' | 'paid';
-    notes?: string;
+    notes?: string | null;
     company_id: number;
     company?: Company;
     created_at: string;
@@ -142,7 +127,7 @@ export interface IncomeEntry {
     hst_amount: number;
     total: number;
     income_type: 'client' | 'capital' | 'other';
-    client_id?: number;
+    client_id?: number | null;
     client?: Client;
     income_date: string;
     company_id: number;
@@ -157,8 +142,8 @@ export interface HSTPayment {
     payment_date: string;
     period_start: string;
     period_end: string;
-    reference?: string;
-    notes?: string;
+    reference?: string | null;
+    notes?: string | null;
     company_id: number;
     company?: Company;
     created_at: string;
@@ -211,8 +196,8 @@ export interface CapitalAsset {
     depreciable_amount: number;
     accumulated_depreciation: number;
     book_value: number;
-    disposal_date?: string;
-    disposal_amount?: number;
+    disposal_date?: string | null;
+    disposal_amount?: number | null;
     paid_by: 'corp' | 'owner';
     receipt_attached: boolean;
     company_id: number;
@@ -228,8 +213,8 @@ export interface OwnerPayment {
     amount: number;
     payment_date: string;
     payment_type: 'reimbursement' | 'loan_repayment' | 'other';
-    reference?: string;
-    notes?: string;
+    reference?: string | null;
+    notes?: string | null;
     company_id: number;
     company?: Company;
     created_at: string;
@@ -245,22 +230,6 @@ export interface CCAClass {
     updated_at: string;
 }
 
-export interface LoginRequest {
-    email: string;
-    password: string;
-}
-
-export interface RegisterRequest {
-    email: string;
-    password: string;
-    name: string;
-}
-
-export interface LoginResponse {
-    token: string;
-    user: User;
-}
-
 export interface PaginatedResponse<T> {
     data: T[];
     total: number;
@@ -269,450 +238,691 @@ export interface PaginatedResponse<T> {
     totalPages: number;
 }
 
-// API client class
-class ApiClient {
-    private baseURL: string;
-    private token: string | null = null;
+type QueryModifier = (query: any) => any;
 
-    constructor(baseURL: string) {
-        this.baseURL = baseURL;
-        this.token = localStorage.getItem('auth_token');
-    }
+const DEFAULT_PAGE_SIZE = 50;
 
-    getToken(): string | null {
-        return this.token;
-    }
+const toPaginatedResponse = <T>(data: T[], count: number | null, page: number, limit: number): PaginatedResponse<T> => ({
+    data,
+    total: count ?? data.length,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil((count ?? data.length) / limit)),
+});
 
-    private async request<T>(
-        endpoint: string,
-        options: RequestInit = {}
-    ): Promise<T> {
-        const url = `${this.baseURL}${endpoint}`;
+const uuid = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 
-        // For FormData, don't set Content-Type to let browser set it with boundary
-        const isFormData = options.body instanceof FormData;
-        const headers: Record<string, string> = isFormData
-            ? { ...(options.headers as Record<string, string>) }
-            : {
-                'Content-Type': 'application/json',
-                ...(options.headers as Record<string, string>),
-            };
-
-        if (this.token) {
-            headers.Authorization = `Bearer ${this.token}`;
+class SupabaseApi {
+    private mapUser(row: any): User {
+        if (!row) {
+            throw new Error('Profile not found');
         }
 
-        const response = await fetch(url, {
-            ...options,
-            headers,
-        });
+        return {
+            id: row.id,
+            email: row.email,
+            name: row.full_name ?? '',
+            role: row.role,
+            company_id: row.company_id ?? 0,
+            company: row.company ?? undefined,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        };
+    }
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-            throw new Error(error.error || `HTTP ${response.status}`);
+    private ensureCompanyId(companyId?: number | null) {
+        if (!companyId) {
+            throw new Error('Company ID is required for this operation.');
+        }
+        return companyId;
+    }
+
+    private async paginatedSelect<T>(table: string, options: {
+        columns?: string;
+        page?: number;
+        limit?: number;
+        order?: { column: string; ascending?: boolean };
+        modify?: QueryModifier;
+    } = {}): Promise<PaginatedResponse<T>> {
+        const page = options.page ?? 1;
+        const limit = options.limit ?? DEFAULT_PAGE_SIZE;
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
+        let query = supabase.from(table).select(options.columns ?? '*', { count: 'exact' });
+        if (options.modify) {
+            query = options.modify(query);
+        }
+        if (options.order) {
+            query = query.order(options.order.column, { ascending: options.order.ascending ?? true });
         }
 
-        return response.json();
+        const { data, error, count } = await query.range(from, to);
+        if (error) throw new Error(error.message);
+        return toPaginatedResponse((data ?? []) as T[], count, page, limit);
     }
 
-    // Authentication
-    async login(credentials: LoginRequest): Promise<LoginResponse> {
-        const response = await this.request<LoginResponse>('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify(credentials),
-        });
-
-        this.token = response.token;
-        localStorage.setItem('auth_token', response.token);
-        return response;
+    private mapExpenseFile(row: any): ExpenseFile {
+        return {
+            id: row.id,
+            expense_id: row.expense_id,
+            file_name: row.storage_path,
+            original_name: row.original_name,
+            file_path: row.storage_path,
+            file_size: row.file_size,
+            mime_type: row.mime_type,
+            company_id: row.company_id,
+            created_at: row.created_at,
+        };
     }
 
-    async register(credentials: RegisterRequest): Promise<LoginResponse> {
-        const response = await this.request<LoginResponse>('/auth/register', {
-            method: 'POST',
-            body: JSON.stringify(credentials),
-        });
+    private async fetchProfileByAuthUser(): Promise<User | null> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) return null;
 
-        this.token = response.token;
-        localStorage.setItem('auth_token', response.token);
-        return response;
+        const { data, error } = await supabase
+            .from('profiles')
+            .select(`
+                id,
+                auth_user_id,
+                email,
+                full_name,
+                role,
+                company_id,
+                created_at,
+                updated_at,
+                company:companies (*)
+            `)
+            .eq('auth_user_id', authUser.id)
+            .maybeSingle();
+
+        if (error) throw new Error(error.message);
+        return data ? this.mapUser(data) : null;
     }
 
+    // Auth helpers --------------------------------------------------------
     async getProfile(): Promise<User> {
-        return this.request<User>('/auth/profile');
+        const profile = await this.fetchProfileByAuthUser();
+        if (!profile) throw new Error('Not authenticated');
+        return profile;
     }
 
-    logout(): void {
-        this.token = null;
-        localStorage.removeItem('auth_token');
-    }
-
-    // Companies
+    // Companies -----------------------------------------------------------
     async getCompanies(params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Company>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<Company>>(`/admin/companies${query ? `?${query}` : ''}`);
+        return this.paginatedSelect<Company>('companies', {
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'created_at', ascending: false },
+            modify: (query) => {
+                if (params?.search) {
+                    query = query.or(`name.ilike.%${params.search}%,business_number.ilike.%${params.search}%`);
+                }
+                return query;
+            },
+        });
     }
 
     async getCompany(id: number): Promise<Company> {
-        return this.request<Company>(`/admin/companies/${id}`);
+        const { data, error } = await supabase.from('companies').select('*').eq('id', id).maybeSingle<Company>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Company not found');
+        return data;
     }
 
     async createCompany(company: Omit<Company, 'id' | 'created_at' | 'updated_at'>): Promise<Company> {
-        return this.request<Company>('/admin/companies', {
-            method: 'POST',
-            body: JSON.stringify(company),
-        });
+        const { data, error } = await supabase.from('companies').insert(company).select('*').single<Company>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async updateCompany(id: number, company: Partial<Company>): Promise<Company> {
-        return this.request<Company>(`/admin/companies/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(company),
-        });
+        const { data, error } = await supabase.from('companies').update(company).eq('id', id).select('*').single<Company>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteCompany(id: number): Promise<void> {
-        await this.request(`/admin/companies/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('companies').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
-    // Clients
+    // Clients -------------------------------------------------------------
     async getClients(params?: { page?: number; limit?: number; search?: string; company_id?: number }): Promise<PaginatedResponse<Client>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<Client>>(`/clients${query ? `?${query}` : ''}`);
+        return this.paginatedSelect<Client>('clients', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'created_at', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.search) {
+                    query = query.or(`name.ilike.%${params.search}%,email.ilike.%${params.search}%`);
+                }
+                return query;
+            },
+        });
     }
 
     async getClient(id: number): Promise<Client> {
-        return this.request<Client>(`/clients/${id}`);
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<Client>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Client not found');
+        return data;
     }
 
-    async createClient(client: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client> {
-        return this.request<Client>('/clients', {
-            method: 'POST',
-            body: JSON.stringify(client),
-        });
+    async createClient(client: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'company'>): Promise<Client> {
+        const { data, error } = await supabase
+            .from('clients')
+            .insert(client)
+            .select('*, company:companies(*)')
+            .single<Client>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async updateClient(id: number, client: Partial<Client>): Promise<Client> {
-        return this.request<Client>(`/clients/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(client),
-        });
+        const { data, error } = await supabase
+            .from('clients')
+            .update(client)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<Client>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteClient(id: number): Promise<void> {
-        await this.request(`/clients/${id}`, {
-            method: 'DELETE',
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Invoices ------------------------------------------------------------
+    async getInvoices(params?: { page?: number; limit?: number; search?: string; company_id?: number; client_id?: number; status?: string }): Promise<PaginatedResponse<Invoice>> {
+        return this.paginatedSelect<Invoice>('invoices', {
+            columns: '*, client:clients(*), items:invoice_items(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'issue_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.client_id) query = query.eq('client_id', params.client_id);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.search) {
+                    query = query.ilike('invoice_number', `%${params.search}%`);
+                }
+                return query;
+            },
         });
     }
 
-    // Invoices
-    async getInvoices(params?: { page?: number; limit?: number; search?: string; company_id?: number; client_id?: number; status?: string }): Promise<PaginatedResponse<Invoice>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.client_id) searchParams.set('client_id', params.client_id.toString());
-        if (params?.status) searchParams.set('status', params.status);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<Invoice>>(`/invoices${query ? `?${query}` : ''}`);
-    }
-
     async getInvoice(id: number): Promise<Invoice> {
-        return this.request<Invoice>(`/invoices/${id}`);
+        const { data, error } = await supabase
+            .from('invoices')
+            .select('*, client:clients(*), items:invoice_items(*)')
+            .eq('id', id)
+            .maybeSingle<Invoice>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Invoice not found');
+        return data;
     }
 
-    async createInvoice(invoice: {
+    async createInvoice(payload: {
         client_id: number;
         issue_date: string;
         due_date: string;
         description?: string;
         company_id: number;
-        items: Array<{
-            description: string;
-            quantity: number;
-            unit_price: number;
-        }>;
+        items: Array<{ description: string; quantity: number; unit_price: number; }>;
     }): Promise<Invoice> {
-        return this.request<Invoice>('/invoices', {
-            method: 'POST',
-            body: JSON.stringify(invoice),
-        });
+        const { client_id, issue_date, due_date, description, company_id, items } = payload;
+        const subtotal = items.reduce((total, item) => total + item.quantity * item.unit_price, 0);
+        const company = await this.getCompany(company_id);
+        const hst_amount = company.hst_registered ? subtotal * company.hst_rate : 0;
+        const total = subtotal + hst_amount;
+
+        const { data: invoice, error } = await supabase
+            .from('invoices')
+            .insert({
+                client_id,
+                issue_date,
+                due_date,
+                description,
+                company_id,
+                subtotal,
+                hst_amount,
+                total,
+            })
+            .select('*')
+            .single<Invoice>();
+        if (error) throw new Error(error.message);
+
+        if (items.length > 0) {
+            const itemPayload = items.map((item) => ({
+                ...item,
+                invoice_id: invoice.id,
+                total: item.quantity * item.unit_price,
+            }));
+            const { error: itemError } = await supabase.from('invoice_items').insert(itemPayload);
+            if (itemError) {
+                await supabase.from('invoices').delete().eq('id', invoice.id);
+                throw new Error(itemError.message);
+            }
+        }
+
+        return this.getInvoice(invoice.id);
     }
 
     async updateInvoice(id: number, invoice: Partial<Invoice> & { items?: Array<{ description: string; quantity: number; unit_price: number; }> }): Promise<Invoice> {
-        return this.request<Invoice>(`/invoices/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(invoice),
-        });
+        const { items, ...rest } = invoice;
+
+        if (Object.keys(rest).length > 0) {
+            const { error } = await supabase.from('invoices').update(rest).eq('id', id);
+            if (error) throw new Error(error.message);
+        }
+
+        if (items) {
+            const { error: deleteError } = await supabase.from('invoice_items').delete().eq('invoice_id', id);
+            if (deleteError) throw new Error(deleteError.message);
+
+            if (items.length > 0) {
+                const payload = items.map((item) => ({
+                    ...item,
+                    invoice_id: id,
+                    total: item.quantity * item.unit_price,
+                }));
+                const { error: insertError } = await supabase.from('invoice_items').insert(payload);
+                if (insertError) throw new Error(insertError.message);
+            }
+        }
+
+        return this.getInvoice(id);
     }
 
     async deleteInvoice(id: number): Promise<void> {
-        await this.request(`/invoices/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('invoices').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
-    // Expense Categories
-    async getExpenseCategories(params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<ExpenseCategory>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<ExpenseCategory>>(`/expense-categories${query ? `?${query}` : ''}`);
+    // Expense categories --------------------------------------------------
+    async getExpenseCategories(params?: { page?: number; limit?: number; search?: string; company_id?: number }): Promise<PaginatedResponse<ExpenseCategory>> {
+        return this.paginatedSelect<ExpenseCategory>('expense_categories', {
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'name', ascending: true },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.search) query = query.ilike('name', `%${params.search}%`);
+                return query;
+            },
+        });
     }
 
     async getExpenseCategory(id: number): Promise<ExpenseCategory> {
-        return this.request<ExpenseCategory>(`/expense-categories/${id}`);
+        const { data, error } = await supabase.from('expense_categories').select('*').eq('id', id).maybeSingle<ExpenseCategory>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Expense category not found');
+        return data;
     }
 
     async createExpenseCategory(category: Omit<ExpenseCategory, 'id' | 'created_at' | 'updated_at'>): Promise<ExpenseCategory> {
-        return this.request<ExpenseCategory>('/expense-categories', {
-            method: 'POST',
-            body: JSON.stringify(category),
-        });
+        const { data, error } = await supabase.from('expense_categories').insert(category).select('*').single<ExpenseCategory>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async updateExpenseCategory(id: number, category: Partial<ExpenseCategory>): Promise<ExpenseCategory> {
-        return this.request<ExpenseCategory>(`/expense-categories/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(category),
-        });
+        const { data, error } = await supabase.from('expense_categories').update(category).eq('id', id).select('*').single<ExpenseCategory>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteExpenseCategory(id: number): Promise<void> {
-        await this.request(`/expense-categories/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('expense_categories').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
-    // Expenses
+    // Expenses ------------------------------------------------------------
     async getExpenses(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; start_date?: string; end_date?: string }): Promise<PaginatedResponse<Expense>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.category_id) searchParams.set('category_id', params.category_id.toString());
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<Expense>>(`/expenses${query ? `?${query}` : ''}`);
+        return this.paginatedSelect<Expense>('expenses', {
+            columns: '*, category:expense_categories(*), files:expense_files(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'expense_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.category_id) query = query.eq('category_id', params.category_id);
+                if (params?.start_date) query = query.gte('expense_date', params.start_date);
+                if (params?.end_date) query = query.lte('expense_date', params.end_date);
+                if (params?.search) query = query.ilike('description', `%${params.search}%`);
+                return query;
+            },
+        }).then((response) => ({
+            ...response,
+            data: response.data.map((expense) => ({
+                ...expense,
+                files: expense.files?.map(this.mapExpenseFile.bind(this)),
+            })),
+        }));
     }
 
     async getExpense(id: number): Promise<Expense> {
-        return this.request<Expense>(`/expenses/${id}`);
+        const { data, error } = await supabase
+            .from('expenses')
+            .select('*, category:expense_categories(*), files:expense_files(*)')
+            .eq('id', id)
+            .maybeSingle<Expense>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Expense not found');
+        return {
+            ...data,
+            files: data.files?.map(this.mapExpenseFile.bind(this)),
+        };
     }
 
-    async createExpense(expense: Omit<Expense, 'id' | 'created_at' | 'updated_at'> & { expense_date: string }): Promise<Expense> {
-        return this.request<Expense>('/expenses', {
-            method: 'POST',
-            body: JSON.stringify(expense),
-        });
+    async createExpense(expense: Omit<Expense, 'id' | 'company' | 'files' | 'created_at' | 'updated_at'>): Promise<Expense> {
+        const payload = {
+            ...expense,
+            receipt_attached: expense.receipt_attached ?? false,
+        };
+        const { data, error } = await supabase
+            .from('expenses')
+            .insert(payload)
+            .select('*, category:expense_categories(*), files:expense_files(*)')
+            .single<Expense>();
+        if (error) throw new Error(error.message);
+        return {
+            ...data,
+            files: data.files?.map(this.mapExpenseFile.bind(this)),
+        };
     }
 
-    async updateExpense(id: number, expense: Partial<Expense> & { expense_date?: string }): Promise<Expense> {
-        return this.request<Expense>(`/expenses/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(expense),
-        });
+    async updateExpense(id: number, expense: Partial<Expense>): Promise<Expense> {
+        const { data, error } = await supabase
+            .from('expenses')
+            .update(expense)
+            .eq('id', id)
+            .select('*, category:expense_categories(*), files:expense_files(*)')
+            .single<Expense>();
+        if (error) throw new Error(error.message);
+        return {
+            ...data,
+            files: data.files?.map(this.mapExpenseFile.bind(this)),
+        };
     }
 
     async deleteExpense(id: number): Promise<void> {
-        await this.request(`/expenses/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('expenses').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
-    // Expense Files
+    // Expense files -------------------------------------------------------
     async uploadExpenseFile(expenseId: number, file: File): Promise<ExpenseFile> {
-        const formData = new FormData();
-        formData.append('file', file);
+        const expense = await this.getExpense(expenseId);
+        const companyId = this.ensureCompanyId(expense.company_id);
+        const extension = file.name.split('.').pop();
+        const objectPath = `${companyId}/${expenseId}/${uuid()}.${extension}`;
 
-        return this.request<ExpenseFile>(`/expenses/${expenseId}/files`, {
-            method: 'POST',
-            body: formData,
-        });
+        const { error: uploadError } = await supabase.storage
+            .from(SUPABASE_STORAGE_BUCKET)
+            .upload(objectPath, file, { upsert: false, contentType: file.type });
+        if (uploadError) throw new Error(uploadError.message);
+
+        const { data, error } = await supabase
+            .from('expense_files')
+            .insert({
+                expense_id: expenseId,
+                storage_path: objectPath,
+                original_name: file.name,
+                file_size: file.size,
+                mime_type: file.type,
+                company_id: companyId,
+            })
+            .select('*')
+            .single();
+        if (error) throw new Error(error.message);
+        return this.mapExpenseFile(data);
     }
 
     async getExpenseFiles(expenseId: number): Promise<ExpenseFile[]> {
-        return this.request<ExpenseFile[]>(`/expenses/${expenseId}/files`);
+        const { data, error } = await supabase
+            .from('expense_files')
+            .select('*')
+            .eq('expense_id', expenseId);
+        if (error) throw new Error(error.message);
+        return (data ?? []).map(this.mapExpenseFile.bind(this));
     }
 
     async downloadExpenseFile(fileId: number): Promise<Blob> {
-        const response = await fetch(`${API_BASE_URL}/expenses/files/${fileId}/download`, {
-            headers: {
-                'Authorization': `Bearer ${this.getToken()}`,
-            },
-        });
+        const { data, error } = await supabase.from('expense_files').select('*').eq('id', fileId).maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('File not found');
 
-        if (!response.ok) {
-            throw new Error(`Failed to download file: ${response.statusText}`);
-        }
-
-        return response.blob();
+        const { data: file, error: downloadError } = await supabase.storage
+            .from(SUPABASE_STORAGE_BUCKET)
+            .download(data.storage_path);
+        if (downloadError) throw new Error(downloadError.message);
+        return file;
     }
 
     async deleteExpenseFile(fileId: number): Promise<void> {
-        await this.request(`/expenses/files/${fileId}`, {
-            method: 'DELETE',
-        });
+        const { data, error } = await supabase.from('expense_files').select('*').eq('id', fileId).maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('File not found');
+
+        const { error: storageError } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).remove([data.storage_path]);
+        if (storageError) throw new Error(storageError.message);
+
+        const { error: deleteError } = await supabase.from('expense_files').delete().eq('id', fileId);
+        if (deleteError) throw new Error(deleteError.message);
     }
 
-    // Dividends
+    // Dividends -----------------------------------------------------------
     async getDividends(params?: { page?: number; limit?: number; company_id?: number; status?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<Dividend>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.status) searchParams.set('status', params.status);
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<Dividend>>(`/dividends${query ? `?${query}` : ''}`);
+        return this.paginatedSelect<Dividend>('dividends', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'declaration_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.start_date) query = query.gte('declaration_date', params.start_date);
+                if (params?.end_date) query = query.lte('declaration_date', params.end_date);
+                return query;
+            },
+        });
     }
 
     async getDividend(id: number): Promise<Dividend> {
-        return this.request<Dividend>(`/dividends/${id}`);
+        const { data, error } = await supabase
+            .from('dividends')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<Dividend>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Dividend not found');
+        return data;
     }
 
-    async createDividend(dividend: Omit<Dividend, 'id' | 'created_at' | 'updated_at'> & { declaration_date: string; payment_date?: string }): Promise<Dividend> {
-        return this.request<Dividend>('/dividends', {
-            method: 'POST',
-            body: JSON.stringify(dividend),
-        });
+    async createDividend(dividend: Omit<Dividend, 'id' | 'company' | 'created_at' | 'updated_at'>): Promise<Dividend> {
+        const { data, error } = await supabase
+            .from('dividends')
+            .insert(dividend)
+            .select('*, company:companies(*)')
+            .single<Dividend>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
-    async updateDividend(id: number, dividend: Partial<Dividend> & { declaration_date?: string; payment_date?: string }): Promise<Dividend> {
-        return this.request<Dividend>(`/dividends/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(dividend),
-        });
+    async updateDividend(id: number, dividend: Partial<Dividend>): Promise<Dividend> {
+        const { data, error } = await supabase
+            .from('dividends')
+            .update(dividend)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<Dividend>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteDividend(id: number): Promise<void> {
-        await this.request(`/dividends/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('dividends').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
-    // Tax Returns
+    // Tax returns ---------------------------------------------------------
     async getTaxReturns(params?: { page?: number; limit?: number; company_id?: number; fiscal_year?: number }): Promise<PaginatedResponse<TaxReturn>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.fiscal_year) searchParams.set('fiscal_year', params.fiscal_year.toString());
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<TaxReturn>>(`/tax-returns${query ? `?${query}` : ''}`);
+        return this.paginatedSelect<TaxReturn>('tax_returns', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'fiscal_year', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.fiscal_year) query = query.eq('fiscal_year', params.fiscal_year);
+                return query;
+            },
+        });
     }
 
     async getTaxReturn(id: number): Promise<TaxReturn> {
-        return this.request<TaxReturn>(`/tax-returns/${id}`);
+        const { data, error } = await supabase
+            .from('tax_returns')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<TaxReturn>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Tax return not found');
+        return data;
     }
 
-    async createTaxReturn(taxReturn: Omit<TaxReturn, 'id' | 'created_at' | 'updated_at'>): Promise<TaxReturn> {
-        return this.request<TaxReturn>('/tax-returns', {
-            method: 'POST',
-            body: JSON.stringify(taxReturn),
-        });
+
+    async createTaxReturn(taxReturn: Omit<TaxReturn, 'id' | 'company' | 'created_at' | 'updated_at'>): Promise<TaxReturn> {
+        const { data, error } = await supabase
+            .from('tax_returns')
+            .insert(taxReturn)
+            .select('*, company:companies(*)')
+            .single<TaxReturn>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async updateTaxReturn(id: number, taxReturn: Partial<TaxReturn>): Promise<TaxReturn> {
-        return this.request<TaxReturn>(`/tax-returns/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(taxReturn),
-        });
+        const { data, error } = await supabase
+            .from('tax_returns')
+            .update(taxReturn)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<TaxReturn>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteTaxReturn(id: number): Promise<void> {
-        await this.request(`/tax-returns/${id}`, {
-            method: 'DELETE',
+        const { error } = await supabase.from('tax_returns').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Income entries ------------------------------------------------------
+    async getIncomeEntries(params?: { page?: number; limit?: number; company_id?: number; income_type?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<IncomeEntry>> {
+        return this.paginatedSelect<IncomeEntry>('income_entries', {
+            columns: '*, client:clients(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'income_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.income_type) query = query.eq('income_type', params.income_type);
+                if (params?.start_date) query = query.gte('income_date', params.start_date);
+                if (params?.end_date) query = query.lte('income_date', params.end_date);
+                return query;
+            },
         });
     }
 
-    // Income Entries
-    async getIncomeEntries(params?: { page?: number; limit?: number; company_id?: number; income_type?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<IncomeEntry>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.income_type) searchParams.set('income_type', params.income_type);
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<IncomeEntry>>(`/income-entries${query ? `?${query}` : ''}`);
-    }
-
     async getIncomeEntry(id: number): Promise<IncomeEntry> {
-        return this.request<IncomeEntry>(`/income-entries/${id}`);
+        const { data, error } = await supabase
+            .from('income_entries')
+            .select('*, client:clients(*)')
+            .eq('id', id)
+            .maybeSingle<IncomeEntry>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Income entry not found');
+        return data;
     }
 
-    async createIncomeEntry(incomeEntry: {
+    async createIncomeEntry(entry: {
         description: string;
         amount: number;
         income_type: 'client' | 'capital' | 'other';
         client_id?: number;
         income_date: string;
         company_id: number;
+        hst_amount?: number;
     }): Promise<IncomeEntry> {
-        return this.request<IncomeEntry>('/income-entries', {
-            method: 'POST',
-            body: JSON.stringify(incomeEntry),
-        });
+        const payload = {
+            ...entry,
+            hst_amount: entry.hst_amount ?? 0,
+            total: entry.amount + (entry.hst_amount ?? 0),
+        };
+        const { data, error } = await supabase
+            .from('income_entries')
+            .insert(payload)
+            .select('*, client:clients(*)')
+            .single<IncomeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
-    async updateIncomeEntry(id: number, incomeEntry: Partial<IncomeEntry> & { income_date?: string }): Promise<IncomeEntry> {
-        return this.request<IncomeEntry>(`/income-entries/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(incomeEntry),
-        });
+    async updateIncomeEntry(id: number, entry: Partial<IncomeEntry>): Promise<IncomeEntry> {
+        const { data, error } = await supabase
+            .from('income_entries')
+            .update(entry)
+            .eq('id', id)
+            .select('*, client:clients(*)')
+            .single<IncomeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteIncomeEntry(id: number): Promise<void> {
-        await this.request(`/income-entries/${id}`, {
-            method: 'DELETE',
+        const { error } = await supabase.from('income_entries').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // HST payments --------------------------------------------------------
+    async getHSTPayments(params?: { page?: number; limit?: number; company_id?: number; start_date?: string; end_date?: string }): Promise<PaginatedResponse<HSTPayment>> {
+        return this.paginatedSelect<HSTPayment>('hst_payments', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'payment_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.start_date) query = query.gte('payment_date', params.start_date);
+                if (params?.end_date) query = query.lte('payment_date', params.end_date);
+                return query;
+            },
         });
     }
 
-    // HST Payments
-    async getHSTPayments(params?: { page?: number; limit?: number; company_id?: number; start_date?: string; end_date?: string }): Promise<PaginatedResponse<HSTPayment>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<HSTPayment>>(`/hst-payments${query ? `?${query}` : ''}`);
-    }
-
     async getHSTPayment(id: number): Promise<HSTPayment> {
-        return this.request<HSTPayment>(`/hst-payments/${id}`);
+        const { data, error } = await supabase
+            .from('hst_payments')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<HSTPayment>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('HST payment not found');
+        return data;
     }
 
-    async createHSTPayment(hstPayment: {
+    async createHSTPayment(payment: {
         amount: number;
         payment_date: string;
         period_start: string;
@@ -721,44 +931,73 @@ class ApiClient {
         notes?: string;
         company_id: number;
     }): Promise<HSTPayment> {
-        return this.request<HSTPayment>('/hst-payments', {
-            method: 'POST',
-            body: JSON.stringify(hstPayment),
-        });
+        const { data, error } = await supabase
+            .from('hst_payments')
+            .insert(payment)
+            .select('*, company:companies(*)')
+            .single<HSTPayment>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
-    async updateHSTPayment(id: number, hstPayment: Partial<HSTPayment> & { payment_date?: string; period_start?: string; period_end?: string }): Promise<HSTPayment> {
-        return this.request<HSTPayment>(`/hst-payments/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(hstPayment),
-        });
+    async updateHSTPayment(id: number, payment: Partial<HSTPayment>): Promise<HSTPayment> {
+        const { data, error } = await supabase
+            .from('hst_payments')
+            .update(payment)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<HSTPayment>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteHSTPayment(id: number): Promise<void> {
-        await this.request(`/hst-payments/${id}`, {
-            method: 'DELETE',
+        const { error } = await supabase.from('hst_payments').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Capital assets ------------------------------------------------------
+    private computeAssetDerivedFields(asset: {
+        purchase_amount: number;
+        hst_paid: number;
+        accumulated_depreciation?: number;
+    }) {
+        const total_cost = asset.purchase_amount + asset.hst_paid;
+        const accumulated_depreciation = asset.accumulated_depreciation ?? 0;
+        const depreciable_amount = total_cost;
+        const book_value = Math.max(0, total_cost - accumulated_depreciation);
+        return { total_cost, depreciable_amount, accumulated_depreciation, book_value };
+    }
+
+    async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string }): Promise<PaginatedResponse<CapitalAsset>> {
+        return this.paginatedSelect<CapitalAsset>('capital_assets', {
+            columns: '*, category:expense_categories(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'purchase_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.category_id) query = query.eq('category_id', params.category_id);
+                if (params?.cca_class) query = query.eq('cca_class', params.cca_class);
+                if (params?.search) query = query.ilike('description', `%${params.search}%`);
+                return query;
+            },
         });
     }
 
-    // Capital Assets
-    async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string }): Promise<PaginatedResponse<CapitalAsset>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.search) searchParams.set('search', params.search);
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.category_id) searchParams.set('category_id', params.category_id.toString());
-        if (params?.cca_class) searchParams.set('cca_class', params.cca_class);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<CapitalAsset>>(`/capital-assets${query ? `?${query}` : ''}`);
-    }
 
     async getCapitalAsset(id: number): Promise<CapitalAsset> {
-        return this.request<CapitalAsset>(`/capital-assets/${id}`);
+        const { data, error } = await supabase
+            .from('capital_assets')
+            .select('*, category:expense_categories(*), depreciation_entries:depreciation_entries(*)')
+            .eq('id', id)
+            .maybeSingle<CapitalAsset>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Capital asset not found');
+        return data;
     }
 
-    async createCapitalAsset(capitalAsset: {
+    async createCapitalAsset(asset: {
         description: string;
         category_id: number;
         purchase_date: string;
@@ -769,23 +1008,63 @@ class ApiClient {
         receipt_attached: boolean;
         company_id: number;
     }): Promise<CapitalAsset> {
-        return this.request<CapitalAsset>('/capital-assets', {
-            method: 'POST',
-            body: JSON.stringify(capitalAsset),
-        });
+        const { data: cca, error: ccaError } = await supabase
+            .from('cca_classes')
+            .select('rate')
+            .eq('class_number', asset.cca_class)
+            .maybeSingle();
+        if (ccaError) throw new Error(ccaError.message);
+        const derived = {
+            ...this.computeAssetDerivedFields({
+                purchase_amount: asset.purchase_amount,
+                hst_paid: asset.hst_paid,
+            }),
+            cca_rate: cca?.rate ?? 0,
+        };
+        const { data, error } = await supabase
+            .from('capital_assets')
+            .insert({ ...asset, ...derived })
+            .select('*, category:expense_categories(*)')
+            .single<CapitalAsset>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
-    async updateCapitalAsset(id: number, capitalAsset: Partial<CapitalAsset> & { purchase_date?: string; disposal_date?: string }): Promise<CapitalAsset> {
-        return this.request<CapitalAsset>(`/capital-assets/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(capitalAsset),
-        });
+    async updateCapitalAsset(id: number, asset: Partial<CapitalAsset>): Promise<CapitalAsset> {
+        let payload = { ...asset };
+        if (asset.purchase_amount !== undefined || asset.hst_paid !== undefined || asset.accumulated_depreciation !== undefined) {
+            const current = await this.getCapitalAsset(id);
+            payload = {
+                ...payload,
+                ...this.computeAssetDerivedFields({
+                    purchase_amount: asset.purchase_amount ?? current.purchase_amount,
+                    hst_paid: asset.hst_paid ?? current.hst_paid,
+                    accumulated_depreciation: asset.accumulated_depreciation ?? current.accumulated_depreciation,
+                }),
+            };
+        }
+        if (asset.cca_class) {
+            const { data: cca, error: ccaError } = await supabase
+                .from('cca_classes')
+                .select('rate')
+                .eq('class_number', asset.cca_class)
+                .maybeSingle();
+            if (ccaError) throw new Error(ccaError.message);
+            payload.cca_rate = cca?.rate ?? 0;
+        }
+        const { data, error } = await supabase
+            .from('capital_assets')
+            .update(payload)
+            .eq('id', id)
+            .select('*, category:expense_categories(*)')
+            .single<CapitalAsset>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteCapitalAsset(id: number): Promise<void> {
-        await this.request(`/capital-assets/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('capital_assets').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
     async calculateDepreciation(id: number, fiscalYear: number): Promise<{
@@ -795,38 +1074,69 @@ class ApiClient {
         is_half_year_rule: boolean;
         remaining_book_value: number;
     }> {
-        return this.request(`/capital-assets/${id}/calculate-depreciation?fiscal_year=${fiscalYear}`);
+        const asset = await this.getCapitalAsset(id);
+        const purchaseYear = new Date(asset.purchase_date).getFullYear();
+        const isHalfYear = fiscalYear === purchaseYear;
+        const rate = isHalfYear ? asset.cca_rate * 0.5 : asset.cca_rate;
+        const depreciation_amount = Math.min(asset.book_value * rate, asset.book_value);
+        const remaining_book_value = asset.book_value - depreciation_amount;
+        return {
+            capital_asset_id: id,
+            fiscal_year: fiscalYear,
+            depreciation_amount,
+            is_half_year_rule: isHalfYear,
+            remaining_book_value,
+        };
     }
 
-    async createDepreciationEntry(id: number, entry: {
-        fiscal_year: number;
-        entry_date: string;
-    }): Promise<DepreciationEntry> {
-        return this.request<DepreciationEntry>(`/capital-assets/${id}/depreciation-entries`, {
-            method: 'POST',
-            body: JSON.stringify(entry),
+    async createDepreciationEntry(id: number, entry: { fiscal_year: number; entry_date: string; depreciation_amount?: number }): Promise<DepreciationEntry> {
+        const calculation = entry.depreciation_amount
+            ? { depreciation_amount: entry.depreciation_amount, is_half_year_rule: false }
+            : await this.calculateDepreciation(id, entry.fiscal_year);
+        const { data, error } = await supabase
+            .from('depreciation_entries')
+            .insert({
+                capital_asset_id: id,
+                company_id: (await this.getCapitalAsset(id)).company_id,
+                fiscal_year: entry.fiscal_year,
+                entry_date: entry.entry_date,
+                depreciation_amount: calculation.depreciation_amount,
+                is_half_year_rule: calculation.is_half_year_rule,
+            })
+            .select('*')
+            .single<DepreciationEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    // Owner payments ------------------------------------------------------
+    async getOwnerPayments(params?: { page?: number; limit?: number; company_id?: number; start_date?: string; end_date?: string; payment_type?: string }): Promise<PaginatedResponse<OwnerPayment>> {
+        return this.paginatedSelect<OwnerPayment>('owner_payments', {
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'payment_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.payment_type) query = query.eq('payment_type', params.payment_type);
+                if (params?.start_date) query = query.gte('payment_date', params.start_date);
+                if (params?.end_date) query = query.lte('payment_date', params.end_date);
+                return query;
+            },
         });
     }
 
-    // Owner Payments
-    async getOwnerPayments(params?: { page?: number; limit?: number; company_id?: number; start_date?: string; end_date?: string; payment_type?: string }): Promise<PaginatedResponse<OwnerPayment>> {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.set('page', params.page.toString());
-        if (params?.limit) searchParams.set('limit', params.limit.toString());
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
-        if (params?.payment_type) searchParams.set('payment_type', params.payment_type);
-
-        const query = searchParams.toString();
-        return this.request<PaginatedResponse<OwnerPayment>>(`/owner-payments${query ? `?${query}` : ''}`);
-    }
-
     async getOwnerPayment(id: number): Promise<OwnerPayment> {
-        return this.request<OwnerPayment>(`/owner-payments/${id}`);
+        const { data, error } = await supabase
+            .from('owner_payments')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle<OwnerPayment>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Owner payment not found');
+        return data;
     }
 
-    async createOwnerPayment(ownerPayment: {
+    async createOwnerPayment(payment: {
         description: string;
         amount: number;
         payment_date: string;
@@ -835,30 +1145,29 @@ class ApiClient {
         notes?: string;
         company_id: number;
     }): Promise<OwnerPayment> {
-        return this.request<OwnerPayment>('/owner-payments', {
-            method: 'POST',
-            body: JSON.stringify(ownerPayment),
-        });
+        const { data, error } = await supabase
+            .from('owner_payments')
+            .insert(payment)
+            .select('*')
+            .single<OwnerPayment>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
-    async updateOwnerPayment(id: number, ownerPayment: {
-        description?: string;
-        amount?: number;
-        payment_date?: string;
-        payment_type?: 'reimbursement' | 'dividend' | 'loan_repayment' | 'other';
-        reference?: string;
-        notes?: string;
-    }): Promise<OwnerPayment> {
-        return this.request<OwnerPayment>(`/owner-payments/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(ownerPayment),
-        });
+    async updateOwnerPayment(id: number, payment: Partial<OwnerPayment>): Promise<OwnerPayment> {
+        const { data, error } = await supabase
+            .from('owner_payments')
+            .update(payment)
+            .eq('id', id)
+            .select('*')
+            .single<OwnerPayment>();
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     async deleteOwnerPayment(id: number): Promise<void> {
-        return this.request<void>(`/owner-payments/${id}`, {
-            method: 'DELETE',
-        });
+        const { error } = await supabase.from('owner_payments').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
     async getOwnerPaymentStats(params?: { company_id?: number; start_date?: string; end_date?: string }): Promise<{
@@ -870,21 +1179,52 @@ class ApiClient {
         start_date: string;
         end_date: string;
     }> {
-        const searchParams = new URLSearchParams();
-        if (params?.company_id) searchParams.set('company_id', params.company_id.toString());
-        if (params?.start_date) searchParams.set('start_date', params.start_date);
-        if (params?.end_date) searchParams.set('end_date', params.end_date);
+        let query = supabase.from('owner_payments').select('*');
+        if (params?.company_id) query = query.eq('company_id', params.company_id);
+        if (params?.start_date) query = query.gte('payment_date', params.start_date);
+        if (params?.end_date) query = query.lte('payment_date', params.end_date);
 
-        const query = searchParams.toString();
-        return this.request(`/owner-payments/stats${query ? `?${query}` : ''}`);
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        const payments: OwnerPayment[] = (data ?? []) as OwnerPayment[];
+        const stats = payments.reduce<{
+            total_paid: number;
+            reimbursement_total: number;
+            loan_repayment_total: number;
+            other_total: number;
+            payment_count: number;
+        }>(
+            (acc, payment) => {
+                acc.total_paid += payment.amount;
+                acc.payment_count += 1;
+                if (payment.payment_type === 'reimbursement') acc.reimbursement_total += payment.amount;
+                else if (payment.payment_type === 'loan_repayment') acc.loan_repayment_total += payment.amount;
+                else acc.other_total += payment.amount;
+                return acc;
+            },
+            {
+                total_paid: 0,
+                reimbursement_total: 0,
+                loan_repayment_total: 0,
+                other_total: 0,
+                payment_count: 0,
+            }
+        );
+        return {
+            ...stats,
+            start_date: params?.start_date ?? '',
+            end_date: params?.end_date ?? '',
+        };
     }
 
-    // CCA Classes
+    // CCA classes ---------------------------------------------------------
     async getCCAClasses(): Promise<CCAClass[]> {
-        return this.request<CCAClass[]>('/cca-classes');
+        const { data, error } = await supabase.from('cca_classes').select('*').order('class_number', { ascending: true });
+        if (error) throw new Error(error.message);
+        return data ?? [];
     }
 
-    // Tax Reports
+    // Reports -------------------------------------------------------------
     async generateTaxReport(request: {
         company_id: number;
         fiscal_year: number;
@@ -892,24 +1232,46 @@ class ApiClient {
         end_date?: string;
         report_type: 'comprehensive' | 'pandl' | 'hst' | 'retained';
     }): Promise<Blob> {
-        const response = await fetch(`${this.baseURL}/reports/tax-report`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.token}`,
-            },
-            body: JSON.stringify(request),
-        });
+        const company = await this.getCompany(request.company_id);
+        const invoices = await this.getInvoices({ company_id: request.company_id, limit: 1000 });
+        const expenses = await this.getExpenses({ company_id: request.company_id, limit: 1000 });
+        const dividends = await this.getDividends({ company_id: request.company_id, limit: 1000 });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to generate tax report');
-        }
+        const paidInvoices = invoices.data.filter((inv) => inv.status === 'paid' && new Date(inv.issue_date).getFullYear() === request.fiscal_year);
+        const filteredExpenses = expenses.data.filter((exp) => new Date(exp.expense_date).getFullYear() === request.fiscal_year);
+        const filteredDividends = dividends.data.filter((div) => new Date(div.declaration_date).getFullYear() === request.fiscal_year);
 
-        return response.blob();
+        const grossIncome = paidInvoices.reduce((sum, inv) => sum + inv.subtotal, 0);
+        const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const hstCollected = paidInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
+        const hstPaid = filteredExpenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
+        const netIncomeBeforeTax = grossIncome - totalExpenses;
+        const smallBusinessTax = netIncomeBeforeTax * company.small_business_rate;
+        const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
+        const hstRemittance = hstCollected - hstPaid;
+        const totalDividends = filteredDividends.reduce((sum, div) => sum + div.amount, 0);
+        const retainedEarnings = netIncomeAfterTax - totalDividends;
+
+        const content = [
+            `Company: ${company.name}`,
+            `Fiscal Year: ${request.fiscal_year}`,
+            `Report Type: ${request.report_type}`,
+            '',
+            `Gross Income: ${grossIncome.toFixed(2)}`,
+            `Total Expenses: ${totalExpenses.toFixed(2)}`,
+            `Net Income Before Tax: ${netIncomeBeforeTax.toFixed(2)}`,
+            `Small Business Tax (${(company.small_business_rate * 100).toFixed(2)}%): ${smallBusinessTax.toFixed(2)}`,
+            `Net Income After Tax: ${netIncomeAfterTax.toFixed(2)}`,
+            `HST Collected: ${hstCollected.toFixed(2)}`,
+            `HST Paid: ${hstPaid.toFixed(2)}`,
+            `HST Remittance: ${hstRemittance.toFixed(2)}`,
+            `Total Dividends: ${totalDividends.toFixed(2)}`,
+            `Retained Earnings: ${retainedEarnings.toFixed(2)}`,
+        ].join('\\n');
+
+        return new Blob([content], { type: 'text/plain' });
     }
 }
 
-// Create and export the API client instance
-export const api = new ApiClient(API_BASE_URL);
+export const api = new SupabaseApi();
 export default api;

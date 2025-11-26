@@ -1,6 +1,6 @@
 # Contracting Business Accounting Tool
 
-A comprehensive accounting tool built with Go backend and React frontend, designed specifically for incorporated contracting businesses in Canada.
+A comprehensive accounting tool built with a React 18 frontend and Supabase (PostgreSQL + Auth + Storage) as the backend-as-a-service, designed specifically for incorporated contracting businesses in Canada.
 
 ## Features
 
@@ -9,214 +9,141 @@ A comprehensive accounting tool built with Go backend and React frontend, design
 - **Tax Calculations**: Automatic calculation of small business tax and HST remittances
 - **Dividend Tracking**: Track dividend distributions and adjust company equity
 - **Financial Reports**: Generate P&L statements, HST reports, and retained earnings reports
-- **User Authentication**: Role-based access control (admin, accountant, viewer)
-- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
+- **User Authentication**: Supabase Auth with role-scoped access (admin, accountant, viewer)
+- **Modern UI**: Clean, responsive interface built with React, Tailwind CSS, and React Query
 
-## Tech Stack
+## Architecture
 
-- **Backend**: Go with Gin framework and PostgreSQL database
-- **Frontend**: React 18 with TypeScript
-- **Database**: PostgreSQL with GORM ORM
-- **Authentication**: JWT tokens with bcrypt password hashing
-- **Styling**: Tailwind CSS
-- **State Management**: React Query for server state
-- **Routing**: React Router
-- **Icons**: Lucide React
+- **Frontend**: React 18 + TypeScript (Vite, React Router, TanStack Query, Tailwind)
+- **Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Storage)
+- **Storage**: Supabase Storage bucket for receipt uploads
+- **CI/CD**: Docker image for the static frontend (optional)
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.21 or higher
-- PostgreSQL 12 or higher
 - Node.js 18+ and npm
+- Supabase project (hosted or self-managed)
+- Supabase CLI (optional, recommended for local migrations)
 
-### Installation
+### 1. Install dependencies
 
-1. **Clone and install dependencies**:
-   ```bash
-   git clone <your-repo>
-   cd accounting-tool
-   npm run install-all
-   ```
+```bash
+git clone <your-repo>
+cd corporate-accounting
+npm run install-all
+```
 
-2. **Set up PostgreSQL database**:
-   ```sql
-   CREATE DATABASE accounting_db;
-   CREATE USER accounting_user WITH PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE accounting_db TO accounting_user;
-   ```
+### 2. Configure environment variables
 
-3. **Configure backend environment**:
-   ```bash
-   cd backend
-   cp env.example .env
-   # Edit .env with your database credentials
-   ```
-
-4. **Start the backend**:
-   ```bash
-   cd backend
-   go run main.go
-   ```
-
-5. **Start the frontend**:
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-6. **Access the application**:
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:8080/api/v1
-   - Default login: admin@example.com / admin123
-
-## Database Schema
-
-The application uses the following main entities:
-
-- **users**: User accounts with role-based access
-- **companies**: Company information and tax settings
-- **clients**: Customer/client information
-- **invoices**: Invoice records with automatic calculations
-- **invoice_items**: Line items for invoices
-- **expense_categories**: Expense categorization
-- **expenses**: Business expense records
-- **dividends**: Dividend declarations and payments
-- **tax_returns**: Annual tax calculations and summaries
-
-## Key Features
-
-### Automatic Calculations
-
-- **Invoice Totals**: Automatically calculates subtotal, HST, and total when items are added/modified
-- **Tax Calculations**: Real-time calculation of small business tax and HST remittances
-- **Retained Earnings**: Automatic tracking of available distributable cash
-
-### Invoice Management
-
-- Automatic invoice numbering (YYYY-XXXX format)
-- HST calculation based on client exemption status
-- Status tracking (draft, sent, paid, overdue, cancelled)
-- Client relationship management
-
-### Expense Tracking
-
-- Categorized expense recording
-- HST paid tracking for input tax credits
-- Receipt attachment support
-- Date-based filtering and reporting
-
-### Tax Compliance
-
-- Small business tax calculation (configurable rate)
-- HST collected vs. paid tracking
-- Automatic remittance calculations
-- Fiscal year reporting
-
-### Reporting
-
-- Profit & Loss statements (pre and post-tax)
-- HST collected vs. paid reports
-- Retained earnings tracking
-- Client and expense summaries
-
-## Development
-
-### Project Structure
+Create `frontend/.env` and add the Supabase credentials for your project:
 
 ```
-├── backend/                 # Go backend application
-│   ├── database/           # Database connection and migrations
-│   ├── handlers/           # HTTP request handlers
-│   ├── middleware/         # Custom middleware (auth, CORS)
-│   ├── models/            # Data models and request/response types
-│   ├── utils/             # Utility functions (JWT, password hashing)
-│   ├── main.go            # Application entry point
-│   └── go.mod             # Go module file
-├── frontend/               # React frontend application
+VITE_SUPABASE_URL=<https://your-project.supabase.co>
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+VITE_SUPABASE_STORAGE_BUCKET=expense-files
+```
+
+See [Environment Variables](#environment-variables) for the full list.
+
+### 3. Provision Supabase
+
+1. Run the SQL in `supabase/sql/schema.sql` against your Supabase project.
+2. Apply Row-Level Security policies from `supabase/sql/policies.sql`.
+3. Ensure a storage bucket (default: `expense-files`) exists with the policies in `supabase/storage/policies.sql`.
+
+> The repository ships with scripts compatible with the `/supabase-mpc` project connection. You can use `supabase db push` or the Supabase dashboard to apply the schema.
+
+### 4. Start the frontend
+
+```bash
+npm run dev
+# or
+cd frontend && npm run dev
+```
+
+Visit http://localhost:5173 and sign up with Supabase Auth. All CRUD operations now talk directly to Supabase.
+
+## Project Structure
+
+```
+├── frontend/                 # React application
 │   ├── src/
-│   │   ├── components/    # Reusable UI components
-│   │   ├── contexts/      # React contexts (Auth, etc.)
-│   │   ├── lib/          # API client and types
-│   │   ├── pages/        # Page components
-│   │   └── App.tsx       # Main application component
+│   │   ├── components/       # Reusable UI components
+│   │   ├── contexts/         # Auth + global contexts
+│   │   ├── lib/              # Supabase client + data helpers
+│   │   ├── pages/            # Route-level components
+│   │   └── main.tsx          # App bootstrap
 │   └── package.json
-└── package.json           # Root package.json with scripts
+├── supabase/
+│   ├── sql/                  # Schema + policy SQL files
+│   └── storage/              # Storage policy snippets
+├── docker-compose.yml        # Optional nginx-based hosting for the built frontend
+├── env.production.example    # Sample env vars for containerized builds
+└── package.json              # Convenience scripts for working with the frontend
 ```
 
-### Available Scripts
+## Supabase Data Model
 
-- `npm run dev`: Start frontend development server
-- `npm run backend`: Start Go backend server
-- `npm run frontend`: Start frontend development server
-- `npm run dev-full`: Start both backend and frontend concurrently
-- `npm run build`: Build frontend for production
-- `npm run install-all`: Install dependencies for both root and frontend
+The schema mirrors the original Go models and includes (non-exhaustive):
 
-### Adding New Features
+- `profiles`: user metadata keyed to `auth.users`
+- `companies`, `clients`, `invoices`, `invoice_items`
+- `expense_categories`, `expenses`, `expense_files`
+- `dividends`, `income_entries`, `hst_payments`
+- `tax_returns`, `capital_assets`, `depreciation_entries`
+- `owner_payments`, `cca_classes`
 
-1. **Backend**: Add new models in `backend/models/`, handlers in `backend/handlers/`, and routes in `backend/main.go`
-2. **Frontend**: Create new components in `frontend/src/components/` and pages in `frontend/src/pages/`
-3. **Types**: Update TypeScript interfaces in `frontend/src/lib/api.ts`
+Each table enforces row-level access by `company_id` and user role, ensuring users only see the organizations they belong to.
+
+## Available Scripts
+
+- `npm run dev` – start the Vite dev server (via `frontend` project)
+- `npm run build` – build the frontend for production
+- `npm run preview` – preview the production build locally
+- `npm run install-all` – install the frontend dependencies
+
+## Environment Variables
+
+Configure the following keys in `frontend/.env` (or via Docker build args):
+
+| Variable | Description |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase project URL (e.g., `https://xyz.supabase.co`) |
+| `VITE_SUPABASE_ANON_KEY` | Public anon key for client-side access |
+| `VITE_SUPABASE_STORAGE_BUCKET` | Bucket used for expense receipt uploads (default `expense-files`) |
+
+If you run Supabase locally, also export the required credentials for the CLI (see Supabase docs).
+
+For Docker-based deployments, copy `env.production.example` to `frontend/.env` (or `.env`) and populate the keys before running `docker-compose up --build`.
 
 ## Deployment
 
-### Production Setup
-
-1. **Build the frontend**:
+1. Ensure your Supabase project has the latest schema/policies applied.
+2. Populate `frontend/.env` with your production Supabase keys.
+3. Build the frontend:
    ```bash
    npm run build
    ```
-
-2. **Deploy Go backend**:
-   - Set production environment variables
-   - Build the Go binary: `cd backend && go build -o accounting-backend main.go`
-   - Deploy to your server with PostgreSQL database
-   - Set up SSL certificates and reverse proxy
-
-3. **Configure frontend**:
-   - Update API URL in `frontend/.env`
-   - Deploy built files to your web server
-
-### Environment Variables
-
-- `VITE_API_URL`: URL of your Go backend API (default: http://localhost:8080/api/v1)
-- Backend environment variables (see `backend/env.example`)
+4. Serve `frontend/dist` using your preferred static host or run:
+   ```bash
+   docker-compose up --build -d
+   ```
 
 ## Security Considerations
 
-- JWT-based authentication with secure token handling
-- Role-based access control ensures users only see appropriate data
-- Input validation and sanitization handled by Go backend
-- Password hashing using bcrypt
-- HTTPS recommended for production deployments
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
+- Supabase Row-Level Security is enabled on every table; keep policies up to date.
+- Use service-role keys only on the server (never in the frontend).
+- Rotate the anon key if it ever leaks.
+- Enforce HTTPS for any public deployment of the frontend.
 
 ## Support
 
-For issues and questions:
-1. Check the migration guide: `MIGRATION_GUIDE.md`
-2. Review the backend documentation: `backend/README.md`
-3. Create an issue in the repository
+1. Verify Supabase connectivity with the CLI (`supabase status`).
+2. Check browser console + network logs for Supabase errors.
+3. Inspect Supabase project logs (Auth, Database, Storage).
 
-## Roadmap
+## License
 
-- [ ] PDF invoice generation
-- [ ] Email invoice sending
-- [ ] Bank account integration
-- [ ] Multi-company support
-- [ ] Advanced reporting with charts
-- [ ] Mobile app
-- [ ] API for third-party integrations
+MIT License – see `LICENSE.md`.
