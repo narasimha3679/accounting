@@ -14,8 +14,7 @@ import {
     Building2,
     Menu,
     X,
-    CreditCard,
-    Link as LinkIcon
+    CreditCard
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
