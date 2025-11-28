@@ -64,7 +64,34 @@ docker-compose restart frontend   # restart container
 docker-compose down               # stop and remove container
 ```
 
-## 5. Post-deploy checklist
+## 5. GitHub Actions CI/CD (cloud VM)
+
+Automated deployments are handled by `.github/workflows/frontend-deploy.yml`. The workflow runs on every push to `main` (and can also be triggered manually via **Run workflow**).
+
+1. **Build job** – checks out the repo, installs Node 20 + dependencies inside `frontend/`, injects the Supabase environment variables, and runs `npm run build`. The generated `frontend/dist` directory is uploaded as an artifact.
+2. **Deploy job** – runs only on the `main` branch, downloads the artifact, and uses `rsync` over SSH to sync the static bundle to your VM. An optional post-deploy command lets you reload nginx or restart a container once the files land on the server.
+
+### Required GitHub secrets
+
+- `VITE_SUPABASE_URL` – production Supabase URL
+- `VITE_SUPABASE_ANON_KEY` – anon key used by the browser
+- `VITE_SUPABASE_STORAGE_BUCKET` – bucket name (defaults to `expense-files`)
+- `SSH_PRIVATE_KEY` – private key that can SSH into the VM (no passphrase)
+- `DEPLOY_USER` – SSH user that owns the deploy directory
+- `DEPLOY_HOST` – VM hostname or IP
+- `DEPLOY_PATH` – absolute path served by nginx (e.g. `/var/www/accounting`)
+- `DEPLOY_PORT` *(optional)* – SSH port if not `22`
+- `POST_DEPLOY_COMMAND` *(optional)* – command run on the VM after rsync (e.g. `sudo systemctl reload nginx`)
+
+### VM preparation checklist
+
+- Create a deploy user with write access to `DEPLOY_PATH` and disable interactive password prompts for deployment commands (e.g. allow passwordless reload via sudoers).
+- Install `rsync` and ensure the SSH key added to GitHub Secrets is present in `~/.ssh/authorized_keys`.
+- Point nginx (or your static server) at `DEPLOY_PATH` so new builds are served immediately after rsync completes.
+
+Once the secrets are configured, every push to `main` will build and publish the latest frontend bundle to the VM automatically. Use the `workflow_dispatch` trigger for ad-hoc deploys.
+
+## 6. Post-deploy checklist
 
 - Create initial accounts through Supabase Auth (email magic link, password, etc.).
 - Seed baseline data using SQL scripts or the Supabase table editor.
