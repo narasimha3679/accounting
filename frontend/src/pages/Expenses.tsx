@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
-import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText } from 'lucide-react';
+import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
+import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const Expenses: React.FC = () => {
@@ -10,13 +11,42 @@ const Expenses: React.FC = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
+        // Load saved preference on component mount
+        const preferences = loadDashboardPreferences();
+        return preferences.timePeriod;
+    });
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
+    // Calculate date range based on time period
+    const getDateRange = () => {
+        let startDate: Date;
+        let endDate: Date;
+
+        if (timePeriod === 'month') {
+            startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        } else {
+            startDate = new Date(selectedDate.getFullYear(), 0, 1);
+            endDate = new Date(selectedDate.getFullYear(), 11, 31);
+        }
+
+        return {
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0],
+        };
+    };
+
+    const { startDate, endDate } = getDateRange();
 
     // Fetch expenses
     const { data: expenses, isLoading } = useQuery({
-        queryKey: ['expenses', user?.company_id],
+        queryKey: ['expenses', user?.company_id, timePeriod, startDate, endDate],
         queryFn: async () => {
             const result = await api.getExpenses({
                 company_id: user?.company_id,
+                start_date: startDate,
+                end_date: endDate,
                 limit: 1000
             });
             return result.data;
@@ -87,13 +117,68 @@ const Expenses: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
                     <p className="text-gray-600">Track your business expenses</p>
                 </div>
-                <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
-                >
-                    <Plus className="h-4 w-4" />
-                    Add Expense
-                </button>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    {/* Time Period Selector */}
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                        <div className="flex rounded-md shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setTimePeriod('month');
+                                    updateDashboardPreference('timePeriod', 'month');
+                                }}
+                                className={`px-3 py-2 text-sm font-medium border rounded-l-md ${timePeriod === 'month'
+                                    ? 'bg-primary-600 text-white border-primary-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                Month
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setTimePeriod('year');
+                                    updateDashboardPreference('timePeriod', 'year');
+                                }}
+                                className={`px-3 py-2 text-sm font-medium border rounded-r-md ${timePeriod === 'year'
+                                    ? 'bg-primary-600 text-white border-primary-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                            >
+                                Year
+                            </button>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <input
+                                type={timePeriod === 'month' ? 'month' : 'number'}
+                                value={timePeriod === 'month'
+                                    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
+                                    : selectedDate.getFullYear()
+                                }
+                                onChange={(e) => {
+                                    if (timePeriod === 'month') {
+                                        const [year, month] = e.target.value.split('-');
+                                        setSelectedDate(new Date(parseInt(year), parseInt(month) - 1, 1));
+                                    } else {
+                                        setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
+                                    }
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add Expense
+                    </button>
+                </div>
             </div>
 
             {/* Category Filter */}
