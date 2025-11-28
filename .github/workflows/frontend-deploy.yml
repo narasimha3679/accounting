@@ -88,15 +88,9 @@ jobs:
 
           SSH_PORT="${PORT:-22}"
           
-          # Create target directory if it doesn't exist
-          echo "Ensuring target directory exists..."
-          ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p ${DEPLOY_PATH}"
-          
-          # Verify directory was created and has write permissions
-          if ! ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "test -w ${DEPLOY_PATH}"; then
-            echo "Error: Target directory ${DEPLOY_PATH} is not writable"
-            exit 1
-          fi
+          # Create target directory with sudo and set permissions
+          echo "Ensuring target directory exists with correct permissions..."
+          ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "sudo mkdir -p ${DEPLOY_PATH} && sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH} && sudo chmod -R 755 ${DEPLOY_PATH}"
           
           echo "Syncing files to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}..."
           rsync -az --delete -e "ssh -p $SSH_PORT" dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
