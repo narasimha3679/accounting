@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type OwnerPayment } from '../lib/api';
+import api, { type Expense, type OwnerPayment } from '../lib/api';
 import {
     Plus,
     Edit,
@@ -15,13 +15,35 @@ import {
     X
 } from 'lucide-react';
 
+const currencyFormatter = new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD'
+});
+
+const formatCurrency = (amount: number) => currencyFormatter.format(amount);
+
+const formatDate = (dateString: string) => {
+    if (!dateString) {
+        return '';
+    }
+    return new Date(dateString).toLocaleDateString('en-CA');
+};
+
 interface OwnerPaymentModalProps {
     ownerPayment?: OwnerPayment;
+    ownerExpenses: Expense[];
+    ownerExpensesLoading: boolean;
     onClose: () => void;
-    onSave: (ownerPayment: OwnerPayment) => void;
+    onSave: (ownerPayment: OwnerPayment, linkedExpenseId?: number) => void;
 }
 
-const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onClose, onSave }) => {
+const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
+    ownerPayment,
+    ownerExpenses,
+    ownerExpensesLoading,
+    onClose,
+    onSave
+}) => {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         description: '',
@@ -32,8 +54,26 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onC
         notes: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [linkedExpenseId, setLinkedExpenseId] = useState<number | ''>('');
+
+    const orderedOwnerExpenses = useMemo(() => {
+        if (!ownerExpenses) return [];
+        return [...ownerExpenses].sort((a, b) => {
+            const dateA = new Date(a.expense_date).getTime();
+            const dateB = new Date(b.expense_date).getTime();
+            return dateB - dateA;
+        });
+    }, [ownerExpenses]);
+
+    const selectedExpense = useMemo(() => {
+        if (typeof linkedExpenseId !== 'number') {
+            return undefined;
+        }
+        return orderedOwnerExpenses.find(expense => expense.id === linkedExpenseId);
+    }, [linkedExpenseId, orderedOwnerExpenses]);
 
     useEffect(() => {
+        setLinkedExpenseId('');
         if (ownerPayment) {
             setFormData({
                 description: ownerPayment.description,
@@ -45,6 +85,37 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onC
             });
         }
     }, [ownerPayment]);
+
+    const handleLinkedExpenseChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const { value } = event.target;
+        if (!value) {
+            setLinkedExpenseId('');
+            return;
+        }
+
+        const expenseId = Number(value);
+        setLinkedExpenseId(expenseId);
+
+        const expense = orderedOwnerExpenses.find(item => item.id === expenseId);
+        if (!expense) {
+            return;
+        }
+
+        const totalWithHst = expense.amount + (expense.hst_paid ?? 0);
+        const formattedDate = formatDate(expense.expense_date);
+        setFormData(prev => ({
+            ...prev,
+            description: expense.description,
+            amount: totalWithHst.toFixed(2),
+            payment_type: 'reimbursement',
+            payment_date: prev.payment_date || expense.expense_date.split('T')[0],
+            notes: prev.notes || `Reimbursement for ${expense.description} (${formattedDate})`
+        }));
+    };
+
+    const handleLinkedExpenseClear = () => {
+        setLinkedExpenseId('');
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,7 +140,7 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onC
                 savedPayment = await api.createOwnerPayment(paymentData);
             }
 
-            onSave(savedPayment);
+            onSave(savedPayment, typeof linkedExpenseId === 'number' ? linkedExpenseId : undefined);
             onClose();
         } catch (error) {
             console.error('Error saving owner payment:', error);
@@ -167,6 +238,59 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onC
                             </select>
                         </div>
 
+                        <div className="md:col-span-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <label htmlFor="linked_expense" className="block text-sm font-medium text-gray-700">
+                                    Link Owner Expense (Optional)
+                                </label>
+                                {typeof linkedExpenseId === 'number' && (
+                                    <button
+                                        type="button"
+                                        onClick={handleLinkedExpenseClear}
+                                        className="text-sm text-blue-600 hover:text-blue-800"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                            <select
+                                id="linked_expense"
+                                value={linkedExpenseId === '' ? '' : linkedExpenseId.toString()}
+                                onChange={handleLinkedExpenseChange}
+                                disabled={ownerExpensesLoading || orderedOwnerExpenses.length === 0}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                            >
+                                <option value="">
+                                    {ownerExpensesLoading
+                                        ? 'Loading owner-paid expenses...'
+                                        : orderedOwnerExpenses.length > 0
+                                            ? 'Select an owner-paid expense to reimburse'
+                                            : 'No unpaid owner expenses available'}
+                                </option>
+                                {orderedOwnerExpenses.map(expense => {
+                                    const totalWithHst = expense.amount + (expense.hst_paid ?? 0);
+                                    return (
+                                        <option key={expense.id} value={expense.id}>
+                                            {`${expense.description} • ${formatCurrency(totalWithHst)} • ${formatDate(expense.expense_date)}`}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <p className="mt-2 text-sm text-gray-500">
+                                Selecting an expense pre-fills the reimbursement details, but you can still edit the fields
+                                before saving.
+                            </p>
+                            {selectedExpense && (
+                                <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                                    <div className="font-semibold">{selectedExpense.description}</div>
+                                    <div className="mt-1 flex flex-wrap gap-4 text-blue-800">
+                                        <span>{formatCurrency(selectedExpense.amount + (selectedExpense.hst_paid ?? 0))} total</span>
+                                        <span>Expense date: {formatDate(selectedExpense.expense_date)}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                             <label htmlFor="reference" className="block text-sm font-medium text-gray-700 mb-2">
                                 Reference (Optional)
@@ -221,7 +345,9 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({ ownerPayment, onC
 const OwnerPayments: React.FC = () => {
     const { user } = useAuth();
     const [ownerPayments, setOwnerPayments] = useState<OwnerPayment[]>([]);
+    const [ownerExpenses, setOwnerExpenses] = useState<Expense[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [ownerExpensesLoading, setOwnerExpensesLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editingPayment, setEditingPayment] = useState<OwnerPayment | undefined>();
     const [searchTerm, setSearchTerm] = useState('');
@@ -232,16 +358,21 @@ const OwnerPayments: React.FC = () => {
         if (!user) {
             // No authenticated user – nothing to load
             setIsLoading(false);
+            setOwnerExpenses([]);
+            setOwnerExpensesLoading(false);
             return;
         }
 
         if (!user.company_id) {
             // Authenticated but no company configured – stop loading and show message
             setIsLoading(false);
+            setOwnerExpenses([]);
+            setOwnerExpensesLoading(false);
             return;
         }
 
         loadOwnerPayments();
+        loadOwnerExpenses();
     }, [user]);
 
     const loadOwnerPayments = async () => {
@@ -263,7 +394,33 @@ const OwnerPayments: React.FC = () => {
         }
     };
 
-    const handleSave = (savedPayment: OwnerPayment) => {
+    const loadOwnerExpenses = async () => {
+        if (!user?.company_id) {
+            setOwnerExpenses([]);
+            setOwnerExpensesLoading(false);
+            return;
+        }
+
+        try {
+            setOwnerExpensesLoading(true);
+            const response = await api.getExpenses({
+                company_id: user.company_id,
+                limit: 1000
+            });
+
+            const ownerPaidExpenses = response.data
+                .filter(expense => expense.paid_by === 'owner')
+                .sort((a, b) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime());
+
+            setOwnerExpenses(ownerPaidExpenses);
+        } catch (error) {
+            console.error('Error loading owner-paid expenses:', error);
+        } finally {
+            setOwnerExpensesLoading(false);
+        }
+    };
+
+    const handleSave = (savedPayment: OwnerPayment, linkedExpenseId?: number) => {
         if (editingPayment) {
             setOwnerPayments(prev =>
                 prev.map(payment =>
@@ -274,6 +431,10 @@ const OwnerPayments: React.FC = () => {
             setOwnerPayments(prev => [savedPayment, ...prev]);
         }
         setEditingPayment(undefined);
+
+        if (linkedExpenseId) {
+            setOwnerExpenses(prev => prev.filter(expense => expense.id !== linkedExpenseId));
+        }
     };
 
     const handleDelete = async (id: number) => {
@@ -286,17 +447,6 @@ const OwnerPayments: React.FC = () => {
             console.error('Error deleting owner payment:', error);
             alert('Error deleting owner payment. Please try again.');
         }
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-CA', {
-            style: 'currency',
-            currency: 'CAD'
-        }).format(amount);
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
     };
 
     const getPaymentTypeIcon = (type: string) => {
@@ -362,7 +512,10 @@ const OwnerPayments: React.FC = () => {
                     <p className="text-gray-600">Track payments made by the corporation to the owner</p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
+                    onClick={() => {
+                        setEditingPayment(undefined);
+                        setShowModal(true);
+                    }}
                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
                     <Plus className="h-4 w-4 mr-2" />
@@ -547,6 +700,8 @@ const OwnerPayments: React.FC = () => {
             {showModal && (
                 <OwnerPaymentModal
                     ownerPayment={editingPayment}
+                    ownerExpenses={ownerExpenses}
+                    ownerExpensesLoading={ownerExpensesLoading}
                     onClose={() => {
                         setShowModal(false);
                         setEditingPayment(undefined);
