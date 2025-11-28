@@ -108,8 +108,8 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
             description: expense.description,
             amount: totalWithHst.toFixed(2),
             payment_type: 'reimbursement',
-            payment_date: prev.payment_date || expense.expense_date.split('T')[0],
-            notes: prev.notes || `Reimbursement for ${expense.description} (${formattedDate})`
+            payment_date: expense.expense_date.split('T')[0],
+            notes: `Reimbursement for ${expense.description} (${formattedDate})`
         }));
     };
 
