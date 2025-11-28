@@ -22,6 +22,7 @@ const CompanyOnboarding: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [businessNumberError, setBusinessNumberError] = useState('');
 
     useEffect(() => {
         // If user already has a company, don't allow onboarding again
@@ -38,8 +39,17 @@ const CompanyOnboarding: React.FC = () => {
         setIsSaving(true);
         setError('');
         setSuccess('');
+        setBusinessNumberError('');
 
         try {
+            // Check if business number already exists
+            const exists = await api.checkBusinessNumberExists(businessNumber);
+            if (exists) {
+                setBusinessNumberError(`A company with business number "${businessNumber}" already exists. Please use a different business number.`);
+                setIsSaving(false);
+                return;
+            }
+
             const company = await api.createCompany({
                 name,
                 business_number: businessNumber,
@@ -119,10 +129,18 @@ const CompanyOnboarding: React.FC = () => {
                                     id="business_number"
                                     type="text"
                                     value={businessNumber}
-                                    onChange={(e) => setBusinessNumber(e.target.value)}
+                                    onChange={(e) => {
+                                        setBusinessNumber(e.target.value);
+                                        setBusinessNumberError('');
+                                    }}
                                     required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm ${
+                                        businessNumberError ? 'border-red-300' : 'border-gray-300'
+                                    }`}
                                 />
+                                {businessNumberError && (
+                                    <p className="mt-1 text-sm text-red-600">{businessNumberError}</p>
+                                )}
                             </div>
                             <div>
                                 <label htmlFor="hst_number" className="block text-sm font-medium text-gray-700">

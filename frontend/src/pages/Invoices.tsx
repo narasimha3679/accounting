@@ -287,21 +287,37 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
         },
     });
 
-    const addItem = () => {
-        if (newItem.description && newItem.quantity > 0 && newItem.unit_price > 0) {
-            const item: InvoiceItem = {
-                id: Date.now(), // Temporary ID
-                description: newItem.description,
-                quantity: newItem.quantity,
-                unit_price: newItem.unit_price,
-                total: newItem.quantity * newItem.unit_price,
-                invoice_id: invoice?.id || 0,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            };
-            setItems([...items, item]);
-            setNewItem({ description: '', quantity: 1, unit_price: 0 });
+    const addItem = (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        e?.stopPropagation();
+
+        if (!newItem.description || newItem.description.trim() === '') {
+            alert('Please enter a description for the item');
+            return;
         }
+
+        if (!newItem.quantity || newItem.quantity <= 0) {
+            alert('Please enter a quantity greater than 0');
+            return;
+        }
+
+        if (!newItem.unit_price || newItem.unit_price <= 0) {
+            alert('Please enter a unit price greater than 0');
+            return;
+        }
+
+        const item: InvoiceItem = {
+            id: Date.now(), // Temporary ID
+            description: newItem.description.trim(),
+            quantity: newItem.quantity,
+            unit_price: newItem.unit_price,
+            total: newItem.quantity * newItem.unit_price,
+            invoice_id: invoice?.id || 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+        setItems([...items, item]);
+        setNewItem({ description: '', quantity: 1, unit_price: 0 });
     };
 
     const removeItem = (index: number) => {
@@ -328,6 +344,12 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
         const clientId = parseInt(String(formData.client_id));
         if (isNaN(clientId)) {
             alert('Invalid client selection');
+            return;
+        }
+
+        // Validate that at least one item is added
+        if (items.length === 0) {
+            alert('Please add at least one item to the invoice');
             return;
         }
 
@@ -364,8 +386,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                         {/* Basic Information */}
                         <div className="grid-mobile-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Client</label>
+                                <label
+                                    htmlFor="invoice-client"
+                                    className="block text-sm font-medium text-gray-700"
+                                >
+                                    Client
+                                </label>
                                 <select
+                                    id="invoice-client"
                                     value={formData.client_id}
                                     onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
                                     className="input"
@@ -378,8 +406,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Issue Date</label>
+                                <label htmlFor="invoice-issue-date" className="block text-sm font-medium text-gray-700">Issue Date</label>
                                 <input
+                                    id="invoice-issue-date"
                                     type="date"
                                     value={formData.issue_date}
                                     onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
@@ -388,8 +417,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                                <label htmlFor="invoice-due-date" className="block text-sm font-medium text-gray-700">Due Date</label>
                                 <input
+                                    id="invoice-due-date"
                                     type="date"
                                     value={formData.due_date}
                                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
@@ -398,8 +428,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Description</label>
+                                <label htmlFor="invoice-description" className="block text-sm font-medium text-gray-700">Description</label>
                                 <input
+                                    id="invoice-description"
                                     type="text"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -416,7 +447,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                             {/* Add New Item */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 mb-4">
                                 <div>
+                                    <label htmlFor="item-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                     <input
+                                        id="item-description"
                                         type="text"
                                         placeholder="Description"
                                         value={newItem.description}
@@ -425,7 +458,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     />
                                 </div>
                                 <div>
+                                    <label htmlFor="item-quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
                                     <input
+                                        id="item-quantity"
                                         type="number"
                                         placeholder="Quantity"
                                         value={newItem.quantity}
@@ -436,7 +471,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     />
                                 </div>
                                 <div>
+                                    <label htmlFor="item-unit-price" className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
                                     <input
+                                        id="item-unit-price"
                                         type="number"
                                         placeholder="Unit Price"
                                         value={newItem.unit_price}
@@ -449,7 +486,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={addItem}
+                                        onClick={(e) => addItem(e)}
                                         className="btn btn-primary w-full"
                                     >
                                         Add Item

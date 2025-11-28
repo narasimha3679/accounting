@@ -1,0 +1,12 @@
+# This is an example workflow file
+# The actual workflow is in the root .github/workflows/test.yml
+# This file is here for reference
+
+# To customize the workflow:
+# 1. Edit .github/workflows/test.yml in the root directory
+# 2. Adjust environment variables as needed
+# 3. Add secrets to GitHub repository settings if needed for:
+#    - Supabase credentials (for E2E tests with real backend)
+#    - API keys
+#    - Other sensitive data
+

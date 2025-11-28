@@ -386,9 +386,34 @@ class SupabaseApi {
         return data;
     }
 
+    async checkBusinessNumberExists(businessNumber: string): Promise<boolean> {
+        const { data, error } = await supabase
+            .from('companies')
+            .select('id')
+            .eq('business_number', businessNumber)
+            .maybeSingle();
+        if (error) {
+            // If error is due to RLS (no access), assume it doesn't exist for this user's context
+            if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
+                return false;
+            }
+            throw new Error(error.message);
+        }
+        return data !== null;
+    }
+
     async createCompany(company: Omit<Company, 'id' | 'created_at' | 'updated_at'>): Promise<Company> {
         const { data, error } = await supabase.from('companies').insert(company).select('*').single<Company>();
-        if (error) throw new Error(error.message);
+        if (error) {
+            // Provide user-friendly error messages for common constraint violations
+            if (error.code === '23505') { // Unique constraint violation
+                if (error.message.includes('business_number')) {
+                    throw new Error(`A company with business number "${company.business_number}" already exists. Please use a different business number.`);
+                }
+                throw new Error('This company information already exists. Please check your details and try again.');
+            }
+            throw new Error(error.message);
+        }
         return data;
     }
 
@@ -501,9 +526,33 @@ class SupabaseApi {
         const hst_amount = company.hst_registered ? subtotal * company.hst_rate : 0;
         const total = subtotal + hst_amount;
 
+        // Generate invoice number: INV-YYYY-NNNN format
+        const year = new Date(issue_date).getFullYear();
+        const { data: existingInvoices, error: countError } = await supabase
+            .from('invoices')
+            .select('invoice_number')
+            .eq('company_id', company_id)
+            .like('invoice_number', `INV-${year}-%`)
+            .order('invoice_number', { ascending: false })
+            .limit(1);
+
+        if (countError) throw new Error(countError.message);
+
+        let invoiceNumber: string;
+        if (existingInvoices && existingInvoices.length > 0) {
+            // Extract the number from the last invoice and increment
+            const lastNumber = existingInvoices[0].invoice_number.match(/\d+$/);
+            const nextNumber = lastNumber ? parseInt(lastNumber[0], 10) + 1 : 1;
+            invoiceNumber = `INV-${year}-${String(nextNumber).padStart(4, '0')}`;
+        } else {
+            // First invoice for this year
+            invoiceNumber = `INV-${year}-0001`;
+        }
+
         const { data: invoice, error } = await supabase
             .from('invoices')
             .insert({
+                invoice_number: invoiceNumber,
                 client_id,
                 issue_date,
                 due_date,

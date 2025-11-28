@@ -202,8 +202,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Company Name *</label>
+                                <label htmlFor="client-name" className="block text-sm font-medium text-gray-700">Company Name *</label>
                                 <input
+                                    id="client-name"
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -213,8 +214,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Contact Person</label>
+                                <label htmlFor="client-contact-person" className="block text-sm font-medium text-gray-700">Contact Person</label>
                                 <input
+                                    id="client-contact-person"
                                     type="text"
                                     value={formData.contact_person}
                                     onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
@@ -223,8 +225,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <label htmlFor="client-email" className="block text-sm font-medium text-gray-700">Email</label>
                                 <input
+                                    id="client-email"
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -233,8 +236,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                                <label htmlFor="client-phone" className="block text-sm font-medium text-gray-700">Phone</label>
                                 <input
+                                    id="client-phone"
                                     type="tel"
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -243,8 +247,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                             </div>
 
                             <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Address</label>
+                                <label htmlFor="client-address" className="block text-sm font-medium text-gray-700">Address</label>
                                 <textarea
+                                    id="client-address"
                                     value={formData.address}
                                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                     className="input"
