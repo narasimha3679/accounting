@@ -5,7 +5,6 @@ import { Plus, Edit, Trash2, Calculator, Building2, Calendar, X } from 'lucide-r
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
-import { cn } from '../lib/utils';
 
 const CapitalAssets: React.FC = () => {
     const { user } = useAuth();
