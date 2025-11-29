@@ -221,6 +221,29 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Calculate HST based on client tax exemption status
+    const calculateHST = (): number => {
+        // Only calculate HST for client income type
+        if (formData.income_type !== 'client' || !formData.client_id) {
+            return 0;
+        }
+
+        const clientId = typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id;
+        const selectedClient = clients.find(c => c.id === clientId);
+
+        // If client is tax exempt, no HST
+        if (selectedClient?.hst_exempt) {
+            return 0;
+        }
+
+        // Calculate HST using company's HST rate
+        const hstRate = user?.company?.hst_rate || 0.13;
+        return formData.amount * hstRate;
+    };
+
+    const hstAmount = calculateHST();
+    const total = formData.amount + hstAmount;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -234,10 +257,15 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                 client_id: formData.client_id ? (typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id) : undefined,
                 income_date: formData.income_date,
                 company_id: user?.company_id!,
+                hst_amount: hstAmount,
             };
 
             if (income) {
-                await api.updateIncomeEntry(income.id, incomeData);
+                // For update, also include total
+                await api.updateIncomeEntry(income.id, {
+                    ...incomeData,
+                    total: total,
+                });
             } else {
                 await api.createIncomeEntry(incomeData);
             }
@@ -307,6 +335,43 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 />
                             </div>
                         </div>
+
+                        {formData.income_type === 'client' && formData.client_id && (
+                            <>
+                                <div className="bg-gray-50 p-3 rounded-md space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">HST ({((user?.company?.hst_rate || 0.13) * 100).toFixed(1)}%):</span>
+                                        <span className="font-medium text-gray-900">
+                                            {new Intl.NumberFormat('en-CA', {
+                                                style: 'currency',
+                                                currency: 'CAD',
+                                            }).format(hstAmount)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2">
+                                        <span className="text-gray-700">Total:</span>
+                                        <span className="text-gray-900">
+                                            {new Intl.NumberFormat('en-CA', {
+                                                style: 'currency',
+                                                currency: 'CAD',
+                                            }).format(total)}
+                                        </span>
+                                    </div>
+                                    {(() => {
+                                        const clientId = typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id;
+                                        const selectedClient = clients.find(c => c.id === clientId);
+                                        if (selectedClient?.hst_exempt) {
+                                            return (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Client is HST exempt - no HST charged
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                            </>
+                        )}
 
                         <div>
                             <label htmlFor="income_type" className="block text-sm font-medium text-gray-700">

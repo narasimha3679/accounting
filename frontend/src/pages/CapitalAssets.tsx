@@ -355,6 +355,8 @@ const CapitalAssetModal: React.FC<CapitalAssetModalProps> = ({ asset, categories
 
         const assetData = {
             ...formData,
+            // Ensure optional dates are sent as null instead of empty strings
+            disposal_date: formData.disposal_date || null,
             company_id: user?.company_id,
         };
 
@@ -581,9 +583,13 @@ interface DepreciationScheduleModalProps {
 }
 
 const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ asset, onClose }) => {
+    const queryClient = useQueryClient();
     const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear());
     const [depreciationCalculation, setDepreciationCalculation] = useState<any>(null);
     const [isCalculating, setIsCalculating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -594,6 +600,8 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
 
     const calculateDepreciation = async () => {
         setIsCalculating(true);
+        setSaveError(null);
+        setSaveSuccess(null);
         try {
             const result = await api.calculateDepreciation(asset.id, fiscalYear);
             setDepreciationCalculation(result);
@@ -601,6 +609,45 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
             console.error('Error calculating depreciation:', error);
         } finally {
             setIsCalculating(false);
+        }
+    };
+
+    const handleRecordDepreciation = async () => {
+        if (!depreciationCalculation) return;
+
+        setIsSaving(true);
+        setSaveError(null);
+        setSaveSuccess(null);
+
+        try {
+            // Reload asset with depreciation entries to avoid duplicate entries for the same year
+            const assetWithEntries = await api.getCapitalAsset(asset.id);
+            const alreadyExists = assetWithEntries.depreciation_entries?.some(
+                (entry) => entry.fiscal_year === fiscalYear
+            );
+
+            if (alreadyExists) {
+                setSaveError('Depreciation for this fiscal year has already been recorded for this asset.');
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+
+            await api.createDepreciationEntry(asset.id, {
+                fiscal_year: fiscalYear,
+                entry_date: today,
+                depreciation_amount: depreciationCalculation.depreciation_amount,
+            });
+
+            setSaveSuccess('Depreciation entry recorded for this fiscal year.');
+
+            // Refresh capital assets so accumulated depreciation and book value stay in sync
+            queryClient.invalidateQueries({ queryKey: ['capital-assets'] });
+        } catch (error) {
+            console.error('Error recording depreciation entry:', error);
+            setSaveError('Failed to record depreciation entry. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -693,20 +740,45 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
                         </div>
 
                         {depreciationCalculation && (
-                            <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Depreciation Amount</p>
-                                        <p className="font-semibold">{formatCurrency(depreciationCalculation.depreciation_amount)}</p>
+                            <div className="mt-4 space-y-3">
+                                <div className="p-3 bg-gray-50 rounded-md">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div>
+                                            <p className="text-sm text-gray-600">Depreciation Amount</p>
+                                            <p className="font-semibold">
+                                                {formatCurrency(depreciationCalculation.depreciation_amount)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Half-Year Rule</p>
+                                            <p className="font-semibold">
+                                                {depreciationCalculation.is_half_year_rule ? 'Yes' : 'No'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Remaining Book Value</p>
+                                            <p className="font-semibold">
+                                                {formatCurrency(depreciationCalculation.remaining_book_value)}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Half-Year Rule</p>
-                                        <p className="font-semibold">{depreciationCalculation.is_half_year_rule ? 'Yes' : 'No'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Remaining Book Value</p>
-                                        <p className="font-semibold">{formatCurrency(depreciationCalculation.remaining_book_value)}</p>
-                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleRecordDepreciation}
+                                        disabled={isSaving}
+                                        className="btn btn-primary"
+                                    >
+                                        {isSaving ? 'Saving...' : 'Record Depreciation Entry'}
+                                    </button>
+                                    {saveSuccess && (
+                                        <p className="text-sm text-green-700">{saveSuccess}</p>
+                                    )}
+                                    {saveError && (
+                                        <p className="text-sm text-red-700">{saveError}</p>
+                                    )}
                                 </div>
                             </div>
                         )}

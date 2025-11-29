@@ -724,6 +724,33 @@ class SupabaseApi {
     }
 
     async deleteExpense(id: number): Promise<void> {
+        // First, get all files associated with this expense
+        const { data: files, error: filesError } = await supabase
+            .from('expense_files')
+            .select('*')
+            .eq('expense_id', id);
+        
+        if (filesError) throw new Error(filesError.message);
+
+        // Delete all files from storage
+        if (files && files.length > 0) {
+            const storagePaths = files.map(file => file.storage_path);
+            const { error: storageError } = await supabase.storage
+                .from(SUPABASE_STORAGE_BUCKET)
+                .remove(storagePaths);
+            
+            if (storageError) throw new Error(storageError.message);
+
+            // Delete all file records from the database
+            const { error: deleteFilesError } = await supabase
+                .from('expense_files')
+                .delete()
+                .eq('expense_id', id);
+            
+            if (deleteFilesError) throw new Error(deleteFilesError.message);
+        }
+
+        // Finally, delete the expense record
         const { error } = await supabase.from('expenses').delete().eq('id', id);
         if (error) throw new Error(error.message);
     }
@@ -1039,7 +1066,8 @@ class SupabaseApi {
 
     async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string }): Promise<PaginatedResponse<CapitalAsset>> {
         return this.paginatedSelect<CapitalAsset>('capital_assets', {
-            columns: '*, category:expense_categories(*)',
+            // Include depreciation entries so CCA flows through to reports and tax calculator
+            columns: '*, category:expense_categories(*), depreciation_entries:depreciation_entries(*)',
             page: params?.page,
             limit: params?.limit,
             order: { column: 'purchase_date', ascending: false },
@@ -1158,9 +1186,13 @@ class SupabaseApi {
     }
 
     async createDepreciationEntry(id: number, entry: { fiscal_year: number; entry_date: string; depreciation_amount?: number }): Promise<DepreciationEntry> {
-        const calculation = entry.depreciation_amount
-            ? { depreciation_amount: entry.depreciation_amount, is_half_year_rule: false }
-            : await this.calculateDepreciation(id, entry.fiscal_year);
+        // Always use calculateDepreciation to determine half-year rule correctly,
+        // but allow the caller to override the amount if they provided one.
+        const baseCalculation = await this.calculateDepreciation(id, entry.fiscal_year);
+        const calculation = {
+            ...baseCalculation,
+            depreciation_amount: entry.depreciation_amount ?? baseCalculation.depreciation_amount,
+        };
         const { data, error } = await supabase
             .from('depreciation_entries')
             .insert({

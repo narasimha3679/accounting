@@ -16,6 +16,7 @@ import OwnerPayments from './pages/OwnerPayments';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
+import TaxCalculator from './pages/TaxCalculator';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -65,9 +66,6 @@ const AuthOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return <>{children}</>;
 };
-
-// Placeholder components for other pages
-const TaxCalculator = () => <div className="p-6"><h1 className="text-2xl font-bold">Tax Calculator</h1><p>Tax calculations coming soon...</p></div>;
 
 function App() {
   return (

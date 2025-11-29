@@ -370,6 +370,18 @@ interface ExpenseModalProps {
 
 const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClose, onSave }) => {
     const { user } = useAuth();
+    const HST_RATE = 0.13; // 13% default HST rate
+    
+    // Determine if tax applies: if editing, check if hst_paid > 0; if new, default to true
+    const initialTaxApplies = expense ? (expense.hst_paid > 0) : true;
+    
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-CA', {
+            style: 'currency',
+            currency: 'CAD',
+        }).format(amount);
+    };
+    
     const [formData, setFormData] = useState({
         description: expense?.description || '',
         category_id: expense?.category_id || 0,
@@ -379,6 +391,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
         receipt_attached: expense?.receipt_attached || false,
         paid_by: expense?.paid_by || 'corp',
     });
+    const [taxApplies, setTaxApplies] = useState(initialTaxApplies);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState(false);
 
@@ -552,7 +565,11 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
                                 <input
                                     type="number"
                                     value={formData.amount}
-                                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => {
+                                        const newAmount = parseFloat(e.target.value) || 0;
+                                        const newHstPaid = taxApplies ? parseFloat((newAmount * HST_RATE).toFixed(2)) : formData.hst_paid;
+                                        setFormData({ ...formData, amount: newAmount, hst_paid: newHstPaid });
+                                    }}
                                     className="input"
                                     min="0"
                                     step="0.01"
@@ -583,7 +600,32 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">HST Paid</label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-medium text-gray-700">HST Paid</label>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="tax_applies"
+                                            checked={taxApplies}
+                                            onChange={(e) => {
+                                                const applies = e.target.checked;
+                                                setTaxApplies(applies);
+                                                if (applies) {
+                                                    // Auto-calculate HST when tax applies is checked
+                                                    const calculatedHst = parseFloat((formData.amount * HST_RATE).toFixed(2));
+                                                    setFormData({ ...formData, hst_paid: calculatedHst });
+                                                } else {
+                                                    // Set to 0 when tax doesn't apply
+                                                    setFormData({ ...formData, hst_paid: 0 });
+                                                }
+                                            }}
+                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                        />
+                                        <label htmlFor="tax_applies" className="ml-2 block text-sm text-gray-700">
+                                            Tax applies (13%)
+                                        </label>
+                                    </div>
+                                </div>
                                 <input
                                     type="number"
                                     value={formData.hst_paid}
@@ -591,7 +633,14 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
                                     className="input"
                                     min="0"
                                     step="0.01"
+                                    readOnly={taxApplies}
+                                    style={taxApplies ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : {}}
                                 />
+                                {taxApplies && formData.amount > 0 && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Calculated: {formatCurrency(formData.amount)} × 13% = {formatCurrency(formData.hst_paid)}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="sm:col-span-2">
