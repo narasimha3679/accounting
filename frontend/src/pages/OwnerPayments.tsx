@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type OwnerPayment } from '../lib/api';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 import {
     Plus,
     Edit,
@@ -37,13 +39,13 @@ interface OwnerPaymentModalProps {
     onSave: (ownerPayment: OwnerPayment, linkedExpenseId?: number) => void;
 }
 
-const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
+function OwnerPaymentModal({
     ownerPayment,
     ownerExpenses,
     ownerExpensesLoading,
     onClose,
     onSave
-}) => {
+}: OwnerPaymentModalProps) {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         description: '',
@@ -151,24 +153,26 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                    <h2 className="text-xl font-semibold text-foreground">
                         {ownerPayment ? 'Edit Owner Payment' : 'Add Owner Payment'}
                     </h2>
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="h-8 w-8 rounded-full"
                     >
                         <X className="h-6 w-6" />
-                    </button>
+                    </Button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="description" className="block text-sm font-medium text-foreground mb-2">
                                 Description *
                             </label>
                             <input
@@ -176,18 +180,18 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                                 id="description"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="amount" className="block text-sm font-medium text-foreground mb-2">
                                 Amount *
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <DollarSign className="h-5 w-5 text-gray-400" />
+                                    <DollarSign className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     type="number"
@@ -196,40 +200,40 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                                     min="0"
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label htmlFor="payment_date" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="payment_date" className="block text-sm font-medium text-foreground mb-2">
                                 Payment Date *
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Calendar className="h-5 w-5 text-gray-400" />
+                                    <Calendar className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     type="date"
                                     id="payment_date"
                                     value={formData.payment_date}
                                     onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label htmlFor="payment_type" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="payment_type" className="block text-sm font-medium text-foreground mb-2">
                                 Payment Type *
                             </label>
                             <select
                                 id="payment_type"
                                 value={formData.payment_type}
                                 onChange={(e) => setFormData({ ...formData, payment_type: e.target.value as any })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value="reimbursement">Reimbursement</option>
@@ -240,17 +244,18 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
 
                         <div className="md:col-span-2">
                             <div className="flex items-center justify-between mb-2">
-                                <label htmlFor="linked_expense" className="block text-sm font-medium text-gray-700">
+                                <label htmlFor="linked_expense" className="block text-sm font-medium text-foreground">
                                     Link Owner Expense (Optional)
                                 </label>
                                 {typeof linkedExpenseId === 'number' && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={handleLinkedExpenseClear}
-                                        className="text-sm text-blue-600 hover:text-blue-800"
                                     >
                                         Clear
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                             <select
@@ -258,7 +263,7 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                                 value={linkedExpenseId === '' ? '' : linkedExpenseId.toString()}
                                 onChange={handleLinkedExpenseChange}
                                 disabled={ownerExpensesLoading || orderedOwnerExpenses.length === 0}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <option value="">
                                     {ownerExpensesLoading
@@ -276,14 +281,14 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                                     );
                                 })}
                             </select>
-                            <p className="mt-2 text-sm text-gray-500">
+                            <p className="mt-2 text-sm text-muted-foreground">
                                 Selecting an expense pre-fills the reimbursement details, but you can still edit the fields
                                 before saving.
                             </p>
                             {selectedExpense && (
-                                <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-                                    <div className="font-semibold">{selectedExpense.description}</div>
-                                    <div className="mt-1 flex flex-wrap gap-4 text-blue-800">
+                                <div className="mt-3 rounded-md border border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 text-sm">
+                                    <div className="font-semibold text-blue-900 dark:text-blue-200">{selectedExpense.description}</div>
+                                    <div className="mt-1 flex flex-wrap gap-4 text-blue-800 dark:text-blue-300">
                                         <span>{formatCurrency(selectedExpense.amount + (selectedExpense.hst_paid ?? 0))} total</span>
                                         <span>Expense date: {formatDate(selectedExpense.expense_date)}</span>
                                     </div>
@@ -292,7 +297,7 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                         </div>
 
                         <div>
-                            <label htmlFor="reference" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="reference" className="block text-sm font-medium text-foreground mb-2">
                                 Reference (Optional)
                             </label>
                             <input
@@ -301,13 +306,13 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                                 value={formData.reference}
                                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                                 placeholder="Check number, transfer reference, etc."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="notes" className="block text-sm font-medium text-foreground mb-2">
                             Notes (Optional)
                         </label>
                         <textarea
@@ -315,32 +320,31 @@ const OwnerPaymentModal: React.FC<OwnerPaymentModalProps> = ({
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="Additional notes about this payment..."
                         />
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                        <button
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                        <Button
                             type="button"
+                            variant="outline"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {isSubmitting ? 'Saving...' : (ownerPayment ? 'Update Payment' : 'Add Payment')}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>
         </div>
     );
-};
+}
 
 const OwnerPayments: React.FC = () => {
     const { user } = useAuth();
@@ -463,11 +467,11 @@ const OwnerPayments: React.FC = () => {
     const getPaymentTypeColor = (type: string) => {
         switch (type) {
             case 'reimbursement':
-                return 'bg-blue-100 text-blue-800';
+                return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
             case 'loan_repayment':
-                return 'bg-purple-100 text-purple-800';
+                return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
             default:
-                return 'bg-gray-100 text-gray-800';
+                return 'bg-muted text-muted-foreground';
         }
     };
 
@@ -485,7 +489,7 @@ const OwnerPayments: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -493,13 +497,13 @@ const OwnerPayments: React.FC = () => {
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="heading-1">Owner Payments</h1>
-                <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
-                    <p className="text-sm text-yellow-800">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Owner Payments</h1>
+                <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         To track owner payments, please first set up your company details in the{' '}
                         <span className="font-semibold">Settings</span> page.
                     </p>
-                </div>
+                </Card>
             </div>
         );
     }
@@ -508,31 +512,31 @@ const OwnerPayments: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="heading-1">Owner Payments</h1>
-                    <p className="text-gray-600">Track payments made by the corporation to the owner</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Owner Payments</h1>
+                    <p className="text-muted-foreground mt-2">Track payments made by the corporation to the owner</p>
                 </div>
-                <button
+                <Button
                     onClick={() => {
                         setEditingPayment(undefined);
                         setShowModal(true);
                     }}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    icon={Plus}
+                    className="w-full sm:w-auto"
                 >
-                    <Plus className="h-4 w-4 mr-2" />
                     Add Payment
-                </button>
+                </Button>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <Card className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="search" className="block text-sm font-medium text-foreground mb-2">
                             Search
                         </label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search className="h-4 w-4 text-gray-400" />
+                                <Search className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <input
                                 type="text"
@@ -540,20 +544,20 @@ const OwnerPayments: React.FC = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search by description or reference..."
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label htmlFor="payment_type_filter" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="payment_type_filter" className="block text-sm font-medium text-foreground mb-2">
                             Payment Type
                         </label>
                         <select
                             id="payment_type_filter"
                             value={paymentTypeFilter}
                             onChange={(e) => setPaymentTypeFilter(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             <option value="">All Types</option>
                             <option value="reimbursement">Reimbursement</option>
@@ -563,14 +567,14 @@ const OwnerPayments: React.FC = () => {
                     </div>
 
                     <div>
-                        <label htmlFor="date_filter" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="date_filter" className="block text-sm font-medium text-foreground mb-2">
                             Year
                         </label>
                         <select
                             id="date_filter"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             <option value="">All Years</option>
                             <option value="2024">2024</option>
@@ -579,114 +583,104 @@ const OwnerPayments: React.FC = () => {
                         </select>
                     </div>
                 </div>
-            </div>
+            </Card>
 
             {/* Summary */}
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
+            <Card className="p-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Summary</h3>
-                        <p className="text-gray-600">{filteredPayments.length} payments found</p>
+                        <h3 className="text-lg font-semibold text-foreground">Summary</h3>
+                        <p className="text-muted-foreground">{filteredPayments.length} payments found</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalAmount)}</div>
-                        <div className="text-sm text-gray-600">Total Amount</div>
+                        <div className="text-2xl font-bold text-foreground">{formatCurrency(totalAmount)}</div>
+                        <div className="text-sm text-muted-foreground">Total Amount</div>
                     </div>
                 </div>
-            </div>
+            </Card>
 
             {/* Payments List */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <Card className="overflow-hidden">
                 {filteredPayments.length === 0 ? (
                     <div className="text-center py-12">
-                        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
-                        <p className="text-gray-600 mb-4">
+                        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">No payments found</h3>
+                        <p className="text-muted-foreground mb-4">
                             {searchTerm || paymentTypeFilter || dateFilter
                                 ? 'Try adjusting your filters to see more results.'
-                                : 'Get started by adding your first owner payment.'
-                            }
+                                : 'Get started by adding your first owner payment.'}
                         </p>
                         {!searchTerm && !paymentTypeFilter && !dateFilter && (
-                            <button
+                            <Button
                                 onClick={() => setShowModal(true)}
-                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                icon={Plus}
                             >
-                                <Plus className="h-4 w-4 mr-2" />
                                 Add Payment
-                            </button>
+                            </Button>
                         )}
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Description
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Type
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Amount
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Date
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Reference
-                                    </th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
+                                    <th className="px-6 py-4">Description</th>
+                                    <th className="px-6 py-4">Type</th>
+                                    <th className="px-6 py-4">Amount</th>
+                                    <th className="px-6 py-4">Date</th>
+                                    <th className="px-6 py-4">Reference</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="divide-y divide-border">
                                 {filteredPayments.map((payment) => (
-                                    <tr key={payment.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
+                                    <tr key={payment.id} className="hover:bg-muted/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-medium text-foreground">
                                                 {payment.description}
                                             </div>
                                             {payment.notes && (
-                                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                                <div className="text-sm text-muted-foreground truncate max-w-xs">
                                                     {payment.notes}
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentTypeColor(payment.payment_type)}`}>
                                                 {getPaymentTypeIcon(payment.payment_type)}
                                                 <span className="ml-1 capitalize">{payment.payment_type.replace('_', ' ')}</span>
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        <td className="px-6 py-4 font-medium text-foreground">
                                             {formatCurrency(payment.amount)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 text-muted-foreground">
                                             {formatDate(payment.payment_date)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 text-muted-foreground">
                                             {payment.reference || '-'}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={() => {
                                                         setEditingPayment(payment);
                                                         setShowModal(true);
                                                     }}
-                                                    className="text-blue-600 hover:text-blue-900"
+                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                                 >
                                                     <Edit className="h-4 w-4" />
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={() => handleDelete(payment.id)}
-                                                    className="text-red-600 hover:text-red-900"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
-                                                </button>
+                                                </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -695,7 +689,7 @@ const OwnerPayments: React.FC = () => {
                         </table>
                     </div>
                 )}
-            </div>
+            </Card>
 
             {showModal && (
                 <OwnerPaymentModal

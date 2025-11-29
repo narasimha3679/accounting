@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import api, { type Invoice, type Expense, type Dividend } from '../lib/api';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
@@ -305,13 +307,13 @@ ${formatCurrency(data.retainedEarnings)}
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="heading-1">Reports</h1>
-                <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
-                    <p className="text-sm text-yellow-800">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports</h1>
+                <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         Reports require a company to be configured. Please go to the{' '}
                         <span className="font-semibold">Settings</span> page to set up your company details.
                     </p>
-                </div>
+                </Card>
             </div>
         );
     }
@@ -319,51 +321,49 @@ ${formatCurrency(data.retainedEarnings)}
     if (!reportData) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Reports</h1>
-                    <p className="text-gray-600">Generate financial reports for your business and tax submission</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports</h1>
+                    <p className="text-muted-foreground mt-2">Generate financial reports for your business and tax submission</p>
                 </div>
-                <div className="flex gap-3">
-                    <button
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
                         onClick={generateReport}
-                        className="btn btn-secondary flex items-center gap-2"
+                        variant="outline"
+                        icon={FileText}
                     >
-                        <FileText className="h-4 w-4" />
                         Download TXT
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={generatePDFReport}
                         disabled={isGeneratingPDF}
-                        className="btn btn-primary flex items-center gap-2"
+                        icon={isGeneratingPDF ? undefined : FileSpreadsheet}
                     >
-                        {isGeneratingPDF ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                            <FileSpreadsheet className="h-4 w-4" />
+                        {isGeneratingPDF && (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         )}
                         {isGeneratingPDF ? 'Generating...' : 'Download PDF'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Report Controls */}
-            <div className="card">
-                <div className="flex items-center gap-6">
+            <Card className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                        <label className="text-sm font-medium text-gray-700">Year:</label>
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                        <label className="text-sm font-medium text-foreground">Year:</label>
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                            className="input w-auto"
+                            className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                                 <option key={year} value={year}>{year}</option>
@@ -372,11 +372,11 @@ ${formatCurrency(data.retainedEarnings)}
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700">Report Type:</label>
+                        <label className="text-sm font-medium text-foreground">Report Type:</label>
                         <select
                             value={selectedReport}
                             onChange={(e) => setSelectedReport(e.target.value as 'pl' | 'hst' | 'retained' | 'comprehensive')}
-                            className="input w-auto"
+                            className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             <option value="pl">Profit & Loss</option>
                             <option value="hst">HST Report</option>
@@ -385,19 +385,19 @@ ${formatCurrency(data.retainedEarnings)}
                         </select>
                     </div>
                 </div>
-            </div>
+            </Card>
 
             {/* Comprehensive Tax Report Info */}
             {selectedReport === 'comprehensive' && (
-                <div className="card bg-blue-50 border-blue-200">
+                <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <div className="flex items-start gap-3">
-                        <FileSpreadsheet className="h-6 w-6 text-blue-600 mt-1" />
+                        <FileSpreadsheet className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1 flex-shrink-0" />
                         <div>
-                            <h3 className="text-lg font-semibold text-blue-900 mb-2">Comprehensive Tax Report</h3>
-                            <p className="text-blue-800 mb-3">
+                            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">Comprehensive Tax Report</h3>
+                            <p className="text-blue-800 dark:text-blue-300 mb-3">
                                 This comprehensive report includes all financial data needed for tax submission to your accountant:
                             </p>
-                            <ul className="text-blue-800 text-sm space-y-1 ml-4">
+                            <ul className="text-blue-800 dark:text-blue-300 text-sm space-y-1 ml-4">
                                 <li>• Complete Profit & Loss Statement</li>
                                 <li>• Detailed HST Summary with monthly breakdown</li>
                                 <li>• Capital Assets and Depreciation (CCA)</li>
@@ -405,153 +405,157 @@ ${formatCurrency(data.retainedEarnings)}
                                 <li>• Retained earnings calculation</li>
                                 <li>• All supporting transaction details</li>
                             </ul>
-                            <p className="text-blue-800 text-sm mt-3 font-medium">
+                            <p className="text-blue-800 dark:text-blue-300 text-sm mt-3 font-medium">
                                 Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
                             </p>
                         </div>
                     </div>
-                </div>
+                </Card>
             )}
 
             {/* Report Summary */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Profit & Loss Summary */}
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center mb-4">
-                        <TrendingUp className="h-6 w-6 text-green-600 mr-2" />
-                        <h3 className="text-lg font-medium text-gray-900">Profit & Loss</h3>
+                        <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400 mr-2" />
+                        <h3 className="text-lg font-medium text-foreground">Profit & Loss</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Gross Income:</span>
-                            <span className="font-medium">{formatCurrency(reportData.grossIncome)}</span>
+                            <span className="text-sm text-muted-foreground">Gross Income:</span>
+                            <span className="font-medium text-foreground">{formatCurrency(reportData.grossIncome)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Expenses:</span>
-                            <span className="font-medium text-red-600">{formatCurrency(reportData.totalExpenses)}</span>
+                            <span className="text-sm text-muted-foreground">Total Expenses:</span>
+                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-2">
-                            <span className="text-sm font-medium">Net Income (Pre-tax):</span>
-                            <span className={`font-bold ${reportData.netIncomeBeforeTax >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="flex justify-between border-t border-border pt-2">
+                            <span className="text-sm font-medium text-foreground">Net Income (Pre-tax):</span>
+                            <span className={`font-bold ${reportData.netIncomeBeforeTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.netIncomeBeforeTax)}
                             </span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Small Business Tax:</span>
-                            <span className="font-medium text-red-600">{formatCurrency(reportData.smallBusinessTax)}</span>
+                            <span className="text-sm text-muted-foreground">Small Business Tax:</span>
+                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.smallBusinessTax)}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-2">
-                            <span className="text-sm font-bold">Net Income (Post-tax):</span>
-                            <span className={`font-bold text-lg ${reportData.netIncomeAfterTax >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="flex justify-between border-t border-border pt-2">
+                            <span className="text-sm font-bold text-foreground">Net Income (Post-tax):</span>
+                            <span className={`font-bold text-lg ${reportData.netIncomeAfterTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.netIncomeAfterTax)}
                             </span>
                         </div>
                     </div>
-                </div>
+                </Card>
 
                 {/* HST Summary */}
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center mb-4">
-                        <Receipt className="h-6 w-6 text-blue-600 mr-2" />
-                        <h3 className="text-lg font-medium text-gray-900">HST Summary</h3>
+                        <Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
+                        <h3 className="text-lg font-medium text-foreground">HST Summary</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">HST Collected:</span>
-                            <span className="font-medium text-green-600">{formatCurrency(reportData.hstCollected)}</span>
+                            <span className="text-sm text-muted-foreground">HST Collected:</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.hstCollected)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">HST Paid:</span>
-                            <span className="font-medium text-blue-600">{formatCurrency(reportData.hstPaid)}</span>
+                            <span className="text-sm text-muted-foreground">HST Paid:</span>
+                            <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstPaid)}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-2">
-                            <span className="text-sm font-bold">HST Remittance:</span>
-                            <span className={`font-bold text-lg ${reportData.hstRemittance >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <div className="flex justify-between border-t border-border pt-2">
+                            <span className="text-sm font-bold text-foreground">HST Remittance:</span>
+                            <span className={`font-bold text-lg ${reportData.hstRemittance >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                 {formatCurrency(reportData.hstRemittance)}
                             </span>
                         </div>
                     </div>
-                </div>
+                </Card>
 
                 {/* Retained Earnings Summary */}
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center mb-4">
-                        <DollarSign className="h-6 w-6 text-purple-600 mr-2" />
-                        <h3 className="text-lg font-medium text-gray-900">Retained Earnings</h3>
+                        <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-2" />
+                        <h3 className="text-lg font-medium text-foreground">Retained Earnings</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Net Income (Post-tax):</span>
-                            <span className="font-medium">{formatCurrency(reportData.netIncomeAfterTax)}</span>
+                            <span className="text-sm text-muted-foreground">Net Income (Post-tax):</span>
+                            <span className="font-medium text-foreground">{formatCurrency(reportData.netIncomeAfterTax)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Dividends Paid:</span>
-                            <span className="font-medium text-red-600">{formatCurrency(reportData.totalDividends)}</span>
+                            <span className="text-sm text-muted-foreground">Dividends Paid:</span>
+                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDividends)}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-2">
-                            <span className="text-sm font-bold">Retained Earnings:</span>
-                            <span className={`font-bold text-lg ${reportData.retainedEarnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="flex justify-between border-t border-border pt-2">
+                            <span className="text-sm font-bold text-foreground">Retained Earnings:</span>
+                            <span className={`font-bold text-lg ${reportData.retainedEarnings >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.retainedEarnings)}
                             </span>
                         </div>
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Detailed Tables */}
             {selectedReport === 'pl' && (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <div className="card">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Invoices</h3>
+                    <Card className="overflow-hidden">
+                        <div className="p-6 border-b border-border">
+                            <h3 className="text-lg font-medium text-foreground">Recent Invoices</h3>
+                        </div>
                         <div className="overflow-x-auto">
-                            <table className="table">
-                                <thead>
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                     <tr>
-                                        <th>Invoice #</th>
-                                        <th>Client</th>
-                                        <th>Amount</th>
-                                        <th>Date</th>
+                                        <th className="px-6 py-3">Invoice #</th>
+                                        <th className="px-6 py-3">Client</th>
+                                        <th className="px-6 py-3">Amount</th>
+                                        <th className="px-6 py-3">Date</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-border">
                                     {reportData.paidInvoices.slice(0, 10).map((invoice) => (
-                                        <tr key={invoice.id}>
-                                            <td className="font-medium">{invoice.invoice_number}</td>
-                                            <td>{invoice.client?.name || 'Unknown'}</td>
-                                            <td>{formatCurrency(invoice.subtotal)}</td>
-                                            <td>{formatDate(invoice.issue_date)}</td>
+                                        <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-foreground">{invoice.invoice_number}</td>
+                                            <td className="px-6 py-4 text-muted-foreground">{invoice.client?.name || 'Unknown'}</td>
+                                            <td className="px-6 py-4 text-foreground">{formatCurrency(invoice.subtotal)}</td>
+                                            <td className="px-6 py-4 text-muted-foreground">{formatDate(invoice.issue_date)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </Card>
 
-                    <div className="card">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Expenses</h3>
+                    <Card className="overflow-hidden">
+                        <div className="p-6 border-b border-border">
+                            <h3 className="text-lg font-medium text-foreground">Recent Expenses</h3>
+                        </div>
                         <div className="overflow-x-auto">
-                            <table className="table">
-                                <thead>
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                     <tr>
-                                        <th>Description</th>
-                                        <th>Category</th>
-                                        <th>Amount</th>
-                                        <th>Date</th>
+                                        <th className="px-6 py-3">Description</th>
+                                        <th className="px-6 py-3">Category</th>
+                                        <th className="px-6 py-3">Amount</th>
+                                        <th className="px-6 py-3">Date</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-border">
                                     {reportData.expenses.slice(0, 10).map((expense) => (
-                                        <tr key={expense.id}>
-                                            <td className="font-medium">{expense.description}</td>
-                                            <td>{expense.category?.name || 'Uncategorized'}</td>
-                                            <td>{formatCurrency(expense.amount)}</td>
-                                            <td>{formatDate(expense.expense_date)}</td>
+                                        <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-foreground">{expense.description}</td>
+                                            <td className="px-6 py-4 text-muted-foreground">{expense.category?.name || 'Uncategorized'}</td>
+                                            <td className="px-6 py-4 text-foreground">{formatCurrency(expense.amount)}</td>
+                                            <td className="px-6 py-4 text-muted-foreground">{formatDate(expense.expense_date)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </Card>
                 </div>
             )}
         </div>

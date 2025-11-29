@@ -4,6 +4,7 @@ import api from '../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const TaxCalculator: React.FC = () => {
     const { user } = useAuth();
@@ -204,7 +205,7 @@ const TaxCalculator: React.FC = () => {
             isHSTRegistered,
             paidInvoices,
             clientIncomeEntries: filteredIncomeEntries.filter(entry => entry.income_type === 'client'),
-            
+
             // Income Tax Data
             grossRevenue,
             invoiceRevenue,
@@ -217,10 +218,10 @@ const TaxCalculator: React.FC = () => {
             corporateTaxOwed,
             filteredExpenses,
             depreciationEntries,
-            capitalAssetsWithDepreciation: capitalAssets.filter(asset => 
+            capitalAssetsWithDepreciation: capitalAssets.filter(asset =>
                 asset.depreciation_entries?.some(entry => entry.fiscal_year === fiscalYear)
             ),
-            
+
             // Summary
             totalTaxesOwed,
         };
@@ -251,7 +252,7 @@ const TaxCalculator: React.FC = () => {
     if (!taxData) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -261,39 +262,41 @@ const TaxCalculator: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Tax Calculator</h1>
-                    <p className="text-gray-600 mt-2">Calculate taxes owed to CRA for Ontario small corporations</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Tax Calculator</h1>
+                    <p className="text-muted-foreground mt-2">Calculate taxes owed to CRA for Ontario small corporations</p>
                 </div>
 
                 {/* Time Period Selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <div className="flex rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
+                    <div className="flex rounded-lg shadow-sm border border-border overflow-hidden">
                         <button
                             type="button"
                             onClick={() => setTimePeriod('month')}
-                            className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                            className={cn(
+                                "px-4 py-2 text-sm font-semibold transition-all duration-200",
                                 timePeriod === 'month'
-                                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }`}
+                                    ? 'bg-primary text-primary-foreground shadow-md'
+                                    : 'bg-card text-foreground hover:bg-muted'
+                            )}
                         >
                             Month
                         </button>
                         <button
                             type="button"
                             onClick={() => setTimePeriod('year')}
-                            className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                            className={cn(
+                                "px-4 py-2 text-sm font-semibold transition-all duration-200 border-l border-border",
                                 timePeriod === 'year'
-                                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }`}
+                                    ? 'bg-primary text-primary-foreground shadow-md'
+                                    : 'bg-card text-foreground hover:bg-muted'
+                            )}
                         >
                             Year
                         </button>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                        <Calendar className="h-5 w-5 text-gray-400" />
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
                         <input
                             type={timePeriod === 'month' ? 'month' : 'number'}
                             value={timePeriod === 'month'
@@ -308,30 +311,40 @@ const TaxCalculator: React.FC = () => {
                                     setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                 }
                             }}
-                            className="input"
+                            className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         />
                     </div>
                 </div>
             </div>
 
             {/* Total Taxes Owed Summary */}
-            <Card gradient={taxData.totalTaxesOwed > 0 ? 'red' : 'green'} className="p-6">
+            <Card className={cn(
+                "p-6",
+                taxData.totalTaxesOwed > 0
+                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                    : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+            )}>
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Total Taxes Owed to CRA</h2>
-                        <p className="text-sm text-gray-600">
-                            {timePeriod === 'month' 
+                        <h2 className="text-2xl font-bold text-foreground mb-2">Total Taxes Owed to CRA</h2>
+                        <p className="text-sm text-muted-foreground">
+                            {timePeriod === 'month'
                                 ? `For ${selectedDate.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })}`
                                 : `For fiscal year ${fiscalYear}`
                             }
                         </p>
                     </div>
                     <div className="text-right">
-                        <div className={`text-4xl font-bold ${taxData.totalTaxesOwed > 0 ? 'text-red-800' : 'text-green-800'}`}>
+                        <div className={cn(
+                            "text-4xl font-bold",
+                            taxData.totalTaxesOwed > 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-green-600 dark:text-green-400"
+                        )}>
                             {formatCurrency(taxData.totalTaxesOwed)}
                         </div>
                         {taxData.totalTaxesOwed < 0 && (
-                            <p className="text-sm text-green-600 mt-1">Refund/Credit</p>
+                            <p className="text-sm text-green-600 dark:text-green-400 mt-1">Refund/Credit</p>
                         )}
                     </div>
                 </div>
@@ -339,35 +352,45 @@ const TaxCalculator: React.FC = () => {
 
             {/* HST Remittance Section */}
             <div className="space-y-4">
-                <Card gradient="orange" className="p-6">
+                <Card className="p-6 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-gray-900">HST Remittance</h2>
+                        <h2 className="text-xl font-bold text-foreground">HST Remittance</h2>
                         <button
                             onClick={() => toggleSection('hst')}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="text-muted-foreground hover:text-foreground"
                         >
                             {expandedSections.hst ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="bg-white rounded-lg p-4 border border-orange-200">
-                            <div className="text-sm text-gray-600 mb-1">HST Collected</div>
-                            <div className="text-2xl font-bold text-gray-900">{formatCurrency(taxData.hstCollected)}</div>
+                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                            <div className="text-sm text-muted-foreground mb-1">HST Collected</div>
+                            <div className="text-2xl font-bold text-foreground">{formatCurrency(taxData.hstCollected)}</div>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-orange-200">
-                            <div className="text-sm text-gray-600 mb-1">HST Input Tax Credits</div>
-                            <div className="text-2xl font-bold text-green-600">
+                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                            <div className="text-sm text-muted-foreground mb-1">HST Input Tax Credits</div>
+                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                                 {taxData.isHSTRegistered ? formatCurrency(taxData.hstInputTaxCredits) : '$0.00 (Not HST Registered)'}
                             </div>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-orange-200">
-                            <div className="text-sm text-gray-600 mb-1">HST Already Paid to CRA</div>
-                            <div className="text-2xl font-bold text-blue-600">{formatCurrency(taxData.hstAlreadyPaid)}</div>
+                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                            <div className="text-sm text-muted-foreground mb-1">HST Already Paid to CRA</div>
+                            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(taxData.hstAlreadyPaid)}</div>
                         </div>
-                        <div className={`bg-white rounded-lg p-4 border-2 ${taxData.hstOwed > 0 ? 'border-red-300' : 'border-green-300'}`}>
-                            <div className="text-sm text-gray-600 mb-1">Net HST Owed</div>
-                            <div className={`text-2xl font-bold ${taxData.hstOwed > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <div className={cn(
+                            "bg-background rounded-lg p-4 border-2",
+                            taxData.hstOwed > 0
+                                ? "border-red-300 dark:border-red-700"
+                                : "border-green-300 dark:border-green-700"
+                        )}>
+                            <div className="text-sm text-muted-foreground mb-1">Net HST Owed</div>
+                            <div className={cn(
+                                "text-2xl font-bold",
+                                taxData.hstOwed > 0
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-green-600 dark:text-green-400"
+                            )}>
                                 {formatCurrency(taxData.hstOwed)}
                             </div>
                         </div>
@@ -376,39 +399,39 @@ const TaxCalculator: React.FC = () => {
                     {expandedSections.hst && (
                         <div className="mt-4 space-y-4">
                             <div>
-                                <h3 className="text-sm font-semibold text-gray-700 mb-2">HST Collected Breakdown</h3>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <h3 className="text-sm font-semibold text-foreground mb-2">HST Collected Breakdown</h3>
+                                <div className="bg-background rounded-lg p-4 border border-border">
                                     <div className="flex justify-between mb-2">
-                                        <span className="text-sm text-gray-600">From Invoices ({taxData.paidInvoices.length} invoices)</span>
-                                        <span className="text-sm font-medium">{formatCurrency(taxData.hstFromInvoices)}</span>
+                                        <span className="text-sm text-muted-foreground">From Invoices ({taxData.paidInvoices.length} invoices)</span>
+                                        <span className="text-sm font-medium text-foreground">{formatCurrency(taxData.hstFromInvoices)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-sm text-gray-600">From Client Income ({taxData.clientIncomeEntries.length} entries)</span>
-                                        <span className="text-sm font-medium">{formatCurrency(taxData.hstFromClientIncome)}</span>
+                                        <span className="text-sm text-muted-foreground">From Client Income ({taxData.clientIncomeEntries.length} entries)</span>
+                                        <span className="text-sm font-medium text-foreground">{formatCurrency(taxData.hstFromClientIncome)}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {taxData.paidInvoices.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Paid Invoices</h3>
-                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
+                                    <h3 className="text-sm font-semibold text-foreground mb-2">Paid Invoices</h3>
+                                    <div className="bg-background rounded-lg border border-border overflow-hidden">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">HST</th>
+                                                    <th className="px-4 py-3">Invoice</th>
+                                                    <th className="px-4 py-3">Date</th>
+                                                    <th className="px-4 py-3 text-right">Subtotal</th>
+                                                    <th className="px-4 py-3 text-right">HST</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
+                                            <tbody className="divide-y divide-border">
                                                 {taxData.paidInvoices.map((invoice) => (
-                                                    <tr key={invoice.id}>
-                                                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{invoice.invoice_number}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">{formatDate(invoice.issue_date)}</td>
-                                                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(invoice.subtotal)}</td>
-                                                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(invoice.hst_amount)}</td>
+                                                    <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
+                                                        <td className="px-4 py-3 font-medium text-foreground">{invoice.invoice_number}</td>
+                                                        <td className="px-4 py-3 text-muted-foreground">{formatDate(invoice.issue_date)}</td>
+                                                        <td className="px-4 py-3 text-right text-foreground">{formatCurrency(invoice.subtotal)}</td>
+                                                        <td className="px-4 py-3 text-right text-foreground">{formatCurrency(invoice.hst_amount)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -423,49 +446,59 @@ const TaxCalculator: React.FC = () => {
 
             {/* Corporate Income Tax Section */}
             <div className="space-y-4">
-                <Card gradient="blue" className="p-6">
+                <Card className="p-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-gray-900">Corporate Income Tax</h2>
+                        <h2 className="text-xl font-bold text-foreground">Corporate Income Tax</h2>
                         <button
                             onClick={() => toggleSection('income')}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="text-muted-foreground hover:text-foreground"
                         >
                             {expandedSections.income ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                         </button>
                     </div>
 
                     <div className="space-y-4">
-                        <div className="bg-white rounded-lg p-4 border border-blue-200">
-                            <div className="text-sm text-gray-600 mb-1">Gross Revenue</div>
-                            <div className="text-2xl font-bold text-gray-900">{formatCurrency(taxData.grossRevenue)}</div>
+                        <div className="bg-background rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                            <div className="text-sm text-muted-foreground mb-1">Gross Revenue</div>
+                            <div className="text-2xl font-bold text-foreground">{formatCurrency(taxData.grossRevenue)}</div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-white rounded-lg p-4 border border-blue-200">
-                                <div className="text-sm text-gray-600 mb-1">Other Income</div>
-                                <div className="text-xl font-bold text-gray-900">{formatCurrency(taxData.otherIncome)}</div>
+                            <div className="bg-background rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                                <div className="text-sm text-muted-foreground mb-1">Other Income</div>
+                                <div className="text-xl font-bold text-foreground">{formatCurrency(taxData.otherIncome)}</div>
                             </div>
-                            <div className="bg-white rounded-lg p-4 border border-red-200">
-                                <div className="text-sm text-gray-600 mb-1">Total Expenses</div>
-                                <div className="text-xl font-bold text-red-600">-{formatCurrency(taxData.totalExpenses)}</div>
+                            <div className="bg-background rounded-lg p-4 border border-red-200 dark:border-red-800">
+                                <div className="text-sm text-muted-foreground mb-1">Total Expenses</div>
+                                <div className="text-xl font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalExpenses)}</div>
                             </div>
-                            <div className="bg-white rounded-lg p-4 border border-purple-200">
-                                <div className="text-sm text-gray-600 mb-1">Depreciation (CCA)</div>
-                                <div className="text-xl font-bold text-purple-600">-{formatCurrency(taxData.totalDepreciation)}</div>
+                            <div className="bg-background rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                                <div className="text-sm text-muted-foreground mb-1">Depreciation (CCA)</div>
+                                <div className="text-xl font-bold text-purple-600 dark:text-purple-400">-{formatCurrency(taxData.totalDepreciation)}</div>
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-300">
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border-2 border-blue-300 dark:border-blue-700">
                             <div className="flex justify-between items-center mb-2">
-                                <div className="text-sm text-gray-600">Taxable Income</div>
-                                <div className="text-sm text-gray-600">Tax Rate: {formatPercentage(taxData.smallBusinessTaxRate)}</div>
+                                <div className="text-sm text-muted-foreground">Taxable Income</div>
+                                <div className="text-sm text-muted-foreground">Tax Rate: {formatPercentage(taxData.smallBusinessTaxRate)}</div>
                             </div>
-                            <div className="text-2xl font-bold text-blue-900">{formatCurrency(taxData.taxableIncome)}</div>
+                            <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{formatCurrency(taxData.taxableIncome)}</div>
                         </div>
 
-                        <div className={`bg-white rounded-lg p-4 border-2 ${taxData.corporateTaxOwed > 0 ? 'border-red-300' : 'border-green-300'}`}>
-                            <div className="text-sm text-gray-600 mb-1">Corporate Income Tax Owed</div>
-                            <div className={`text-3xl font-bold ${taxData.corporateTaxOwed > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <div className={cn(
+                            "bg-background rounded-lg p-4 border-2",
+                            taxData.corporateTaxOwed > 0
+                                ? "border-red-300 dark:border-red-700"
+                                : "border-green-300 dark:border-green-700"
+                        )}>
+                            <div className="text-sm text-muted-foreground mb-1">Corporate Income Tax Owed</div>
+                            <div className={cn(
+                                "text-3xl font-bold",
+                                taxData.corporateTaxOwed > 0
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-green-600 dark:text-green-400"
+                            )}>
                                 {formatCurrency(taxData.corporateTaxOwed)}
                             </div>
                         </div>
@@ -474,37 +507,37 @@ const TaxCalculator: React.FC = () => {
                     {expandedSections.income && (
                         <div className="mt-4 space-y-4">
                             <div>
-                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Revenue Breakdown</h3>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <h3 className="text-sm font-semibold text-foreground mb-2">Revenue Breakdown</h3>
+                                <div className="bg-background rounded-lg p-4 border border-border">
                                     <div className="flex justify-between mb-2">
-                                        <span className="text-sm text-gray-600">Invoice Revenue ({taxData.paidInvoices.length} invoices)</span>
-                                        <span className="text-sm font-medium">{formatCurrency(taxData.invoiceRevenue)}</span>
+                                        <span className="text-sm text-muted-foreground">Invoice Revenue ({taxData.paidInvoices.length} invoices)</span>
+                                        <span className="text-sm font-medium text-foreground">{formatCurrency(taxData.invoiceRevenue)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-sm text-gray-600">Client Income ({taxData.clientIncomeEntries.length} entries)</span>
-                                        <span className="text-sm font-medium">{formatCurrency(taxData.clientIncome)}</span>
+                                        <span className="text-sm text-muted-foreground">Client Income ({taxData.clientIncomeEntries.length} entries)</span>
+                                        <span className="text-sm font-medium text-foreground">{formatCurrency(taxData.clientIncome)}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {taxData.filteredExpenses.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Expenses ({taxData.filteredExpenses.length} items)</h3>
-                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden max-h-64 overflow-y-auto">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50 sticky top-0">
+                                    <h3 className="text-sm font-semibold text-foreground mb-2">Expenses ({taxData.filteredExpenses.length} items)</h3>
+                                    <div className="bg-background rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold sticky top-0">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                                    <th className="px-4 py-3">Date</th>
+                                                    <th className="px-4 py-3">Description</th>
+                                                    <th className="px-4 py-3 text-right">Amount</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
+                                            <tbody className="divide-y divide-border">
                                                 {taxData.filteredExpenses.map((expense) => (
-                                                    <tr key={expense.id}>
-                                                        <td className="px-4 py-3 text-sm text-gray-500">{formatDate(expense.expense_date)}</td>
-                                                        <td className="px-4 py-3 text-sm text-gray-900">{expense.description}</td>
-                                                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(expense.amount)}</td>
+                                                    <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
+                                                        <td className="px-4 py-3 text-muted-foreground">{formatDate(expense.expense_date)}</td>
+                                                        <td className="px-4 py-3 text-foreground">{expense.description}</td>
+                                                        <td className="px-4 py-3 text-right text-foreground">{formatCurrency(expense.amount)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -515,30 +548,30 @@ const TaxCalculator: React.FC = () => {
 
                             {taxData.depreciationEntries.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Depreciation (CCA) for {fiscalYear}</h3>
-                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
+                                    <h3 className="text-sm font-semibold text-foreground mb-2">Depreciation (CCA) for {fiscalYear}</h3>
+                                    <div className="bg-background rounded-lg border border-border overflow-hidden">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CCA Class</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Depreciation</th>
+                                                    <th className="px-4 py-3">Asset</th>
+                                                    <th className="px-4 py-3">CCA Class</th>
+                                                    <th className="px-4 py-3 text-right">Depreciation</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
+                                            <tbody className="divide-y divide-border">
                                                 {taxData.depreciationEntries.map((entry) => {
-                                                    const asset = taxData.capitalAssetsWithDepreciation.find(a => 
+                                                    const asset = taxData.capitalAssetsWithDepreciation.find(a =>
                                                         a.depreciation_entries?.some(e => e.id === entry.id)
                                                     );
                                                     return (
-                                                        <tr key={entry.id}>
-                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                        <tr key={entry.id} className="hover:bg-muted/50 transition-colors">
+                                                            <td className="px-4 py-3 text-foreground">
                                                                 {asset?.description || 'Unknown Asset'}
                                                             </td>
-                                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                                            <td className="px-4 py-3 text-muted-foreground">
                                                                 Class {asset?.cca_class || 'N/A'} ({(asset?.cca_rate || 0) * 100}%)
                                                             </td>
-                                                            <td className="px-4 py-3 text-sm text-right text-gray-900">
+                                                            <td className="px-4 py-3 text-right text-foreground">
                                                                 {formatCurrency(entry.depreciation_amount)}
                                                             </td>
                                                         </tr>
@@ -555,12 +588,12 @@ const TaxCalculator: React.FC = () => {
             </div>
 
             {/* Information Card */}
-            <Card gradient="none" className="p-6 border-2 border-blue-200">
+            <Card className="p-6 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                 <div className="flex items-start">
-                    <AlertCircle className="h-6 w-6 text-blue-600 mr-3 mt-0.5" />
+                    <AlertCircle className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Important Notes</h3>
-                        <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Important Notes</h3>
+                        <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
                             <li>HST Input Tax Credits (ITCs) are only available if your company is HST registered.</li>
                             <li>Capital contributions are not included in taxable income.</li>
                             <li>Depreciation (CCA) reduces taxable income and is calculated based on fiscal year.</li>
@@ -575,4 +608,3 @@ const TaxCalculator: React.FC = () => {
 };
 
 export default TaxCalculator;
-

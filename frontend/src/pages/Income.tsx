@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type IncomeEntry, type Client } from '../lib/api';
-import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, X } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const Income: React.FC = () => {
     const { user } = useAuth();
@@ -70,109 +72,97 @@ const Income: React.FC = () => {
 
     const getIncomeTypeColor = (type: string) => {
         switch (type) {
-            case 'client': return 'bg-blue-100 text-blue-800';
-            case 'capital': return 'bg-green-100 text-green-800';
-            case 'other': return 'bg-purple-100 text-purple-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'client': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+            case 'capital': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+            case 'other': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+            default: return 'bg-muted text-muted-foreground';
         }
     };
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Income Entries</h1>
-                    <p className="text-gray-600 mt-2">Track income from clients, capital contributions, and other sources</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Income Entries</h1>
+                    <p className="text-muted-foreground mt-2">Track income from clients, capital contributions, and other sources</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
                     icon={Plus}
-                    iconPosition="left"
+                    className="w-full sm:w-auto"
                 >
                     Add Income Entry
                 </Button>
             </div>
 
             {/* Income Entries Table */}
-            <div className="card">
+            <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Description
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Type
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Client
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Amount
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    HST
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Date
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
+                                <th className="px-6 py-4">Description</th>
+                                <th className="px-6 py-4">Type</th>
+                                <th className="px-6 py-4">Client</th>
+                                <th className="px-6 py-4">Amount</th>
+                                <th className="px-6 py-4">HST</th>
+                                <th className="px-6 py-4">Total</th>
+                                <th className="px-6 py-4">Date</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {incomeEntries?.map((entry) => (
-                                <tr key={entry.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <tr key={entry.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-foreground">
                                         {entry.description}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getIncomeTypeColor(entry.income_type)}`}>
+                                    <td className="px-6 py-4">
+                                        <span className={cn("inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full", getIncomeTypeColor(entry.income_type))}>
                                             {getIncomeTypeLabel(entry.income_type)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 text-muted-foreground">
                                         {entry.client?.name || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 font-medium text-foreground">
                                         {formatCurrency(entry.amount)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 text-muted-foreground">
                                         {formatCurrency(entry.hst_amount)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <td className="px-6 py-4 font-medium text-foreground">
                                         {formatCurrency(entry.total)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 text-muted-foreground">
                                         {formatDate(entry.income_date)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
-                                            <button
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => setEditingIncome(entry)}
-                                                className="text-primary-600 hover:text-primary-900"
+                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                             >
                                                 <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleDelete(entry.id)}
-                                                className="text-red-600 hover:text-red-900"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -180,7 +170,7 @@ const Income: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {/* Create/Edit Modal */}
             {(showCreateModal || editingIncome) && (
@@ -287,22 +277,27 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                <div className="mt-3">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                        {income ? 'Edit Income Entry' : 'Add Income Entry'}
-                    </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-6">
+            <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-foreground">
+                            {income ? 'Edit Income Entry' : 'Add Income Entry'}
+                        </h3>
+                        <Button variant="ghost" size="icon" onClick={onClose}>
+                            <X className="h-5 w-5" />
+                        </Button>
+                    </div>
 
                     {error && (
-                        <div className="mb-4 rounded-md bg-red-50 p-4">
-                            <div className="text-sm text-red-700">{error}</div>
+                        <div className="mb-6 rounded-md bg-destructive/10 p-4 border border-destructive/20">
+                            <div className="text-sm text-destructive">{error}</div>
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <label htmlFor="description" className="text-sm font-medium text-foreground">
                                 Description
                             </label>
                             <input
@@ -310,18 +305,18 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 id="description"
                                 value={formData.description}
                                 onChange={(e) => handleInputChange('description', e.target.value)}
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <label htmlFor="amount" className="text-sm font-medium text-foreground">
                                 Amount
                             </label>
-                            <div className="mt-1 relative rounded-md shadow-sm">
+                            <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <DollarSign className="h-4 w-4 text-gray-400" />
+                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
                                 </div>
                                 <input
                                     type="number"
@@ -330,58 +325,56 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                     min="0"
                                     value={formData.amount}
                                     onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
-                                    className="block w-full pl-10 pr-3 border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-9 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                         </div>
 
                         {formData.income_type === 'client' && formData.client_id && (
-                            <>
-                                <div className="bg-gray-50 p-3 rounded-md space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">HST ({((user?.company?.hst_rate || 0.13) * 100).toFixed(1)}%):</span>
-                                        <span className="font-medium text-gray-900">
-                                            {new Intl.NumberFormat('en-CA', {
-                                                style: 'currency',
-                                                currency: 'CAD',
-                                            }).format(hstAmount)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2">
-                                        <span className="text-gray-700">Total:</span>
-                                        <span className="text-gray-900">
-                                            {new Intl.NumberFormat('en-CA', {
-                                                style: 'currency',
-                                                currency: 'CAD',
-                                            }).format(total)}
-                                        </span>
-                                    </div>
-                                    {(() => {
-                                        const clientId = typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id;
-                                        const selectedClient = clients.find(c => c.id === clientId);
-                                        if (selectedClient?.hst_exempt) {
-                                            return (
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Client is HST exempt - no HST charged
-                                                </p>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
+                            <div className="bg-muted/50 p-3 rounded-md space-y-2 border border-border">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">HST ({((user?.company?.hst_rate || 0.13) * 100).toFixed(1)}%):</span>
+                                    <span className="font-medium text-foreground">
+                                        {new Intl.NumberFormat('en-CA', {
+                                            style: 'currency',
+                                            currency: 'CAD',
+                                        }).format(hstAmount)}
+                                    </span>
                                 </div>
-                            </>
+                                <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
+                                    <span className="text-foreground">Total:</span>
+                                    <span className="text-foreground">
+                                        {new Intl.NumberFormat('en-CA', {
+                                            style: 'currency',
+                                            currency: 'CAD',
+                                        }).format(total)}
+                                    </span>
+                                </div>
+                                {(() => {
+                                    const clientId = typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id;
+                                    const selectedClient = clients.find(c => c.id === clientId);
+                                    if (selectedClient?.hst_exempt) {
+                                        return (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Client is HST exempt - no HST charged
+                                            </p>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
                         )}
 
-                        <div>
-                            <label htmlFor="income_type" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <label htmlFor="income_type" className="text-sm font-medium text-foreground">
                                 Income Type
                             </label>
                             <select
                                 id="income_type"
                                 value={formData.income_type}
                                 onChange={(e) => handleInputChange('income_type', e.target.value)}
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value="client">Client Income</option>
@@ -391,15 +384,15 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                         </div>
 
                         {formData.income_type === 'client' && (
-                            <div>
-                                <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">
+                            <div className="space-y-2">
+                                <label htmlFor="client_id" className="text-sm font-medium text-foreground">
                                     Client
                                 </label>
                                 <select
                                     id="client_id"
                                     value={formData.client_id}
                                     onChange={(e) => handleInputChange('client_id', e.target.value)}
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <option value="">Select a client</option>
                                     {clients.map((client) => (
@@ -411,8 +404,8 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                             </div>
                         )}
 
-                        <div>
-                            <label htmlFor="income_date" className="block text-sm font-medium text-gray-700">
+                        <div className="space-y-2">
+                            <label htmlFor="income_date" className="text-sm font-medium text-foreground">
                                 Income Date
                             </label>
                             <input
@@ -420,26 +413,25 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 id="income_date"
                                 value={formData.income_date}
                                 onChange={(e) => handleInputChange('income_date', e.target.value)}
-                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div className="flex justify-end space-x-3 pt-4">
-                            <button
+                            <Button
                                 type="button"
+                                variant="outline"
                                 onClick={onClose}
-                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
                             >
                                 {isLoading ? 'Saving...' : (income ? 'Update' : 'Create')}
-                            </button>
+                            </Button>
                         </div>
                     </form>
                 </div>

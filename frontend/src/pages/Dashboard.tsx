@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type CapitalAsset, type OwnerPayment } from '../lib/api';
+import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type OwnerPayment } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import {
     DollarSign,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import StatCard from '../components/ui/StatCard';
 import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
@@ -54,8 +55,6 @@ const Dashboard: React.FC = () => {
     const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
     const [recentIncomeEntries, setRecentIncomeEntries] = useState<IncomeEntry[]>([]);
     const [recentHSTPayments, setRecentHSTPayments] = useState<HSTPayment[]>([]);
-    const [recentDividends, setRecentDividends] = useState<Dividend[]>([]);
-    const [recentCapitalAssets, setRecentCapitalAssets] = useState<CapitalAsset[]>([]);
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -269,7 +268,7 @@ const Dashboard: React.FC = () => {
 
             // Extract recent items from already-fetched data (sorted by date, take first 5)
             // Recent invoices - all invoices sorted by issue_date descending
-            const sortedInvoices = [...allInvoices].sort((a, b) => 
+            const sortedInvoices = [...allInvoices].sort((a, b) =>
                 new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime()
             );
             setRecentInvoices(sortedInvoices.slice(0, 5));
@@ -282,12 +281,6 @@ const Dashboard: React.FC = () => {
 
             // Recent HST payments - already sorted by payment_date descending from API
             setRecentHSTPayments(hstPayments.slice(0, 5));
-
-            // Recent dividends - already sorted by declaration_date descending from API
-            setRecentDividends(dividends.slice(0, 5));
-
-            // Recent capital assets - already sorted by purchase_date descending from API
-            setRecentCapitalAssets(capitalAssets.slice(0, 5));
 
             setAllDividends(dividends);
             setOwnerPayments(ownerPayments);
@@ -312,7 +305,7 @@ const Dashboard: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -321,24 +314,25 @@ const Dashboard: React.FC = () => {
         <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Dashboard</h1>
-                    <p className="text-gray-600 mt-2">Welcome back, {user?.name}</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
+                    <p className="text-muted-foreground mt-2">Welcome back, {user?.name}</p>
                 </div>
 
                 {/* Time Period Selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <div className="flex rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
+                    <div className="flex rounded-md shadow-sm border border-input overflow-hidden">
                         <button
                             type="button"
                             onClick={() => {
                                 setTimePeriod('month');
                                 updateDashboardPreference('timePeriod', 'month');
                             }}
-                            className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium transition-all duration-200",
                                 timePeriod === 'month'
-                                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }`}
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            )}
                         >
                             Month
                         </button>
@@ -348,18 +342,19 @@ const Dashboard: React.FC = () => {
                                 setTimePeriod('year');
                                 updateDashboardPreference('timePeriod', 'year');
                             }}
-                            className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium transition-all duration-200",
                                 timePeriod === 'year'
-                                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }`}
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            )}
                         >
                             Year
                         </button>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                        <Calendar className="h-5 w-5 text-gray-400" />
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
                         <input
                             type={timePeriod === 'month' ? 'month' : 'number'}
                             value={timePeriod === 'month'
@@ -374,7 +369,7 @@ const Dashboard: React.FC = () => {
                                     setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                 }
                             }}
-                            className="input"
+                            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
                 </div>
@@ -382,10 +377,10 @@ const Dashboard: React.FC = () => {
 
             {/* Financial Overview Section */}
             <div className="space-y-6">
-                <h2 className="heading-2 border-b-2 border-primary-200 pb-3">Financial Overview</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Financial Overview</h2>
 
                 {/* Key Metrics Row */}
-                <div className="grid-mobile-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <StatCard
                         title="Total Revenue"
                         value={formatCurrency(stats.totalRevenue)}
@@ -419,8 +414,10 @@ const Dashboard: React.FC = () => {
                 {/* Owner Balance Section */}
                 {(stats.ownerReimbursementOwed > 0 || stats.ownerPaymentsTotal > 0) && (
                     <Card
-                        gradient={stats.netOwnerBalance > 0 ? 'orange' : stats.netOwnerBalance < 0 ? 'green' : 'none'}
-                        className="p-6"
+                        className={cn("p-6",
+                            stats.netOwnerBalance > 0 ? 'border-l-4 border-l-orange-500 bg-orange-50/10 dark:bg-orange-900/10' :
+                                stats.netOwnerBalance < 0 ? 'border-l-4 border-l-green-500 bg-green-50/10 dark:bg-green-900/10' : ''
+                        )}
                     >
                         <div className="flex items-start">
                             <div className="flex-shrink-0">
@@ -429,16 +426,15 @@ const Dashboard: React.FC = () => {
                                 ) : stats.netOwnerBalance < 0 ? (
                                     <Check className="h-6 w-6 text-green-500" />
                                 ) : (
-                                    <Banknote className="h-6 w-6 text-gray-500" />
+                                    <Banknote className="h-6 w-6 text-muted-foreground" />
                                 )}
                             </div>
                             <div className="ml-4 flex-1">
-                                <h3 className={`text-lg font-semibold mb-2 ${stats.netOwnerBalance > 0
-                                    ? 'text-orange-900'
-                                    : stats.netOwnerBalance < 0
-                                        ? 'text-green-900'
-                                        : 'text-gray-900'
-                                    }`}>
+                                <h3 className={cn("text-lg font-semibold mb-2",
+                                    stats.netOwnerBalance > 0 ? 'text-orange-700 dark:text-orange-400' :
+                                        stats.netOwnerBalance < 0 ? 'text-green-700 dark:text-green-400' :
+                                            'text-foreground'
+                                )}>
                                     {stats.netOwnerBalance > 0
                                         ? 'Owner Reimbursement Required'
                                         : stats.netOwnerBalance < 0
@@ -448,30 +444,30 @@ const Dashboard: React.FC = () => {
                                 </h3>
 
                                 {stats.netOwnerBalance > 0 && (
-                                    <p className="text-orange-800 mb-4">
-                                        The corporation owes the owner <span className="font-bold text-orange-900">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
+                                    <p className="text-muted-foreground mb-4">
+                                        The corporation owes the owner <span className="font-bold text-foreground">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
                                     </p>
                                 )}
 
                                 {stats.netOwnerBalance < 0 && (
-                                    <p className="text-green-800 mb-4">
-                                        The corporation has overpaid the owner by <span className="font-bold text-green-900">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
+                                    <p className="text-muted-foreground mb-4">
+                                        The corporation has overpaid the owner by <span className="font-bold text-foreground">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
                                     </p>
                                 )}
 
                                 {stats.netOwnerBalance === 0 && stats.ownerReimbursementOwed > 0 && (
-                                    <p className="text-gray-800 mb-4">
+                                    <p className="text-muted-foreground mb-4">
                                         Owner balance is settled. All reimbursements have been paid.
                                     </p>
                                 )}
 
-                                <div className="grid-mobile-3 mb-4">
-                                    <div className="bg-orange-100 border border-orange-200 p-4 rounded-lg">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4">
+                                    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-4 rounded-lg">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className="font-semibold text-orange-900">Owner Paid</div>
-                                                <div className="text-2xl font-bold text-orange-800">{formatCurrency(stats.ownerReimbursementOwed)}</div>
-                                                <div className="text-sm text-orange-600">{stats.ownerExpenseCount} expenses</div>
+                                                <div className="font-semibold text-orange-900 dark:text-orange-300">Owner Paid</div>
+                                                <div className="text-2xl font-bold text-orange-800 dark:text-orange-400">{formatCurrency(stats.ownerReimbursementOwed)}</div>
+                                                <div className="text-sm text-orange-600 dark:text-orange-500">{stats.ownerExpenseCount} expenses</div>
                                             </div>
                                             <div className="text-orange-500">
                                                 <AlertCircle className="h-8 w-8" />
@@ -479,12 +475,12 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="bg-blue-100 border border-blue-200 p-4 rounded-lg">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className="font-semibold text-blue-900">Corp Paid Back</div>
-                                                <div className="text-2xl font-bold text-blue-800">{formatCurrency(stats.ownerPaymentsTotal)}</div>
-                                                <div className="text-sm text-blue-600">payments made</div>
+                                                <div className="font-semibold text-blue-900 dark:text-blue-300">Corp Paid Back</div>
+                                                <div className="text-2xl font-bold text-blue-800 dark:text-blue-400">{formatCurrency(stats.ownerPaymentsTotal)}</div>
+                                                <div className="text-sm text-blue-600 dark:text-blue-500">payments made</div>
                                             </div>
                                             <div className="text-blue-500">
                                                 <Banknote className="h-8 w-8" />
@@ -492,41 +488,36 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className={`border p-4 rounded-lg ${stats.netOwnerBalance > 0
-                                        ? 'bg-orange-100 border-orange-200'
-                                        : stats.netOwnerBalance < 0
-                                            ? 'bg-green-100 border-green-200'
-                                            : 'bg-gray-100 border-gray-200'
-                                        }`}>
+                                    <div className={cn("border p-4 rounded-lg",
+                                        stats.netOwnerBalance > 0 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' :
+                                            stats.netOwnerBalance < 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
+                                                'bg-muted/50 border-border'
+                                    )}>
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className={`font-semibold ${stats.netOwnerBalance > 0
-                                                    ? 'text-orange-900'
-                                                    : stats.netOwnerBalance < 0
-                                                        ? 'text-green-900'
-                                                        : 'text-gray-900'
-                                                    }`}>Net Balance</div>
-                                                <div className={`text-2xl font-bold ${stats.netOwnerBalance > 0
-                                                    ? 'text-orange-800'
-                                                    : stats.netOwnerBalance < 0
-                                                        ? 'text-green-800'
-                                                        : 'text-gray-800'
-                                                    }`}>{formatCurrency(stats.netOwnerBalance)}</div>
-                                                <div className={`text-sm ${stats.netOwnerBalance > 0
-                                                    ? 'text-orange-600'
-                                                    : stats.netOwnerBalance < 0
-                                                        ? 'text-green-600'
-                                                        : 'text-gray-600'
-                                                    }`}>
+                                                <div className={cn("font-semibold",
+                                                    stats.netOwnerBalance > 0 ? 'text-orange-900 dark:text-orange-300' :
+                                                        stats.netOwnerBalance < 0 ? 'text-green-900 dark:text-green-300' :
+                                                            'text-foreground'
+                                                )}>Net Balance</div>
+                                                <div className={cn("text-2xl font-bold",
+                                                    stats.netOwnerBalance > 0 ? 'text-orange-800 dark:text-orange-400' :
+                                                        stats.netOwnerBalance < 0 ? 'text-green-800 dark:text-green-400' :
+                                                            'text-foreground'
+                                                )}>{formatCurrency(stats.netOwnerBalance)}</div>
+                                                <div className={cn("text-sm",
+                                                    stats.netOwnerBalance > 0 ? 'text-orange-600 dark:text-orange-500' :
+                                                        stats.netOwnerBalance < 0 ? 'text-green-600 dark:text-green-500' :
+                                                            'text-muted-foreground'
+                                                )}>
                                                     {stats.netOwnerBalance > 0 ? 'owed to owner' : stats.netOwnerBalance < 0 ? 'overpaid' : 'settled'}
                                                 </div>
                                             </div>
-                                            <div className={`${stats.netOwnerBalance > 0
-                                                ? 'text-orange-500'
-                                                : stats.netOwnerBalance < 0
-                                                    ? 'text-green-500'
-                                                    : 'text-gray-500'
-                                                }`}>
+                                            <div className={cn(
+                                                stats.netOwnerBalance > 0 ? 'text-orange-500' :
+                                                    stats.netOwnerBalance < 0 ? 'text-green-500' :
+                                                        'text-muted-foreground'
+                                            )}>
                                                 {stats.netOwnerBalance > 0 ? (
                                                     <AlertCircle className="h-8 w-8" />
                                                 ) : stats.netOwnerBalance < 0 ? (
@@ -539,12 +530,13 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className={`border p-3 rounded-lg ${stats.netOwnerBalance > 0
-                                    ? 'bg-orange-100 border-orange-200'
-                                    : 'bg-gray-100 border-gray-200'
-                                    }`}>
-                                    <p className={`text-sm ${stats.netOwnerBalance > 0 ? 'text-orange-800' : 'text-gray-800'
-                                        }`}>
+                                <div className={cn("border p-3 rounded-lg",
+                                    stats.netOwnerBalance > 0 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' :
+                                        'bg-muted/50 border-border'
+                                )}>
+                                    <p className={cn("text-sm",
+                                        stats.netOwnerBalance > 0 ? 'text-orange-800 dark:text-orange-300' : 'text-muted-foreground'
+                                    )}>
                                         <strong>Note:</strong> Owner reimbursement includes both the expense amount and HST paid on owner-funded expenses.
                                         {stats.netOwnerBalance > 0 && ' This amount should be paid to the owner to reimburse their personal funds used for business expenses.'}
                                     </p>
@@ -555,7 +547,7 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Dividend Summary */}
-                <div className="grid-mobile-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <StatCard
                         title="Dividends Paid"
                         value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'paid').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
@@ -573,9 +565,9 @@ const Dashboard: React.FC = () => {
 
             {/* Tax & Compliance Section */}
             <div className="space-y-6">
-                <h2 className="heading-2 border-b-2 border-primary-200 pb-3">Tax & Compliance</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Tax & Compliance</h2>
 
-                <div className="grid-mobile">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                     <StatCard
                         title="HST Owed"
                         value={formatCurrency(stats.hstOwed)}
@@ -605,9 +597,9 @@ const Dashboard: React.FC = () => {
             {/* Capital Assets Section */}
             {stats.totalCapitalAssets > 0 && (
                 <div className="space-y-6">
-                    <h2 className="heading-2 border-b-2 border-primary-200 pb-3">Capital Assets</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Capital Assets</h2>
 
-                    <div className="grid-mobile-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                         <StatCard
                             title="Total Assets"
                             value={stats.totalCapitalAssets}
@@ -643,17 +635,17 @@ const Dashboard: React.FC = () => {
             {/* Alerts & Notifications Section */}
             {(stats.outstandingInvoices > 0 || stats.overdueInvoices > 0) && (
                 <div className="space-y-4">
-                    <h2 className="heading-3 border-b border-gray-200 pb-2">Alerts & Notifications</h2>
-                    <Card gradient="amber" className="p-6">
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2">Alerts & Notifications</h2>
+                    <Card className="p-6 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
                         <div className="flex items-start">
                             <div className="flex-shrink-0">
-                                <AlertCircle className="h-6 w-6 text-amber-600" />
+                                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-500" />
                             </div>
                             <div className="ml-4">
-                                <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                                <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-400 mb-2">
                                     Invoice Alerts
                                 </h3>
-                                <div className="text-amber-800">
+                                <div className="text-amber-800 dark:text-amber-300">
                                     <ul className="list-disc pl-5 space-y-1">
                                         {stats.outstandingInvoices > 0 && (
                                             <li><strong>{stats.outstandingInvoices}</strong> outstanding invoices need attention</li>
@@ -672,32 +664,32 @@ const Dashboard: React.FC = () => {
 
             {/* Recent Activity Section */}
             <div className="space-y-6">
-                <h2 className="heading-2 border-b-2 border-primary-200 pb-3">Recent Activity</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Recent Activity</h2>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {/* Recent Invoices */}
                     <Card>
                         <div className="flex items-center mb-4">
-                            <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                                <FileText className="h-5 w-5 text-blue-600" />
+                            <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg mr-3">
+                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Invoices</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Recent Invoices</h3>
                         </div>
                         <div className="space-y-3">
                             {recentInvoices.map((invoice) => (
                                 <div key={invoice.id} className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {invoice.invoice_number}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {invoice.client?.name || 'Unknown Client'}
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {formatCurrency(invoice.total)}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {formatDate(invoice.issue_date)}
                                         </p>
                                     </div>
@@ -709,27 +701,27 @@ const Dashboard: React.FC = () => {
                     {/* Recent Expenses */}
                     <Card>
                         <div className="flex items-center mb-4">
-                            <div className="bg-red-100 p-2 rounded-lg mr-3">
-                                <Receipt className="h-5 w-5 text-red-600" />
+                            <div className="bg-red-100 dark:bg-red-900/20 p-2 rounded-lg mr-3">
+                                <Receipt className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Expenses</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Recent Expenses</h3>
                         </div>
                         <div className="space-y-3">
                             {recentExpenses.map((expense) => (
                                 <div key={expense.id} className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {expense.description}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {expense.category?.name || 'Uncategorized'} • {expense.paid_by}
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {formatCurrency(expense.amount)}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {formatDate(expense.expense_date)}
                                         </p>
                                     </div>
@@ -741,27 +733,27 @@ const Dashboard: React.FC = () => {
                     {/* Recent Income Entries */}
                     <Card>
                         <div className="flex items-center mb-4">
-                            <div className="bg-green-100 p-2 rounded-lg mr-3">
-                                <DollarSign className="h-5 w-5 text-green-600" />
+                            <div className="bg-green-100 dark:bg-green-900/20 p-2 rounded-lg mr-3">
+                                <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Income Entries</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Recent Income Entries</h3>
                         </div>
                         <div className="space-y-3">
                             {recentIncomeEntries.map((entry) => (
                                 <div key={entry.id} className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {entry.description}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {entry.income_type} {entry.client ? `• ${entry.client.name}` : ''}
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {formatCurrency(entry.amount)}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {formatDate(entry.income_date)}
                                         </p>
                                     </div>
@@ -773,27 +765,27 @@ const Dashboard: React.FC = () => {
                     {/* Recent HST Payments */}
                     <Card>
                         <div className="flex items-center mb-4">
-                            <div className="bg-orange-100 p-2 rounded-lg mr-3">
-                                <CreditCard className="h-5 w-5 text-orange-600" />
+                            <div className="bg-orange-100 dark:bg-orange-900/20 p-2 rounded-lg mr-3">
+                                <CreditCard className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Recent HST Payments</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Recent HST Payments</h3>
                         </div>
                         <div className="space-y-3">
                             {recentHSTPayments.map((payment) => (
                                 <div key={payment.id} className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             HST Payment
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {payment.reference ? `Ref: ${payment.reference}` : 'No reference'}
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-foreground">
                                             {formatCurrency(payment.amount)}
                                         </p>
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             {formatDate(payment.payment_date)}
                                         </p>
                                     </div>
@@ -801,72 +793,6 @@ const Dashboard: React.FC = () => {
                             ))}
                         </div>
                     </Card>
-
-                    {/* Recent Dividends */}
-                    <Card>
-                        <div className="flex items-center mb-4">
-                            <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                                <Banknote className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Dividends</h3>
-                        </div>
-                        <div className="space-y-3">
-                            {recentDividends.map((dividend) => (
-                                <div key={dividend.id} className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">
-                                            Dividend Payment
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {dividend.status === 'paid' ? 'Paid' : 'Declared'} • {formatDate(dividend.declaration_date)}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-gray-900">
-                                            {formatCurrency(dividend.amount)}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {dividend.payment_date ? formatDate(dividend.payment_date) : 'Not paid'}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
-
-                    {/* Recent Capital Assets */}
-                    {stats.totalCapitalAssets > 0 && (
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-indigo-100 p-2 rounded-lg mr-3">
-                                    <Building2 className="h-5 w-5 text-indigo-600" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900">Recent Capital Assets</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentCapitalAssets.map((asset) => (
-                                    <div key={asset.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {asset.description}
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                Class {asset.cca_class} • {(asset.cca_rate * 100).toFixed(1)}%
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {formatCurrency(asset.total_cost)}
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                {formatDate(asset.purchase_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    )}
                 </div>
             </div>
         </div>

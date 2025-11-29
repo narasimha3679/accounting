@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type CapitalAsset, type ExpenseCategory, type CCAClass } from '../lib/api';
-import { Plus, Edit, Trash2, Calculator, Building2, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Calculator, Building2, Calendar, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const CapitalAssets: React.FC = () => {
     const { user } = useAuth();
@@ -87,35 +90,35 @@ const CapitalAssets: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Capital Assets</h1>
-                    <p className="text-gray-600">Manage depreciable business assets over $500</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Capital Assets</h1>
+                    <p className="text-muted-foreground mt-2">Manage depreciable business assets over $500</p>
                 </div>
-                <button
+                <Button
                     onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center gap-2"
+                    icon={Plus}
+                    className="w-full sm:w-auto"
                 >
-                    <Plus className="h-4 w-4" />
                     Add Capital Asset
-                </button>
+                </Button>
             </div>
 
             {/* Filters */}
-            <div className="card">
-                <div className="flex items-center gap-4">
-                    <label className="text-sm font-medium text-gray-700">Filter by category:</label>
+            <Card className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <label className="text-sm font-medium text-foreground">Filter by category:</label>
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="input w-auto"
+                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -123,11 +126,11 @@ const CapitalAssets: React.FC = () => {
                         ))}
                     </select>
 
-                    <label className="text-sm font-medium text-gray-700">Filter by CCA class:</label>
+                    <label className="text-sm font-medium text-foreground">Filter by CCA class:</label>
                     <select
                         value={selectedCCAClass}
                         onChange={(e) => setSelectedCCAClass(e.target.value)}
-                        className="input w-auto"
+                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All CCA Classes</option>
                         {ccaClasses?.map(ccaClass => (
@@ -137,132 +140,136 @@ const CapitalAssets: React.FC = () => {
                         ))}
                     </select>
                 </div>
-            </div>
+            </Card>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Building2 className="h-8 w-8 text-blue-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                            <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Total Cost
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalCost)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Calculator className="h-8 w-8 text-orange-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-orange-100 dark:bg-orange-900/20">
+                            <Calculator className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Accumulated Depreciation
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalDepreciation)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Building2 className="h-8 w-8 text-green-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-green-100 dark:bg-green-900/20">
+                            <Building2 className="h-6 w-6 text-green-600 dark:text-green-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Net Book Value
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalBookValue)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Capital Assets Table */}
-            <div className="card">
+            <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="table">
-                        <thead className="bg-gray-50">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                             <tr>
-                                <th>Description</th>
-                                <th>Category</th>
-                                <th>Purchase Date</th>
-                                <th>Total Cost</th>
-                                <th>CCA Class</th>
-                                <th>CCA Rate</th>
-                                <th>Accumulated Depreciation</th>
-                                <th>Book Value</th>
-                                <th>Paid By</th>
-                                <th>Actions</th>
+                                <th className="px-6 py-4">Description</th>
+                                <th className="px-6 py-4">Category</th>
+                                <th className="px-6 py-4">Purchase Date</th>
+                                <th className="px-6 py-4">Total Cost</th>
+                                <th className="px-6 py-4">CCA Class</th>
+                                <th className="px-6 py-4">CCA Rate</th>
+                                <th className="px-6 py-4">Accumulated Depreciation</th>
+                                <th className="px-6 py-4">Book Value</th>
+                                <th className="px-6 py-4">Paid By</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {filteredAssets?.map((asset) => (
-                                <tr key={asset.id}>
-                                    <td className="font-medium">{asset.description}</td>
-                                    <td>{asset.category?.name || 'Uncategorized'}</td>
-                                    <td>{formatDate(asset.purchase_date)}</td>
-                                    <td className="font-medium">{formatCurrency(asset.total_cost)}</td>
-                                    <td>
-                                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                <tr key={asset.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-foreground">{asset.description}</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{asset.category?.name || 'Uncategorized'}</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(asset.purchase_date)}</td>
+                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(asset.total_cost)}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                             Class {asset.cca_class}
                                         </span>
                                     </td>
-                                    <td>{(asset.cca_rate * 100).toFixed(1)}%</td>
-                                    <td>{formatCurrency(asset.accumulated_depreciation)}</td>
-                                    <td className="font-medium">{formatCurrency(asset.book_value)}</td>
-                                    <td>
+                                    <td className="px-6 py-4 text-muted-foreground">{(asset.cca_rate * 100).toFixed(1)}%</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{formatCurrency(asset.accumulated_depreciation)}</td>
+                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(asset.book_value)}</td>
+                                    <td className="px-6 py-4">
                                         {asset.paid_by === 'corp' ? (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                                 Corporation
                                             </span>
                                         ) : (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                                                 Owner
                                             </span>
                                         )}
                                     </td>
-                                    <td>
-                                        <div className="flex items-center gap-2">
-                                            <button
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => setShowDepreciationSchedule(asset)}
-                                                className="text-green-600 hover:text-green-800"
+                                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
                                                 title="View Depreciation Schedule"
                                             >
                                                 <Calendar className="h-4 w-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => setEditingAsset(asset)}
-                                                className="text-blue-600 hover:text-blue-800"
-                                                title="Edit"
+                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                             >
                                                 <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleDelete(asset)}
-                                                className="text-red-600 hover:text-red-800"
-                                                title="Delete"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -270,12 +277,12 @@ const CapitalAssets: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {filteredAssets?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No capital assets found</p>
-                    <p className="text-gray-400">Add your first capital asset to get started</p>
+                    <p className="text-muted-foreground text-lg">No capital assets found</p>
+                    <p className="text-muted-foreground/60">Add your first capital asset to get started</p>
                 </div>
             )}
 
@@ -317,7 +324,7 @@ interface CapitalAssetModalProps {
     onSave: () => void;
 }
 
-const CapitalAssetModal: React.FC<CapitalAssetModalProps> = ({ asset, categories, ccaClasses, onClose, onSave }) => {
+function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: CapitalAssetModalProps) {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         description: asset?.description || '',
@@ -370,211 +377,220 @@ const CapitalAssetModal: React.FC<CapitalAssetModalProps> = ({ asset, categories
     const selectedCCAClass = ccaClasses.find(cca => cca.class_number === formData.cca_class);
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-                <div className="mt-3">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-foreground">
                         {asset ? 'Edit Capital Asset' : 'Add New Capital Asset'}
                     </h3>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Description *</label>
+                            <input
+                                type="text"
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Category *</label>
+                            <select
+                                value={formData.category_id}
+                                onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            >
+                                <option value={0}>Select a category</option>
+                                {categories.map(category => (
+                                    <option key={category.id} value={category.id}>{category.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Purchase Date *</label>
+                            <input
+                                type="date"
+                                value={formData.purchase_date}
+                                onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Purchase Amount (before HST) *</label>
+                            <input
+                                type="number"
+                                value={formData.purchase_amount}
+                                onChange={(e) => setFormData({ ...formData, purchase_amount: parseFloat(e.target.value) || 0 })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                min="0"
+                                step="0.01"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">HST Paid</label>
+                            <input
+                                type="number"
+                                value={formData.hst_paid}
+                                onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity
+
+-50"
+                                min="0"
+                                step="0.01"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">CCA Class *</label>
+                            <select
+                                value={formData.cca_class}
+                                onChange={(e) => setFormData({ ...formData, cca_class: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            >
+                                <option value="">Select CCA class</option>
+                                {ccaClasses.map(ccaClass => (
+                                    <option key={ccaClass.class_number} value={ccaClass.class_number}>
+                                        Class {ccaClass.class_number} - {ccaClass.description} ({(ccaClass.rate * 100).toFixed(1)}%)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {selectedCCAClass && (
                             <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Description *</label>
-                                <input
-                                    type="text"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Category *</label>
-                                <select
-                                    value={formData.category_id}
-                                    onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                                    className="input"
-                                    required
-                                >
-                                    <option value={0}>Select a category</option>
-                                    {categories.map(category => (
-                                        <option key={category.id} value={category.id}>{category.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Purchase Date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.purchase_date}
-                                    onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Purchase Amount (before HST) *</label>
-                                <input
-                                    type="number"
-                                    value={formData.purchase_amount}
-                                    onChange={(e) => setFormData({ ...formData, purchase_amount: parseFloat(e.target.value) || 0 })}
-                                    className="input"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">HST Paid</label>
-                                <input
-                                    type="number"
-                                    value={formData.hst_paid}
-                                    onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
-                                    className="input"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">CCA Class *</label>
-                                <select
-                                    value={formData.cca_class}
-                                    onChange={(e) => setFormData({ ...formData, cca_class: e.target.value })}
-                                    className="input"
-                                    required
-                                >
-                                    <option value="">Select CCA class</option>
-                                    {ccaClasses.map(ccaClass => (
-                                        <option key={ccaClass.class_number} value={ccaClass.class_number}>
-                                            Class {ccaClass.class_number} - {ccaClass.description} ({(ccaClass.rate * 100).toFixed(1)}%)
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {selectedCCAClass && (
-                                <div className="sm:col-span-2">
-                                    <div className="bg-blue-50 p-3 rounded-md">
-                                        <p className="text-sm text-blue-800">
-                                            <strong>CCA Class {selectedCCAClass.class_number}:</strong> {selectedCCAClass.description}
-                                        </p>
-                                        <p className="text-sm text-blue-600">
-                                            Depreciation Rate: {(selectedCCAClass.rate * 100).toFixed(1)}% per year
-                                        </p>
-                                    </div>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                                    <p className="text-sm text-blue-800 dark:text-blue-300">
+                                        <strong>CCA Class {selectedCCAClass.class_number}:</strong> {selectedCCAClass.description}
+                                    </p>
+                                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                                        Depreciation Rate: {(selectedCCAClass.rate * 100).toFixed(1)}% per year
+                                    </p>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            <div className="sm:col-span-2">
+                        <div className="sm:col-span-2">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="receipt_attached"
+                                    checked={formData.receipt_attached}
+                                    onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
+                                    className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
+                                />
+                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-foreground">
+                                    Receipt attached
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Paid By *</label>
+                            <div className="flex gap-6">
                                 <div className="flex items-center">
                                     <input
-                                        type="checkbox"
-                                        id="receipt_attached"
-                                        checked={formData.receipt_attached}
-                                        onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
-                                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                        type="radio"
+                                        id="paid_by_corp"
+                                        name="paid_by"
+                                        value="corp"
+                                        checked={formData.paid_by === 'corp'}
+                                        onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-input"
                                     />
-                                    <label htmlFor="receipt_attached" className="ml-2 block text-sm text-gray-900">
-                                        Receipt attached
+                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-foreground">
+                                        Corporation
+                                    </label>
+                                </div>
+                                <div className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        id="paid_by_owner"
+                                        name="paid_by"
+                                        value="owner"
+                                        checked={formData.paid_by === 'owner'}
+                                        onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-input"
+                                    />
+                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-foreground">
+                                        Owner (to be reimbursed)
                                     </label>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Paid By *</label>
-                                <div className="flex gap-6">
-                                    <div className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            id="paid_by_corp"
-                                            name="paid_by"
-                                            value="corp"
-                                            checked={formData.paid_by === 'corp'}
-                                            onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
-                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                                        />
-                                        <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-gray-900">
-                                            Corporation
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            id="paid_by_owner"
-                                            name="paid_by"
-                                            value="owner"
-                                            checked={formData.paid_by === 'owner'}
-                                            onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
-                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                                        />
-                                        <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-gray-900">
-                                            Owner (to be reimbursed)
-                                        </label>
-                                    </div>
+                        {/* Disposal fields for editing */}
+                        {asset && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-2">Disposal Date</label>
+                                    <input
+                                        type="date"
+                                        value={formData.disposal_date}
+                                        onChange={(e) => setFormData({ ...formData, disposal_date: e.target.value })}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
                                 </div>
-                            </div>
 
-                            {/* Disposal fields for editing */}
-                            {asset && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Disposal Date</label>
-                                        <input
-                                            type="date"
-                                            value={formData.disposal_date}
-                                            onChange={(e) => setFormData({ ...formData, disposal_date: e.target.value })}
-                                            className="input"
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-2">Disposal Amount</label>
+                                    <input
+                                        type="number"
+                                        value={formData.disposal_amount}
+                                        onChange={(e) => setFormData({ ...formData, disposal_amount: parseFloat(e.target.value) || 0 })}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Disposal Amount</label>
-                                        <input
-                                            type="number"
-                                            value={formData.disposal_amount}
-                                            onChange={(e) => setFormData({ ...formData, disposal_amount: parseFloat(e.target.value) || 0 })}
-                                            className="input"
-                                            min="0"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="btn btn-secondary"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={createAssetMutation.isPending || updateAssetMutation.isPending}
-                            >
-                                {createAssetMutation.isPending || updateAssetMutation.isPending
-                                    ? 'Saving...'
-                                    : asset
-                                        ? 'Update Asset'
-                                        : 'Create Asset'
-                                }
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={createAssetMutation.isPending || updateAssetMutation.isPending}
+                        >
+                            {createAssetMutation.isPending || updateAssetMutation.isPending
+                                ? 'Saving...'
+                                : asset
+                                    ? 'Update Asset'
+                                    : 'Create Asset'
+                            }
+                        </Button>
+                    </div>
+                </form>
             </div>
         </div>
     );
-};
+}
 
 // Depreciation Schedule Modal Component
 interface DepreciationScheduleModalProps {
@@ -582,7 +598,7 @@ interface DepreciationScheduleModalProps {
     onClose: () => void;
 }
 
-const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ asset, onClose }) => {
+function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModalProps) {
     const queryClient = useQueryClient();
     const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear());
     const [depreciationCalculation, setDepreciationCalculation] = useState<any>(null);
@@ -680,104 +696,103 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
     const schedule = generateSchedule();
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-                <div className="mt-3">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-medium text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-y-auto">
+            <div className="relative w-full max-w-4xl my-10 mx-4">
+                <Card className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-semibold text-foreground">
                             Depreciation Schedule - {asset.description}
                         </h3>
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="h-8 w-8 rounded-full"
                         >
-                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                            <X className="h-4 w-4" />
+                        </Button>
                     </div>
 
                     {/* Asset Summary */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-blue-800">Total Cost</h4>
-                            <p className="text-2xl font-bold text-blue-900">{formatCurrency(asset.total_cost)}</p>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300">Total Cost</h4>
+                            <p className="text-2xl font-bold text-blue-900 dark:text-blue-200">{formatCurrency(asset.total_cost)}</p>
                         </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-orange-800">CCA Class</h4>
-                            <p className="text-2xl font-bold text-orange-900">Class {asset.cca_class}</p>
-                            <p className="text-sm text-orange-700">{(asset.cca_rate * 100).toFixed(1)}% per year</p>
+                        <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-100 dark:border-orange-800">
+                            <h4 className="text-sm font-medium text-orange-800 dark:text-orange-300">CCA Class</h4>
+                            <p className="text-2xl font-bold text-orange-900 dark:text-orange-200">Class {asset.cca_class}</p>
+                            <p className="text-sm text-orange-700 dark:text-orange-400">{(asset.cca_rate * 100).toFixed(1)}% per year</p>
                         </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-green-800">Current Book Value</h4>
-                            <p className="text-2xl font-bold text-green-900">{formatCurrency(asset.book_value)}</p>
+                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800">
+                            <h4 className="text-sm font-medium text-green-800 dark:text-green-300">Current Book Value</h4>
+                            <p className="text-2xl font-bold text-green-900 dark:text-green-200">{formatCurrency(asset.book_value)}</p>
                         </div>
                     </div>
 
                     {/* Depreciation Calculator */}
-                    <div className="mb-6 p-4 border rounded-lg">
-                        <h4 className="text-md font-medium text-gray-900 mb-3">Depreciation Calculator</h4>
-                        <div className="flex items-center gap-4">
+                    <div className="mb-6 p-4 border border-border rounded-lg bg-muted/20">
+                        <h4 className="text-md font-medium text-foreground mb-3">Depreciation Calculator</h4>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Fiscal Year</label>
+                                <label className="block text-sm font-medium text-foreground mb-2">Fiscal Year</label>
                                 <input
                                     type="number"
                                     value={fiscalYear}
                                     onChange={(e) => setFiscalYear(parseInt(e.target.value))}
-                                    className="input w-32"
+                                    className="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                     min="2020"
                                     max="2030"
                                 />
                             </div>
-                            <button
+                            <Button
                                 onClick={calculateDepreciation}
                                 disabled={isCalculating}
-                                className="btn btn-primary flex items-center gap-2"
+                                icon={Calculator}
+                                className="sm:mt-6"
                             >
-                                <Calculator className="h-4 w-4" />
                                 {isCalculating ? 'Calculating...' : 'Calculate'}
-                            </button>
+                            </Button>
                         </div>
 
                         {depreciationCalculation && (
                             <div className="mt-4 space-y-3">
-                                <div className="p-3 bg-gray-50 rounded-md">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="p-3 bg-background rounded-md border border-border">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         <div>
-                                            <p className="text-sm text-gray-600">Depreciation Amount</p>
-                                            <p className="font-semibold">
+                                            <p className="text-sm text-muted-foreground">Depreciation Amount</p>
+                                            <p className="font-semibold text-foreground">
                                                 {formatCurrency(depreciationCalculation.depreciation_amount)}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-gray-600">Half-Year Rule</p>
-                                            <p className="font-semibold">
+                                            <p className="text-sm text-muted-foreground">Half-Year Rule</p>
+                                            <p className="font-semibold text-foreground">
                                                 {depreciationCalculation.is_half_year_rule ? 'Yes' : 'No'}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-gray-600">Remaining Book Value</p>
-                                            <p className="font-semibold">
+                                            <p className="text-sm text-muted-foreground">Remaining Book Value</p>
+                                            <p className="font-semibold text-foreground">
                                                 {formatCurrency(depreciationCalculation.remaining_book_value)}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-4">
-                                    <button
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <Button
                                         type="button"
                                         onClick={handleRecordDepreciation}
                                         disabled={isSaving}
-                                        className="btn btn-primary"
                                     >
                                         {isSaving ? 'Saving...' : 'Record Depreciation Entry'}
-                                    </button>
+                                    </Button>
                                     {saveSuccess && (
-                                        <p className="text-sm text-green-700">{saveSuccess}</p>
+                                        <p className="text-sm text-green-700 dark:text-green-400">{saveSuccess}</p>
                                     )}
                                     {saveError && (
-                                        <p className="text-sm text-red-700">{saveError}</p>
+                                        <p className="text-sm text-destructive">{saveError}</p>
                                     )}
                                 </div>
                             </div>
@@ -786,36 +801,28 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
 
                     {/* Depreciation Schedule Table */}
                     <div className="overflow-x-auto">
-                        <table className="table">
-                            <thead className="bg-gray-50">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                 <tr>
-                                    <th>Fiscal Year</th>
-                                    <th>Depreciation Rate</th>
-                                    <th>Depreciation Amount</th>
-                                    <th>Remaining Book Value</th>
-                                    <th>Notes</th>
+                                    <th className="px-6 py-4">Fiscal Year</th>
+                                    <th className="px-6 py-4">Depreciation Rate</th>
+                                    <th className="px-6 py-4">Depreciation Amount</th>
+                                    <th className="px-6 py-4">Remaining Book Value</th>
+                                    <th className="px-6 py-4">Notes</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="divide-y divide-border">
                                 {schedule.map((entry) => (
-                                    <tr key={entry.year}>
-                                        <td className="font-medium">{entry.year}</td>
-                                        <td>
-                                            {entry.isHalfYear ? (
-                                                <span className="text-orange-600 font-semibold">
-                                                    {(asset.cca_rate * 50).toFixed(1)}% (Half-Year)
-                                                </span>
-                                            ) : (
-                                                <span className="text-blue-600">
-                                                    {(asset.cca_rate * 100).toFixed(1)}%
-                                                </span>
-                                            )}
+                                    <tr key={entry.year} className="hover:bg-muted/50 transition-colors">
+                                        <td className="px-6 py-4 font-medium text-foreground">{entry.year}</td>
+                                        <td className="px-6 py-4 text-muted-foreground">
+                                            {entry.isHalfYear ? (asset.cca_rate * 50).toFixed(1) : (asset.cca_rate * 100).toFixed(1)}%
                                         </td>
-                                        <td className="font-medium">{formatCurrency(entry.depreciationAmount)}</td>
-                                        <td className="font-medium">{formatCurrency(entry.remainingBookValue)}</td>
-                                        <td>
+                                        <td className="px-6 py-4 text-foreground">{formatCurrency(entry.depreciationAmount)}</td>
+                                        <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(entry.remainingBookValue)}</td>
+                                        <td className="px-6 py-4">
                                             {entry.isHalfYear && (
-                                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                                                <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
                                                     Half-Year Rule
                                                 </span>
                                             )}
@@ -825,19 +832,10 @@ const DepreciationScheduleModal: React.FC<DepreciationScheduleModalProps> = ({ a
                             </tbody>
                         </table>
                     </div>
-
-                    <div className="mt-6 flex justify-end">
-                        <button
-                            onClick={onClose}
-                            className="btn btn-secondary"
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
+                </Card>
             </div>
         </div>
     );
-};
+}
 
 export default CapitalAssets;

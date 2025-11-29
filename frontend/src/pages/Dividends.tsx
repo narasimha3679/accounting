@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Dividend } from '../lib/api';
 import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 import {
     Plus,
     Edit,
@@ -9,7 +10,8 @@ import {
     DollarSign,
     CheckCircle,
     Clock,
-    Search
+    Search,
+    X
 } from 'lucide-react';
 
 const Dividends: React.FC = () => {
@@ -144,22 +146,22 @@ const Dividends: React.FC = () => {
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'paid':
-                return <CheckCircle className="h-4 w-4 text-green-500" />;
+                return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
             case 'declared':
-                return <Clock className="h-4 w-4 text-yellow-500" />;
+                return <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />;
             default:
-                return <Clock className="h-4 w-4 text-gray-500" />;
+                return <Clock className="h-4 w-4 text-muted-foreground" />;
         }
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'paid':
-                return 'bg-green-100 text-green-800';
+                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
             case 'declared':
-                return 'bg-yellow-100 text-yellow-800';
+                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
             default:
-                return 'bg-gray-100 text-gray-800';
+                return 'bg-muted text-muted-foreground';
         }
     };
 
@@ -175,7 +177,7 @@ const Dividends: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -183,15 +185,14 @@ const Dividends: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Dividends</h1>
-                    <p className="text-gray-600 mt-2">Manage corporate dividend declarations and payments</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Dividends</h1>
+                    <p className="text-muted-foreground mt-2">Manage corporate dividend declarations and payments</p>
                 </div>
                 <Button
                     onClick={openModal}
                     icon={Plus}
-                    iconPosition="left"
                     className="w-full sm:w-auto"
                 >
                     Create Dividend
@@ -200,73 +201,73 @@ const Dividends: React.FC = () => {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <DollarSign className="h-8 w-8 text-blue-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                            <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Total Dividends
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalDividends)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <CheckCircle className="h-8 w-8 text-green-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-green-100 dark:bg-green-900/20">
+                            <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Paid Dividends
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(paidDividends)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Clock className="h-8 w-8 text-yellow-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/20">
+                            <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Declared (Unpaid)
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(declaredDividends)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Filters */}
-            <div className="card">
+            <Card className="p-4">
                 <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <input
                                 type="text"
                                 placeholder="Search dividends..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 input-field"
+                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -274,7 +275,7 @@ const Dividends: React.FC = () => {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="input-field"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <option value="">All Status</option>
                             <option value="declared">Declared</option>
@@ -282,71 +283,63 @@ const Dividends: React.FC = () => {
                         </select>
                     </div>
                 </div>
-            </div>
+            </Card>
 
             {/* Dividends Table */}
-            <div className="card">
+            <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Amount
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Declaration Date
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Payment Date
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Notes
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
+                                <th className="px-6 py-4">Amount</th>
+                                <th className="px-6 py-4">Declaration Date</th>
+                                <th className="px-6 py-4">Payment Date</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Notes</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {filteredDividends.map((dividend) => (
-                                <tr key={dividend.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <tr key={dividend.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-foreground">
                                         {formatCurrency(dividend.amount)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 text-muted-foreground">
                                         {formatDate(dividend.declaration_date)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td className="px-6 py-4 text-muted-foreground">
                                         {dividend.payment_date ? formatDate(dividend.payment_date) : '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(dividend.status)}`}>
                                             {getStatusIcon(dividend.status)}
                                             <span className="ml-1 capitalize">{dividend.status}</span>
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                    <td className="px-6 py-4 text-muted-foreground max-w-xs truncate">
                                         {dividend.notes || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex items-center gap-2 flex-wrap justify-end">
-                                            <button
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleEdit(dividend)}
-                                                className="text-blue-600 hover:text-blue-800 p-1"
+                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                                 title="Edit"
                                             >
                                                 <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleDelete(dividend.id)}
-                                                className="text-red-600 hover:text-red-800 p-1"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 title="Delete"
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -357,20 +350,20 @@ const Dividends: React.FC = () => {
 
                 {filteredDividends.length === 0 && (
                     <div className="text-center py-12">
-                        <DollarSign className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">No dividends found</h3>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-2 text-sm font-medium text-foreground">No dividends found</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
                             {searchTerm || statusFilter ? 'Try adjusting your search or filter criteria.' : 'Get started by adding your first dividend.'}
                         </p>
                         {!searchTerm && !statusFilter && (
                             <div className="mt-6">
-                                <button
+                                <Button
                                     onClick={openModal}
-                                    className="btn btn-primary flex items-center justify-center gap-2 mx-auto"
+                                    icon={Plus}
+                                    className="mx-auto"
                                 >
-                                    <Plus className="h-4 w-4" />
                                     Create Dividend
-                                </button>
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -378,160 +371,171 @@ const Dividends: React.FC = () => {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                    <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
                         <div className="flex-1 flex justify-between sm:hidden">
-                            <button
+                            <Button
+                                variant="outline"
                                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
-                                className="btn btn-secondary disabled:opacity-50"
                             >
                                 Previous
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="outline"
                                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage === totalPages}
-                                className="btn btn-secondary disabled:opacity-50"
                             >
                                 Next
-                            </button>
+                            </Button>
                         </div>
                         <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                             <div>
-                                <p className="text-sm text-gray-700">
-                                    Showing <span className="font-medium">{(currentPage - 1) * 10 + 1}</span> to{' '}
-                                    <span className="font-medium">{Math.min(currentPage * 10, total)}</span> of{' '}
-                                    <span className="font-medium">{total}</span> results
+                                <p className="text-sm text-muted-foreground">
+                                    Showing <span className="font-medium text-foreground">{(currentPage - 1) * 10 + 1}</span> to{' '}
+                                    <span className="font-medium text-foreground">{Math.min(currentPage * 10, total)}</span> of{' '}
+                                    <span className="font-medium text-foreground">{total}</span> results
                                 </p>
                             </div>
                             <div>
                                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                                    <button
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                         disabled={currentPage === 1}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="rounded-r-none"
                                     >
                                         Previous
-                                    </button>
+                                    </Button>
                                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                        <button
+                                        <Button
                                             key={page}
+                                            variant={page === currentPage ? "default" : "outline"}
+                                            size="sm"
                                             onClick={() => setCurrentPage(page)}
-                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
-                                                ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
-                                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                                }`}
+                                            className="rounded-none"
                                         >
                                             {page}
-                                        </button>
+                                        </Button>
                                     ))}
-                                    <button
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="rounded-l-none"
                                     >
                                         Next
-                                    </button>
+                                    </Button>
                                 </nav>
                             </div>
                         </div>
                     </div>
                 )}
-            </div>
+            </Card>
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                        <div className="mt-3">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                    <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-foreground">
                                 {editingDividend ? 'Edit Dividend' : 'Add New Dividend'}
                             </h3>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Amount *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={formData.amount}
-                                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                        className="input-field"
-                                        placeholder="0.00"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Declaration Date *
-                                    </label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={formData.declaration_date}
-                                        onChange={(e) => setFormData({ ...formData, declaration_date: e.target.value })}
-                                        className="input-field"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Payment Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={formData.payment_date}
-                                        onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                                        className="input-field"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Status *
-                                    </label>
-                                    <select
-                                        required
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'declared' | 'paid' })}
-                                        className="input-field"
-                                    >
-                                        <option value="declared">Declared</option>
-                                        <option value="paid">Paid</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">
-                                        Notes
-                                    </label>
-                                    <textarea
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                        className="input-field"
-                                        rows={3}
-                                        placeholder="Optional notes about this dividend..."
-                                    />
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={closeModal}
-                                        className="btn btn-secondary"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary"
-                                    >
-                                        {editingDividend ? 'Update' : 'Create'} Dividend
-                                    </button>
-                                </div>
-                            </form>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={closeModal}
+                                className="h-8 w-8 rounded-full"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
                         </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Amount *
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    value={formData.amount}
+                                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Declaration Date *
+                                </label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={formData.declaration_date}
+                                    onChange={(e) => setFormData({ ...formData, declaration_date: e.target.value })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Payment Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={formData.payment_date}
+                                    onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Status *
+                                </label>
+                                <select
+                                    required
+                                    value={formData.status}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'declared' | 'paid' })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="declared">Declared</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Notes
+                                </label>
+                                <textarea
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    rows={3}
+                                    placeholder="Optional notes about this dividend..."
+                                />
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeModal}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                >
+                                    {editingDividend ? 'Update' : 'Create'} Dividend
+                                </Button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

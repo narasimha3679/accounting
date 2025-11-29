@@ -6,6 +6,7 @@ import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar } 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const Expenses: React.FC = () => {
     const { user } = useAuth();
@@ -107,7 +108,7 @@ const Expenses: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -116,25 +117,26 @@ const Expenses: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Expenses</h1>
-                    <p className="text-gray-600 mt-2">Track your business expenses</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Expenses</h1>
+                    <p className="text-muted-foreground mt-2">Track your business expenses</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     {/* Time Period Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
+                        <div className="flex rounded-lg shadow-sm border border-border overflow-hidden">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setTimePeriod('month');
                                     updateDashboardPreference('timePeriod', 'month');
                                 }}
-                                className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium transition-colors duration-200",
                                     timePeriod === 'month'
-                                        ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-card text-muted-foreground hover:bg-muted"
+                                )}
                             >
                                 Month
                             </button>
@@ -144,18 +146,19 @@ const Expenses: React.FC = () => {
                                     setTimePeriod('year');
                                     updateDashboardPreference('timePeriod', 'year');
                                 }}
-                                className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium transition-colors duration-200",
                                     timePeriod === 'year'
-                                        ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
-                                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-card text-muted-foreground hover:bg-muted"
+                                )}
                             >
                                 Year
                             </button>
                         </div>
 
                         <div className="flex items-center space-x-2">
-                            <Calendar className="h-5 w-5 text-gray-400" />
+                            <Calendar className="h-5 w-5 text-muted-foreground" />
                             <input
                                 type={timePeriod === 'month' ? 'month' : 'number'}
                                 value={timePeriod === 'month'
@@ -170,7 +173,7 @@ const Expenses: React.FC = () => {
                                         setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                     }
                                 }}
-                                className="input"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -178,7 +181,6 @@ const Expenses: React.FC = () => {
                     <Button
                         onClick={() => setShowCreateModal(true)}
                         icon={Plus}
-                        iconPosition="left"
                         className="w-full sm:w-auto"
                     >
                         Add Expense
@@ -187,13 +189,13 @@ const Expenses: React.FC = () => {
             </div>
 
             {/* Category Filter */}
-            <Card>
+            <Card className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <label className="text-sm font-medium text-gray-700">Filter by category:</label>
+                    <label className="text-sm font-medium text-foreground">Filter by category:</label>
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="input w-full sm:w-auto"
+                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -205,125 +207,127 @@ const Expenses: React.FC = () => {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Receipt className="h-8 w-8 text-red-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-red-100 dark:bg-red-900/20">
+                            <Receipt className="h-6 w-6 text-red-600 dark:text-red-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Total Expenses
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalExpenses)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Receipt className="h-8 w-8 text-blue-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                            <Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     HST Paid
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalHSTPaid)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
 
-                <div className="card">
+                <Card className="p-6">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <Receipt className="h-8 w-8 text-green-600" />
+                        <div className="flex-shrink-0 p-3 rounded-full bg-green-100 dark:bg-green-900/20">
+                            <Receipt className="h-6 w-6 text-green-600 dark:text-green-400" />
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
                                     Total with HST
                                 </dt>
-                                <dd className="text-lg font-medium text-gray-900">
+                                <dd className="text-2xl font-bold text-foreground">
                                     {formatCurrency(totalExpenses + totalHSTPaid)}
                                 </dd>
                             </dl>
                         </div>
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Expenses Table */}
-            <div className="card">
+            <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="table">
-                        <thead className="bg-gray-50">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                             <tr>
-                                <th>Date</th>
-                                <th>Description</th>
-                                <th>Category</th>
-                                <th>Amount</th>
-                                <th>HST Paid</th>
-                                <th>Total</th>
-                                <th>Paid By</th>
-                                <th>Receipt</th>
-                                <th>Actions</th>
+                                <th className="px-6 py-4">Date</th>
+                                <th className="px-6 py-4">Description</th>
+                                <th className="px-6 py-4">Category</th>
+                                <th className="px-6 py-4">Amount</th>
+                                <th className="px-6 py-4">HST Paid</th>
+                                <th className="px-6 py-4">Total</th>
+                                <th className="px-6 py-4">Paid By</th>
+                                <th className="px-6 py-4">Receipt</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {filteredExpenses?.map((expense) => (
-                                <tr key={expense.id}>
-                                    <td>{formatDate(expense.expense_date)}</td>
-                                    <td className="font-medium">{expense.description}</td>
-                                    <td>{expense.category?.name || 'Uncategorized'}</td>
-                                    <td className="font-medium">{formatCurrency(expense.amount)}</td>
-                                    <td>{formatCurrency(expense.hst_paid)}</td>
-                                    <td className="font-medium text-green-600">{formatCurrency(expense.amount + expense.hst_paid)}</td>
-                                    <td>
+                                <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(expense.expense_date)}</td>
+                                    <td className="px-6 py-4 font-medium text-foreground">{expense.description}</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{expense.category?.name || 'Uncategorized'}</td>
+                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(expense.amount)}</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{formatCurrency(expense.hst_paid)}</td>
+                                    <td className="px-6 py-4 font-medium text-green-600 dark:text-green-400">{formatCurrency(expense.amount + expense.hst_paid)}</td>
+                                    <td className="px-6 py-4">
                                         {expense.paid_by === 'corp' ? (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                                 Corporation
                                             </span>
                                         ) : (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                                                 Owner
                                             </span>
                                         )}
                                     </td>
-                                    <td>
+                                    <td className="px-6 py-4">
                                         {expense.receipt_attached ? (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                                                 Yes
                                             </span>
                                         ) : (
-                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
                                                 No
                                             </span>
                                         )}
                                     </td>
-                                    <td>
-                                        <div className="flex items-center gap-2">
-                                            <button
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => setEditingExpense(expense)}
-                                                className="text-blue-600 hover:text-blue-800"
-                                                title="Edit"
+                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                             >
                                                 <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => handleDelete(expense)}
-                                                className="text-red-600 hover:text-red-800"
-                                                title="Delete"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -331,12 +335,12 @@ const Expenses: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {filteredExpenses?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No expenses found</p>
-                    <p className="text-gray-400">Add your first expense to get started</p>
+                    <p className="text-muted-foreground text-lg">No expenses found</p>
+                    <p className="text-muted-foreground/60">Add your first expense to get started</p>
                 </div>
             )}
 
@@ -368,20 +372,20 @@ interface ExpenseModalProps {
     onSave: () => void;
 }
 
-const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClose, onSave }) => {
+function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProps) {
     const { user } = useAuth();
     const HST_RATE = 0.13; // 13% default HST rate
-    
+
     // Determine if tax applies: if editing, check if hst_paid > 0; if new, default to true
     const initialTaxApplies = expense ? (expense.hst_paid > 0) : true;
-    
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
             style: 'currency',
             currency: 'CAD',
         }).format(amount);
     };
-    
+
     const [formData, setFormData] = useState({
         description: expense?.description || '',
         category_id: expense?.category_id || 0,
@@ -514,311 +518,327 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ expense, categories, onClos
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-                <div className="mt-3">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-foreground">
                         {expense ? 'Edit Expense' : 'Add New Expense'}
                     </h3>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Description *</label>
-                                <input
-                                    type="text"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Category *</label>
-                                <select
-                                    value={formData.category_id}
-                                    onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                                    className="input"
-                                    required
-                                >
-                                    <option value={0}>Select a category</option>
-                                    {categories.map(category => (
-                                        <option key={category.id} value={category.id}>{category.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Expense Date *</label>
-                                <input
-                                    type="date"
-                                    value={formData.expense_date}
-                                    onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Amount (before HST) *</label>
-                                <input
-                                    type="number"
-                                    value={formData.amount}
-                                    onChange={(e) => {
-                                        const newAmount = parseFloat(e.target.value) || 0;
-                                        const newHstPaid = taxApplies ? parseFloat((newAmount * HST_RATE).toFixed(2)) : formData.hst_paid;
-                                        setFormData({ ...formData, amount: newAmount, hst_paid: newHstPaid });
-                                    }}
-                                    className="input"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                />
-                                {formData.amount > 500 && (
-                                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                        <div className="flex">
-                                            <div className="flex-shrink-0">
-                                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                </svg>
-                                            </div>
-                                            <div className="ml-3">
-                                                <h3 className="text-sm font-medium text-yellow-800">
-                                                    Capital Asset Alert
-                                                </h3>
-                                                <div className="mt-2 text-sm text-yellow-700">
-                                                    <p>
-                                                        This expense is over $500 CAD and may be considered a capital asset that requires depreciation.
-                                                        Consider creating a capital asset entry instead of a regular expense.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="block text-sm font-medium text-gray-700">HST Paid</label>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            id="tax_applies"
-                                            checked={taxApplies}
-                                            onChange={(e) => {
-                                                const applies = e.target.checked;
-                                                setTaxApplies(applies);
-                                                if (applies) {
-                                                    // Auto-calculate HST when tax applies is checked
-                                                    const calculatedHst = parseFloat((formData.amount * HST_RATE).toFixed(2));
-                                                    setFormData({ ...formData, hst_paid: calculatedHst });
-                                                } else {
-                                                    // Set to 0 when tax doesn't apply
-                                                    setFormData({ ...formData, hst_paid: 0 });
-                                                }
-                                            }}
-                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                        />
-                                        <label htmlFor="tax_applies" className="ml-2 block text-sm text-gray-700">
-                                            Tax applies (13%)
-                                        </label>
-                                    </div>
-                                </div>
-                                <input
-                                    type="number"
-                                    value={formData.hst_paid}
-                                    onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
-                                    className="input"
-                                    min="0"
-                                    step="0.01"
-                                    readOnly={taxApplies}
-                                    style={taxApplies ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : {}}
-                                />
-                                {taxApplies && formData.amount > 0 && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        Calculated: {formatCurrency(formData.amount)} × 13% = {formatCurrency(formData.hst_paid)}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        id="receipt_attached"
-                                        checked={formData.receipt_attached}
-                                        onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
-                                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                    />
-                                    <label htmlFor="receipt_attached" className="ml-2 block text-sm text-gray-900">
-                                        Receipt attached
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Paid By *</label>
-                                <div className="flex gap-6">
-                                    <div className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            id="paid_by_corp"
-                                            name="paid_by"
-                                            value="corp"
-                                            checked={formData.paid_by === 'corp'}
-                                            onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
-                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                                        />
-                                        <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-gray-900">
-                                            Corporation
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            id="paid_by_owner"
-                                            name="paid_by"
-                                            value="owner"
-                                            checked={formData.paid_by === 'owner'}
-                                            onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
-                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                                        />
-                                        <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-gray-900">
-                                            Owner (to be reimbursed)
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Description *</label>
+                            <input
+                                type="text"
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            />
                         </div>
 
-                        {/* File Upload Section */}
-                        <div className="border-t pt-6">
-                            <h4 className="text-lg font-medium text-gray-900 mb-4">Files & Receipts</h4>
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Category *</label>
+                            <select
+                                value={formData.category_id}
+                                onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            >
+                                <option value={0}>Select a category</option>
+                                {categories.map(category => (
+                                    <option key={category.id} value={category.id}>{category.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                            {/* Existing Files */}
-                            {expense?.files && expense.files.length > 0 && (
-                                <div className="mb-6">
-                                    <h5 className="text-sm font-medium text-gray-700 mb-3">Uploaded Files</h5>
-                                    <div className="space-y-2">
-                                        {expense.files.map((file) => (
-                                            <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                                <div className="flex items-center gap-3">
-                                                    <FileText className="h-5 w-5 text-gray-500" />
-                                                    <div>
-                                                        <p className="text-sm font-medium text-gray-900">{file.original_name}</p>
-                                                        <p className="text-xs text-gray-500">{formatFileSize(file.file_size)}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleFileDownload(file)}
-                                                        className="text-blue-600 hover:text-blue-800"
-                                                        title="Download"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleFileDelete(file.id)}
-                                                        className="text-red-600 hover:text-red-800"
-                                                        title="Delete"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                </div>
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Expense Date *</label>
+                            <input
+                                type="date"
+                                value={formData.expense_date}
+                                onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Amount (before HST) *</label>
+                            <input
+                                type="number"
+                                value={formData.amount}
+                                onChange={(e) => {
+                                    const newAmount = parseFloat(e.target.value) || 0;
+                                    const newHstPaid = taxApplies ? parseFloat((newAmount * HST_RATE).toFixed(2)) : formData.hst_paid;
+                                    setFormData({ ...formData, amount: newAmount, hst_paid: newHstPaid });
+                                }}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                min="0"
+                                step="0.01"
+                                required
+                            />
+                            {formData.amount > 500 && (
+                                <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                    <div className="flex">
+                                        <div className="flex-shrink-0">
+                                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="ml-3">
+                                            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                                                Capital Asset Alert
+                                            </h3>
+                                            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                                                <p>
+                                                    This expense is over $500 CAD and may be considered a capital asset that requires depreciation.
+                                                    Consider creating a capital asset entry instead of a regular expense.
+                                                </p>
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}
+                        </div>
 
-                            {/* File Upload */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-foreground">HST Paid</label>
+                                <div className="flex items-center">
                                     <input
-                                        type="file"
-                                        multiple
-                                        onChange={handleFileSelect}
-                                        className="hidden"
-                                        id="file-upload"
-                                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar"
+                                        type="checkbox"
+                                        id="tax_applies"
+                                        checked={taxApplies}
+                                        onChange={(e) => {
+                                            const applies = e.target.checked;
+                                            setTaxApplies(applies);
+                                            if (applies) {
+                                                // Auto-calculate HST when tax applies is checked
+                                                const calculatedHst = parseFloat((formData.amount * HST_RATE).toFixed(2));
+                                                setFormData({ ...formData, hst_paid: calculatedHst });
+                                            } else {
+                                                // Set to 0 when tax doesn't apply
+                                                setFormData({ ...formData, hst_paid: 0 });
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
                                     />
-                                    <label htmlFor="file-upload" className="cursor-pointer">
-                                        <div className="text-center">
-                                            <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                                            <div className="mt-2">
-                                                <p className="text-sm text-gray-600">
-                                                    <span className="font-medium text-primary-600 hover:text-primary-500">
-                                                        Click to upload
-                                                    </span>
-                                                    {' '}or drag and drop
-                                                </p>
-                                                <p className="text-xs text-gray-500">PDF, images, documents up to 10MB each</p>
-                                            </div>
-                                        </div>
+                                    <label htmlFor="tax_applies" className="ml-2 block text-sm text-foreground">
+                                        Tax applies (13%)
                                     </label>
                                 </div>
-
-                                {/* Selected Files */}
-                                {selectedFiles.length > 0 && (
-                                    <div className="mt-4">
-                                        <h6 className="text-sm font-medium text-gray-700 mb-2">Selected Files</h6>
-                                        <div className="space-y-2">
-                                            {selectedFiles.map((file, index) => (
-                                                <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                                                    <span className="text-sm text-gray-900">{file.name}</span>
-                                                    <button
-                                                        onClick={() => handleFileRemove(index)}
-                                                        className="text-red-600 hover:text-red-800"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {expense && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleFileUpload(expense.id)}
-                                                disabled={uploadingFiles}
-                                                className="mt-3 btn btn-primary btn-sm"
-                                            >
-                                                {uploadingFiles ? 'Uploading...' : 'Upload Files'}
-                                            </button>
-                                        )}
-                                    </div>
+                            </div>
+                            <input
+                                type="number"
+                                value={formData.hst_paid}
+                                onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
+                                className={cn(
+                                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                                    taxApplies && "bg-muted cursor-not-allowed"
                                 )}
+                                min="0"
+                                step="0.01"
+                                readOnly={taxApplies}
+                            />
+                            {taxApplies && formData.amount > 0 && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Calculated: {formatCurrency(formData.amount)} × 13% = {formatCurrency(formData.hst_paid)}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="receipt_attached"
+                                    checked={formData.receipt_attached}
+                                    onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
+                                    className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
+                                />
+                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-foreground">
+                                    Receipt attached
+                                </label>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="btn btn-secondary"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles}
-                            >
-                                {createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles
-                                    ? 'Saving...'
-                                    : expense
-                                        ? 'Update Expense'
-                                        : 'Create Expense'
-                                }
-                            </button>
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Paid By *</label>
+                            <div className="flex gap-6">
+                                <div className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        id="paid_by_corp"
+                                        name="paid_by"
+                                        value="corp"
+                                        checked={formData.paid_by === 'corp'}
+                                        onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-input"
+                                    />
+                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-foreground">
+                                        Corporation
+                                    </label>
+                                </div>
+                                <div className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        id="paid_by_owner"
+                                        name="paid_by"
+                                        value="owner"
+                                        checked={formData.paid_by === 'owner'}
+                                        onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-input"
+                                    />
+                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-foreground">
+                                        Owner (to be reimbursed)
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                    </form>
-                </div>
+                    </div>
+
+                    {/* File Upload Section */}
+                    <div className="border-t border-border pt-6">
+                        <h4 className="text-lg font-medium text-foreground mb-4">Files & Receipts</h4>
+
+                        {/* Existing Files */}
+                        {expense?.files && expense.files.length > 0 && (
+                            <div className="mb-6">
+                                <h5 className="text-sm font-medium text-muted-foreground mb-3">Uploaded Files</h5>
+                                <div className="space-y-2">
+                                    {expense.files.map((file) => (
+                                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+                                            <div className="flex items-center gap-3">
+                                                <FileText className="h-5 w-5 text-muted-foreground" />
+                                                <div>
+                                                    <p className="text-sm font-medium text-foreground">{file.original_name}</p>
+                                                    <p className="text-xs text-muted-foreground">{formatFileSize(file.file_size)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleFileDownload(file)}
+                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                                                    title="Download"
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleFileDelete(file.id)}
+                                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    title="Delete"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* File Upload */}
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Upload Files</label>
+                            <div className="border-2 border-dashed border-border rounded-lg p-6 hover:bg-muted/50 transition-colors">
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                    id="file-upload"
+                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar"
+                                />
+                                <label htmlFor="file-upload" className="cursor-pointer w-full h-full block">
+                                    <div className="text-center">
+                                        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                                        <div className="mt-2">
+                                            <p className="text-sm text-muted-foreground">
+                                                <span className="font-medium text-primary hover:text-primary/90">
+                                                    Click to upload
+                                                </span>
+                                                {' '}or drag and drop
+                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1">PDF, images, documents up to 10MB each</p>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Selected Files */}
+                            {selectedFiles.length > 0 && (
+                                <div className="mt-4">
+                                    <h6 className="text-sm font-medium text-foreground mb-2">Selected Files</h6>
+                                    <div className="space-y-2">
+                                        {selectedFiles.map((file, index) => (
+                                            <div key={index} className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                                <span className="text-sm text-foreground">{file.name}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleFileRemove(index)}
+                                                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {expense && (
+                                        <Button
+                                            type="button"
+                                            onClick={() => handleFileUpload(expense.id)}
+                                            disabled={uploadingFiles}
+                                            className="mt-3"
+                                            size="sm"
+                                        >
+                                            {uploadingFiles ? 'Uploading...' : 'Upload Files'}
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles}
+                        >
+                            {createExpenseMutation.isPending || updateExpenseMutation.isPending || uploadingFiles
+                                ? 'Saving...'
+                                : expense
+                                    ? 'Update Expense'
+                                    : 'Create Expense'
+                            }
+                        </Button>
+                    </div>
+                </form>
             </div>
         </div>
     );
-};
+}
 
 export default Expenses;

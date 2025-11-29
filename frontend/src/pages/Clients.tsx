@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Client } from '../lib/api';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 
 const Clients: React.FC = () => {
     const { user } = useAuth();
-    const _queryClient = useQueryClient();
+    const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -30,7 +31,7 @@ const Clients: React.FC = () => {
             return api.deleteClient(id);
         },
         onSuccess: () => {
-            _queryClient.invalidateQueries({ queryKey: ['clients'] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] });
         },
     });
 
@@ -43,22 +44,22 @@ const Clients: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="heading-1">Clients</h1>
-                    <p className="text-gray-600 mt-2">Manage your client information</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Clients</h1>
+                    <p className="text-muted-foreground mt-2">Manage your client information</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
                     icon={Plus}
-                    iconPosition="left"
+                    className="w-full sm:w-auto"
                 >
                     Add Client
                 </Button>
@@ -67,58 +68,62 @@ const Clients: React.FC = () => {
             {/* Clients Grid */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {clients?.map((client) => (
-                    <div key={client.id} className="card">
+                    <Card key={client.id} className="p-6">
                         <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">{client.name}</h3>
+                            <h3 className="text-lg font-medium text-foreground">{client.name}</h3>
                             <div className="flex items-center gap-2">
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => setEditingClient(client)}
-                                    className="text-blue-600 hover:text-blue-800"
+                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                     title="Edit"
                                 >
                                     <Edit className="h-4 w-4" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => handleDelete(client)}
-                                    className="text-red-600 hover:text-red-800"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     title="Delete"
                                 >
                                     <Trash2 className="h-4 w-4" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
 
-                        <div className="space-y-2 text-sm text-gray-600">
+                        <div className="space-y-2 text-sm text-muted-foreground">
                             {client.contact_person && (
-                                <p><span className="font-medium">Contact:</span> {client.contact_person}</p>
+                                <p><span className="font-medium text-foreground">Contact:</span> {client.contact_person}</p>
                             )}
                             {client.email && (
-                                <p><span className="font-medium">Email:</span> {client.email}</p>
+                                <p><span className="font-medium text-foreground">Email:</span> {client.email}</p>
                             )}
                             {client.phone && (
-                                <p><span className="font-medium">Phone:</span> {client.phone}</p>
+                                <p><span className="font-medium text-foreground">Phone:</span> {client.phone}</p>
                             )}
                             {client.address && (
-                                <p><span className="font-medium">Address:</span> {client.address}</p>
+                                <p><span className="font-medium text-foreground">Address:</span> {client.address}</p>
                             )}
                             <p>
-                                <span className="font-medium">HST Exempt:</span>{' '}
+                                <span className="font-medium text-foreground">HST Exempt:</span>{' '}
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${client.hst_exempt
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-blue-100 text-blue-800'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
                                     }`}>
                                     {client.hst_exempt ? 'Yes' : 'No'}
                                 </span>
                             </p>
                         </div>
-                    </div>
+                    </Card>
                 ))}
             </div>
 
             {clients?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No clients found</p>
-                    <p className="text-gray-400">Add your first client to get started</p>
+                    <p className="text-muted-foreground text-lg">No clients found</p>
+                    <p className="text-muted-foreground/60">Add your first client to get started</p>
                 </div>
             )}
 
@@ -131,7 +136,7 @@ const Clients: React.FC = () => {
                         setEditingClient(null);
                     }}
                     onSave={() => {
-                        _queryClient.invalidateQueries({ queryKey: ['clients'] });
+                        queryClient.invalidateQueries({ queryKey: ['clients'] });
                         setShowCreateModal(false);
                         setEditingClient(null);
                     }}
@@ -148,7 +153,7 @@ interface ClientModalProps {
     onSave: () => void;
 }
 
-const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) => {
+function ClientModal({ client, onClose, onSave }: ClientModalProps) {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         name: client?.name || '',
@@ -193,116 +198,123 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-                <div className="mt-3">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-foreground">
                         {client ? 'Edit Client' : 'Add New Client'}
                     </h3>
-
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                            <div className="sm:col-span-2">
-                                <label htmlFor="client-name" className="block text-sm font-medium text-gray-700">Company Name *</label>
-                                <input
-                                    id="client-name"
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="input"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="client-contact-person" className="block text-sm font-medium text-gray-700">Contact Person</label>
-                                <input
-                                    id="client-contact-person"
-                                    type="text"
-                                    value={formData.contact_person}
-                                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="client-email" className="block text-sm font-medium text-gray-700">Email</label>
-                                <input
-                                    id="client-email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-
-                            <div>
-                                <label htmlFor="client-phone" className="block text-sm font-medium text-gray-700">Phone</label>
-                                <input
-                                    id="client-phone"
-                                    type="tel"
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <label htmlFor="client-address" className="block text-sm font-medium text-gray-700">Address</label>
-                                <textarea
-                                    id="client-address"
-                                    value={formData.address}
-                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                    className="input"
-                                    rows={3}
-                                />
-                            </div>
-
-                            <div className="sm:col-span-2">
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        id="hst_exempt"
-                                        checked={formData.hst_exempt}
-                                        onChange={(e) => setFormData({ ...formData, hst_exempt: e.target.checked })}
-                                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                    />
-                                    <label htmlFor="hst_exempt" className="ml-2 block text-sm text-gray-900">
-                                        HST Exempt
-                                    </label>
-                                </div>
-                                <p className="mt-1 text-sm text-gray-500">
-                                    Check if this client is exempt from HST charges
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="btn btn-secondary"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={createClientMutation.isPending || updateClientMutation.isPending}
-                            >
-                                {createClientMutation.isPending || updateClientMutation.isPending
-                                    ? 'Saving...'
-                                    : client
-                                        ? 'Update Client'
-                                        : 'Create Client'
-                                }
-                            </button>
-                        </div>
-                    </form>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
                 </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="client-name" className="block text-sm font-medium text-foreground mb-2">Company Name *</label>
+                            <input
+                                id="client-name"
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="client-contact-person" className="block text-sm font-medium text-foreground mb-2">Contact Person</label>
+                            <input
+                                id="client-contact-person"
+                                type="text"
+                                value={formData.contact_person}
+                                onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="client-email" className="block text-sm font-medium text-foreground mb-2">Email</label>
+                            <input
+                                id="client-email"
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="client-phone" className="block text-sm font-medium text-foreground mb-2">Phone</label>
+                            <input
+                                id="client-phone"
+                                type="tel"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <label htmlFor="client-address" className="block text-sm font-medium text-foreground mb-2">Address</label>
+                            <textarea
+                                id="client-address"
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                rows={3}
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="hst_exempt"
+                                    checked={formData.hst_exempt}
+                                    onChange={(e) => setFormData({ ...formData, hst_exempt: e.target.checked })}
+                                    className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
+                                />
+                                <label htmlFor="hst_exempt" className="ml-2 block text-sm text-foreground">
+                                    HST Exempt
+                                </label>
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Check if this client is exempt from HST charges
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={createClientMutation.isPending || updateClientMutation.isPending}
+                        >
+                            {createClientMutation.isPending || updateClientMutation.isPending
+                                ? 'Saving...'
+                                : client
+                                    ? 'Update Client'
+                                    : 'Create Client'
+                            }
+                        </Button>
+                    </div>
+                </form>
             </div>
         </div>
     );
-};
+}
 
 export default Clients;
