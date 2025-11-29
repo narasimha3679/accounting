@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type CapitalAsset } from '../lib/api';
+import api from '../lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, Receipt, DollarSign, Percent, AlertCircle, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
-import StatCard from '../components/ui/StatCard';
 
 const TaxCalculator: React.FC = () => {
     const { user } = useAuth();
