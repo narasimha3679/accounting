@@ -99,7 +99,7 @@ const Settings: React.FC = () => {
         return (
             <div className="p-6 space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+                    <h1 className="heading-1">Settings</h1>
                     <p className="text-gray-700">
                         You don&apos;t have a company set up yet. You&apos;ll need to create one before you can manage
                         settings.

@@ -4,6 +4,8 @@ import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../li
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 
 const Expenses: React.FC = () => {
     const { user } = useAuth();
@@ -114,24 +116,25 @@ const Expenses: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-                    <p className="text-gray-600">Track your business expenses</p>
+                    <h1 className="heading-1">Expenses</h1>
+                    <p className="text-gray-600 mt-2">Track your business expenses</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     {/* Time Period Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex rounded-md shadow-sm">
+                        <div className="flex rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setTimePeriod('month');
                                     updateDashboardPreference('timePeriod', 'month');
                                 }}
-                                className={`px-3 py-2 text-sm font-medium border rounded-l-md ${timePeriod === 'month'
-                                    ? 'bg-primary-600 text-white border-primary-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                                    }`}
+                                className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                                    timePeriod === 'month'
+                                        ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
+                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }`}
                             >
                                 Month
                             </button>
@@ -141,17 +144,18 @@ const Expenses: React.FC = () => {
                                     setTimePeriod('year');
                                     updateDashboardPreference('timePeriod', 'year');
                                 }}
-                                className={`px-3 py-2 text-sm font-medium border rounded-r-md ${timePeriod === 'year'
-                                    ? 'bg-primary-600 text-white border-primary-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                                    }`}
+                                className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                                    timePeriod === 'year'
+                                        ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md'
+                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }`}
                             >
                                 Year
                             </button>
                         </div>
 
                         <div className="flex items-center space-x-2">
-                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <Calendar className="h-5 w-5 text-gray-400" />
                             <input
                                 type={timePeriod === 'month' ? 'month' : 'number'}
                                 value={timePeriod === 'month'
@@ -166,23 +170,24 @@ const Expenses: React.FC = () => {
                                         setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                     }
                                 }}
-                                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                className="input"
                             />
                         </div>
                     </div>
 
-                    <button
+                    <Button
                         onClick={() => setShowCreateModal(true)}
-                        className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+                        icon={Plus}
+                        iconPosition="left"
+                        className="w-full sm:w-auto"
                     >
-                        <Plus className="h-4 w-4" />
                         Add Expense
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Category Filter */}
-            <div className="card">
+            <Card>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <label className="text-sm font-medium text-gray-700">Filter by category:</label>
                     <select
@@ -196,7 +201,7 @@ const Expenses: React.FC = () => {
                         ))}
                     </select>
                 </div>
-            </div>
+            </Card>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">

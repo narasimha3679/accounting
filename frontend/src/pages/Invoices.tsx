@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import api, { type Invoice, type Client, type InvoiceItem } from '../lib/api';
 import { Plus, Edit, Eye, Trash2, Send, Check } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 
 const Invoices: React.FC = () => {
     const { user } = useAuth();
@@ -111,20 +113,21 @@ const Invoices: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-                    <p className="text-gray-600">Manage your client invoices</p>
+                    <h1 className="heading-1">Invoices</h1>
+                    <p className="text-gray-600 mt-2">Manage your client invoices</p>
                 </div>
-                <button
+                <Button
                     onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+                    icon={Plus}
+                    iconPosition="left"
+                    className="w-full sm:w-auto"
                 >
-                    <Plus className="h-4 w-4" />
                     Create Invoice
-                </button>
+                </Button>
             </div>
 
             {/* Invoices Table */}
-            <div className="card">
+            <Card>
                 <div className="overflow-x-auto">
                     <table className="table-mobile">
                         <thead className="bg-gray-50">
@@ -199,7 +202,7 @@ const Invoices: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {/* Create/Edit Invoice Modal */}
             {(showCreateModal || editingInvoice) && (

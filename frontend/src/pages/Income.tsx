@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api, { type IncomeEntry, type Client } from '../lib/api';
 import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
 
 const Income: React.FC = () => {
     const { user } = useAuth();
@@ -88,16 +89,16 @@ const Income: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Income Entries</h1>
-                    <p className="text-gray-600">Track income from clients, capital contributions, and other sources</p>
+                    <h1 className="heading-1">Income Entries</h1>
+                    <p className="text-gray-600 mt-2">Track income from clients, capital contributions, and other sources</p>
                 </div>
-                <button
+                <Button
                     onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    icon={Plus}
+                    iconPosition="left"
                 >
-                    <Plus className="h-4 w-4 mr-2" />
                     Add Income Entry
-                </button>
+                </Button>
             </div>
 
             {/* Income Entries Table */}

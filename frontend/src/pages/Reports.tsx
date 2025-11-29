@@ -305,7 +305,7 @@ ${formatCurrency(data.retainedEarnings)}
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+                <h1 className="heading-1">Reports</h1>
                 <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
                     <p className="text-sm text-yellow-800">
                         Reports require a company to be configured. Please go to the{' '}
@@ -328,7 +328,7 @@ ${formatCurrency(data.retainedEarnings)}
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+                    <h1 className="heading-1">Reports</h1>
                     <p className="text-gray-600">Generate financial reports for your business and tax submission</p>
                 </div>
                 <div className="flex gap-3">

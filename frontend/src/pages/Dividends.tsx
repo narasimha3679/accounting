@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Dividend } from '../lib/api';
+import Button from '../components/ui/Button';
 import {
     Plus,
     Edit,
@@ -184,16 +185,17 @@ const Dividends: React.FC = () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dividends</h1>
-                    <p className="text-gray-600">Manage corporate dividend declarations and payments</p>
+                    <h1 className="heading-1">Dividends</h1>
+                    <p className="text-gray-600 mt-2">Manage corporate dividend declarations and payments</p>
                 </div>
-                <button
+                <Button
                     onClick={openModal}
-                    className="btn btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+                    icon={Plus}
+                    iconPosition="left"
+                    className="w-full sm:w-auto"
                 >
-                    <Plus className="h-4 w-4" />
                     Create Dividend
-                </button>
+                </Button>
             </div>
 
             {/* Summary Cards */}

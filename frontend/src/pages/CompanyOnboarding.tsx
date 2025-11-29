@@ -85,7 +85,7 @@ const CompanyOnboarding: React.FC = () => {
                         <Building2 className="h-6 w-6 text-primary-600" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Set up your company</h1>
+                        <h1 className="heading-1">Set up your company</h1>
                         <p className="text-gray-600">
                             Welcome{user?.name ? `, ${user.name}` : ''}. Before you start using the app, we need a few details about your corporation.
                         </p>

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api, { type Client } from '../lib/api';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Button from '../components/ui/Button';
 
 const Clients: React.FC = () => {
     const { user } = useAuth();
@@ -51,16 +52,16 @@ const Clients: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-                    <p className="text-gray-600">Manage your client information</p>
+                    <h1 className="heading-1">Clients</h1>
+                    <p className="text-gray-600 mt-2">Manage your client information</p>
                 </div>
-                <button
+                <Button
                     onClick={() => setShowCreateModal(true)}
-                    className="btn btn-primary flex items-center gap-2"
+                    icon={Plus}
+                    iconPosition="left"
                 >
-                    <Plus className="h-4 w-4" />
                     Add Client
-                </button>
+                </Button>
             </div>
 
             {/* Clients Grid */}

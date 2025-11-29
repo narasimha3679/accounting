@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './pages/Dashboard';
@@ -70,10 +71,11 @@ const TaxCalculator = () => <div className="p-6"><h1 className="text-2xl font-bo
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Router>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route
               path="/onboarding/company"
@@ -171,10 +173,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -493,7 +493,7 @@ const OwnerPayments: React.FC = () => {
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="text-2xl font-bold text-gray-900">Owner Payments</h1>
+                <h1 className="heading-1">Owner Payments</h1>
                 <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
                     <p className="text-sm text-yellow-800">
                         To track owner payments, please first set up your company details in the{' '}
@@ -508,7 +508,7 @@ const OwnerPayments: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Owner Payments</h1>
+                    <h1 className="heading-1">Owner Payments</h1>
                     <p className="text-gray-600">Track payments made by the corporation to the owner</p>
                 </div>
                 <button
