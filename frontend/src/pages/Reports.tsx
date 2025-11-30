@@ -5,6 +5,8 @@ import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } 
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
@@ -281,26 +283,339 @@ const Reports: React.FC = () => {
         window.URL.revokeObjectURL(url);
     };
 
+    const generatePDFFromData = (data: NonNullable<typeof reportData>) => {
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 15;
+        let yPosition = margin;
+
+        // Helper function to add a new page if needed
+        const checkPageBreak = (requiredHeight: number) => {
+            if (yPosition + requiredHeight > pageHeight - margin) {
+                pdf.addPage();
+                yPosition = margin;
+                return true;
+            }
+            return false;
+        };
+
+        // Helper function to add text with word wrap
+        const addText = (text: string, fontSize: number, isBold = false, color: [number, number, number] = [0, 0, 0]) => {
+            pdf.setFontSize(fontSize);
+            pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+            pdf.setTextColor(color[0], color[1], color[2]);
+            
+            const lines = pdf.splitTextToSize(text, pageWidth - 2 * margin);
+            lines.forEach((line: string) => {
+                checkPageBreak(fontSize * 0.5);
+                pdf.text(line, margin, yPosition);
+                yPosition += fontSize * 0.5;
+            });
+            yPosition += 3;
+        };
+
+        // Header
+        pdf.setFontSize(20);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('COMPREHENSIVE TAX REPORT', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 10;
+
+        // Company Information
+        addText(`Company: ${user?.company?.name || 'N/A'}`, 12, true);
+        addText(`Business Number: ${user?.company?.business_number || 'N/A'}`, 10);
+        addText(`HST Number: ${user?.company?.hst_number || 'Not Registered'}`, 10);
+        addText(`Fiscal Year: ${selectedYear}`, 10);
+        addText(`Report Generated: ${new Date().toLocaleDateString('en-CA')}`, 10);
+        yPosition += 5;
+
+        // Profit & Loss Summary
+        addText('PROFIT & LOSS SUMMARY', 14, true);
+        autoTable(pdf, {
+            startY: yPosition,
+            head: [['Item', 'Amount']],
+            body: [
+                ['Gross Income', formatCurrency(data.grossIncome)],
+                ['Total Expenses', formatCurrency(data.totalExpenses)],
+                ...(data.totalDepreciationForYear > 0 ? [['Depreciation (CCA)', formatCurrency(data.totalDepreciationForYear)]] : []),
+                ['Net Income (Pre-tax)', formatCurrency(data.netIncomeBeforeTax)],
+                [`Small Business Tax (${((user?.company?.small_business_rate || 0.125) * 100).toFixed(2)}%)`, formatCurrency(data.smallBusinessTax)],
+                ['Net Income (Post-tax)', formatCurrency(data.netIncomeAfterTax)],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 9 },
+            margin: { left: margin, right: margin },
+        });
+        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+        // HST Summary
+        checkPageBreak(30);
+        addText('HST SUMMARY', 14, true);
+        autoTable(pdf, {
+            startY: yPosition,
+            head: [['Item', 'Amount']],
+            body: [
+                ['HST Collected', formatCurrency(data.hstCollected)],
+                ...(data.isHSTRegistered ? [['HST Input Tax Credits', formatCurrency(data.hstInputTaxCredits)]] : []),
+                ...(data.hstAlreadyPaid > 0 ? [['HST Already Paid to CRA', formatCurrency(data.hstAlreadyPaid)]] : []),
+                ['HST Remittance', formatCurrency(data.hstRemittance)],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 9 },
+            margin: { left: margin, right: margin },
+        });
+        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+        // Retained Earnings Summary
+        checkPageBreak(30);
+        addText('RETAINED EARNINGS', 14, true);
+        autoTable(pdf, {
+            startY: yPosition,
+            head: [['Item', 'Amount']],
+            body: [
+                ['Net Income (Post-tax)', formatCurrency(data.netIncomeAfterTax)],
+                ['Dividends Paid', formatCurrency(data.totalDividends)],
+                ...(data.totalOwnerPayments > 0 ? [['Owner Payments', formatCurrency(data.totalOwnerPayments)]] : []),
+                ['Retained Earnings', formatCurrency(data.retainedEarnings)],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 9 },
+            margin: { left: margin, right: margin },
+        });
+        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+        // Expense Breakdown by Category
+        if (data.expenses && data.expenses.length > 0) {
+            checkPageBreak(30);
+            addText('EXPENSE BREAKDOWN BY CATEGORY', 14, true);
+            const categoryTotals: { [key: string]: { name: string; total: number; count: number } } = {};
+            data.expenses.forEach((exp: Expense) => {
+                const categoryName = exp.category?.name || 'Uncategorized';
+                if (!categoryTotals[categoryName]) {
+                    categoryTotals[categoryName] = { name: categoryName, total: 0, count: 0 };
+                }
+                categoryTotals[categoryName].total += exp.amount;
+                categoryTotals[categoryName].count += 1;
+            });
+            const categoryRows = Object.values(categoryTotals)
+                .sort((a, b) => b.total - a.total)
+                .map(cat => [cat.name, cat.count.toString(), formatCurrency(cat.total)]);
+            
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Category', 'Count', 'Total Amount']],
+                body: categoryRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Capital Assets and Depreciation
+        if (data.capitalAssets && data.capitalAssets.length > 0) {
+            checkPageBreak(30);
+            addText('CAPITAL ASSETS AND DEPRECIATION (CCA)', 14, true);
+            addText(`Total Capital Asset Cost: ${formatCurrency(data.totalCapitalAssetCost || 0)}`, 10);
+            addText(`Total Accumulated Depreciation: ${formatCurrency(data.totalAccumulatedDepreciation || 0)}`, 10);
+            addText(`Depreciation for ${selectedYear}: ${formatCurrency(data.totalDepreciationForYear || 0)}`, 10);
+            yPosition += 5;
+
+            const assetRows = data.capitalAssets.map((asset: any) => {
+                const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
+                return [
+                    asset.description,
+                    formatDate(asset.purchase_date),
+                    formatCurrency(asset.total_cost),
+                    asset.cca_class,
+                    formatCurrency(yearDepreciation),
+                    formatCurrency(asset.book_value),
+                ];
+            });
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Asset', 'Purchase Date', 'Total Cost', 'CCA Class', `Depreciation (${selectedYear})`, 'Book Value']],
+                body: assetRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 8 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Monthly HST Breakdown
+        checkPageBreak(30);
+        addText('MONTHLY HST BREAKDOWN', 14, true);
+        const monthlyRows: string[][] = [];
+        Array.from({ length: 12 }, (_, i) => i + 1).forEach(month => {
+            const monthInvoices = data.paidInvoices.filter((inv: Invoice) =>
+                new Date(inv.issue_date).getMonth() + 1 === month
+            );
+            const monthExpenses = data.expenses.filter((exp: Expense) =>
+                new Date(exp.expense_date).getMonth() + 1 === month
+            );
+            const monthClientIncome = (data.clientIncomeEntries || []).filter((entry: IncomeEntry) =>
+                new Date(entry.income_date).getMonth() + 1 === month
+            );
+
+            const hstCollectedFromInvoices = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
+            const hstCollectedFromIncome = monthClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
+            const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
+            const hstPaid = monthExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
+            const netHST = hstCollected - hstPaid;
+
+            const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
+            monthlyRows.push([
+                monthName,
+                formatCurrency(hstCollectedFromInvoices),
+                formatCurrency(hstCollectedFromIncome),
+                formatCurrency(hstCollected),
+                formatCurrency(hstPaid),
+                formatCurrency(netHST),
+            ]);
+        });
+
+        autoTable(pdf, {
+            startY: yPosition,
+            head: [['Month', 'HST Collected (Invoices)', 'HST Collected (Income)', 'Total HST Collected', 'HST Paid (ITC)', 'Net HST']],
+            body: monthlyRows,
+            theme: 'striped',
+            headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 8 },
+            margin: { left: margin, right: margin },
+        });
+        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+        // Invoice Summary by Client
+        if (data.paidInvoices && data.paidInvoices.length > 0) {
+            checkPageBreak(30);
+            addText('INVOICE SUMMARY BY CLIENT', 14, true);
+            const clientTotals: { [key: string]: { name: string; total: number; count: number; hst: number } } = {};
+            data.paidInvoices.forEach((inv: Invoice) => {
+                const clientName = inv.client?.name || 'Unknown';
+                if (!clientTotals[clientName]) {
+                    clientTotals[clientName] = { name: clientName, total: 0, count: 0, hst: 0 };
+                }
+                clientTotals[clientName].total += inv.subtotal;
+                clientTotals[clientName].hst += inv.hst_amount;
+                clientTotals[clientName].count += 1;
+            });
+            const clientRows = Object.values(clientTotals)
+                .sort((a, b) => b.total - a.total)
+                .map(client => [client.name, client.count.toString(), formatCurrency(client.total), formatCurrency(client.hst)]);
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Client', 'Invoice Count', 'Total Revenue', 'HST Collected']],
+                body: clientRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Expense Summary by Payment Method
+        if (data.expenses && data.expenses.length > 0) {
+            checkPageBreak(30);
+            addText('EXPENSE SUMMARY BY PAYMENT METHOD', 14, true);
+            const paidByTotals: { [key: string]: { total: number; count: number; hst: number } } = {};
+            data.expenses.forEach((exp: Expense) => {
+                if (!paidByTotals[exp.paid_by]) {
+                    paidByTotals[exp.paid_by] = { total: 0, count: 0, hst: 0 };
+                }
+                paidByTotals[exp.paid_by].total += exp.amount;
+                paidByTotals[exp.paid_by].hst += exp.hst_paid;
+                paidByTotals[exp.paid_by].count += 1;
+            });
+            const paidByRows = Object.entries(paidByTotals)
+                .map(([paidBy, totals]) => [
+                    paidBy === 'corp' ? 'Corporation' : 'Owner',
+                    totals.count.toString(),
+                    formatCurrency(totals.total),
+                    formatCurrency(totals.hst),
+                ]);
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Payment Method', 'Count', 'Total Amount', 'HST Paid']],
+                body: paidByRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Dividends
+        if (data.dividends && data.dividends.length > 0) {
+            checkPageBreak(30);
+            addText('DIVIDEND DISTRIBUTIONS', 14, true);
+            const dividendRows = data.dividends.map((div: Dividend) => [
+                formatDate(div.declaration_date),
+                formatCurrency(div.amount),
+                div.status,
+            ]);
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Date', 'Amount', 'Status']],
+                body: dividendRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Owner Payments
+        if (data.ownerPayments && data.ownerPayments.length > 0) {
+            checkPageBreak(30);
+            addText('OWNER PAYMENTS', 14, true);
+            const ownerPaymentRows = data.ownerPayments.map((payment: OwnerPayment) => [
+                formatDate(payment.payment_date),
+                payment.description,
+                payment.payment_type,
+                formatCurrency(payment.amount),
+            ]);
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Date', 'Description', 'Type', 'Amount']],
+                body: ownerPaymentRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        return pdf;
+    };
+
     const generatePDFReport = async () => {
-        if (!user?.company_id) return;
+        if (!user?.company_id || !reportData) return;
 
         setIsGeneratingPDF(true);
         try {
-            const blob = await api.generateTaxReport({
-                company_id: user.company_id,
-                fiscal_year: selectedYear,
-                report_type: 'comprehensive'
-            });
-
-            // Create download link
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Comprehensive_Tax_Report_${selectedYear}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            const pdf = generatePDFFromData(reportData);
+            pdf.save(`Comprehensive_Tax_Report_${selectedYear}.pdf`);
         } catch (error) {
             console.error('Failed to generate PDF report:', error);
             alert('Failed to generate PDF report. Please try again.');
