@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type Dividend } from '../lib/api';
+import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type HSTPayment, type DepreciationEntry } from '../lib/api';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
@@ -9,7 +9,6 @@ import Card from '../components/ui/Card';
 const Reports: React.FC = () => {
     const { user } = useAuth();
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [selectedReport, setSelectedReport] = useState<'pl' | 'hst' | 'retained' | 'comprehensive'>('pl');
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Fetch tax return data for the selected year
@@ -81,6 +80,80 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
+    // Fetch income entries for the selected year
+    const { data: incomeEntries } = useQuery({
+        queryKey: ['income_entries_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getIncomeEntries({
+                company_id: user?.company_id,
+                limit: 1000
+            });
+            // Filter by year on the client side
+            return result.data.filter(entry => {
+                const year = new Date(entry.income_date).getFullYear();
+                return year === selectedYear;
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch owner payments for the selected year
+    const { data: ownerPayments } = useQuery({
+        queryKey: ['owner_payments_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getOwnerPayments({
+                company_id: user?.company_id,
+                limit: 1000
+            });
+            // Filter by year on the client side
+            return result.data.filter(payment => {
+                const year = new Date(payment.payment_date).getFullYear();
+                return year === selectedYear;
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch HST payments for the selected year
+    const { data: hstPayments } = useQuery({
+        queryKey: ['hst_payments_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getHSTPayments({
+                company_id: user?.company_id,
+                limit: 1000
+            });
+            // Filter by year on the client side
+            return result.data.filter(payment => {
+                const year = new Date(payment.payment_date).getFullYear();
+                return year === selectedYear;
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch capital assets for the selected year
+    const { data: capitalAssets } = useQuery({
+        queryKey: ['capital_assets_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getCapitalAssets({
+                company_id: user?.company_id,
+                limit: 1000
+            });
+            // Filter by purchase date within the selected year and include depreciation entries for the year
+            return result.data.map(asset => {
+                const purchaseYear = new Date(asset.purchase_date).getFullYear();
+                const yearDepreciationEntries = asset.depreciation_entries?.filter(entry => entry.fiscal_year === selectedYear) || [];
+                return {
+                    ...asset,
+                    depreciation_entries: asset.depreciation_entries || [],
+                    yearDepreciationEntries,
+                    isInYear: purchaseYear === selectedYear || yearDepreciationEntries.length > 0
+                };
+            }).filter(asset => asset.isInYear);
+        },
+        enabled: !!user?.company_id,
+    });
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
             style: 'currency',
@@ -94,64 +167,114 @@ const Reports: React.FC = () => {
 
     // Calculate report data
     const reportData = React.useMemo(() => {
-        if (!invoices || !expenses || !dividends) return null;
+        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets) return null;
 
         const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-        const grossIncome = paidInvoices.reduce((sum, inv) => sum + inv.subtotal, 0);
-        const hstCollected = paidInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
+
+        // Calculate revenue from invoices
+        const invoiceRevenue = paidInvoices.reduce((sum, inv) => sum + inv.subtotal, 0);
+
+        // Calculate revenue from client income entries
+        const clientIncomeEntries = incomeEntries.filter(entry => entry.income_type === 'client');
+        const clientIncome = clientIncomeEntries.reduce((sum, entry) => sum + entry.amount, 0);
+
+        // Calculate other income (taxable income that's not from clients)
+        const otherIncomeEntries = incomeEntries.filter(entry => entry.income_type === 'other');
+        const otherIncome = otherIncomeEntries.reduce((sum, entry) => sum + entry.amount, 0);
+
+        // Total gross income includes invoices, client income, and other income
+        const grossIncome = invoiceRevenue + clientIncome + otherIncome;
+
+        // Calculate HST collected from invoices
+        const hstFromInvoices = paidInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
+
+        // Calculate HST collected from client income entries
+        const hstFromClientIncome = clientIncomeEntries.reduce((sum, entry) => sum + entry.hst_amount, 0);
+
+        // Total HST collected includes both invoices and client income entries
+        const hstCollected = hstFromInvoices + hstFromClientIncome;
 
         const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        const hstPaid = expenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
+
+        // Calculate HST paid from expenses (Input Tax Credits)
+        const isHSTRegistered = user?.company?.hst_registered || false;
+        const hstPaidFromExpenses = expenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
+        const hstInputTaxCredits = isHSTRegistered ? hstPaidFromExpenses : 0;
+
+        // Calculate HST already paid to CRA
+        const hstAlreadyPaid = hstPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+        // Calculate HST remittance (what's owed after accounting for ITCs and payments made)
+        const hstRemittance = hstCollected - hstInputTaxCredits - hstAlreadyPaid;
 
         const totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
 
-        const netIncomeBeforeTax = grossIncome - totalExpenses;
+        // Calculate total owner payments
+        const totalOwnerPayments = ownerPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+        // Calculate capital assets and depreciation for the year
+        const totalDepreciationForYear = capitalAssets.reduce((sum, asset: any) => {
+            const yearDepreciation = asset.yearDepreciationEntries?.reduce((depSum: number, entry: DepreciationEntry) => depSum + Number(entry.depreciation_amount), 0) || 0;
+            return sum + yearDepreciation;
+        }, 0);
+
+        const totalCapitalAssetCost = capitalAssets.reduce((sum, asset) => sum + Number(asset.total_cost), 0);
+        const totalAccumulatedDepreciation = capitalAssets.reduce((sum, asset) => sum + Number(asset.accumulated_depreciation), 0);
+
+        // Net income before tax should include depreciation as an expense
+        const netIncomeBeforeTax = grossIncome - totalExpenses - totalDepreciationForYear;
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125; // Use company rate, fallback to 12.5%
         const smallBusinessTax = Math.max(0, netIncomeBeforeTax * smallBusinessTaxRate);
         const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
-        const hstRemittance = hstCollected - hstPaid;
-        const retainedEarnings = netIncomeAfterTax - totalDividends;
+
+        // Retained earnings = Net Income After Tax - Dividends - Owner Payments
+        const retainedEarnings = netIncomeAfterTax - totalDividends - totalOwnerPayments;
 
         return {
             grossIncome,
+            invoiceRevenue,
+            clientIncome,
+            otherIncome,
             totalExpenses,
+            totalDepreciationForYear,
             netIncomeBeforeTax,
             smallBusinessTax,
             netIncomeAfterTax,
             hstCollected,
-            hstPaid,
+            hstFromInvoices,
+            hstFromClientIncome,
+            hstPaidFromExpenses,
+            hstInputTaxCredits,
+            hstAlreadyPaid,
             hstRemittance,
+            isHSTRegistered,
             totalDividends,
+            totalOwnerPayments,
             retainedEarnings,
             paidInvoices,
+            clientIncomeEntries,
+            otherIncomeEntries,
             expenses,
             dividends,
+            ownerPayments,
+            hstPayments,
+            capitalAssets,
+            totalCapitalAssetCost,
+            totalAccumulatedDepreciation,
         };
-    }, [invoices, expenses, dividends]);
+    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, user?.company?.small_business_rate, user?.company?.hst_registered]);
 
     const generateReport = () => {
         if (!reportData) return;
 
-        let reportContent = '';
-
-        switch (selectedReport) {
-            case 'pl':
-                reportContent = generatePandLReport(reportData);
-                break;
-            case 'hst':
-                reportContent = generateHSTReport(reportData);
-                break;
-            case 'retained':
-                reportContent = generateRetainedEarningsReport(reportData);
-                break;
-        }
+        const reportContent = generateComprehensiveReport(reportData);
 
         // Create and download the report
         const blob = new Blob([reportContent], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${selectedReport.toUpperCase()}_Report_${selectedYear}.txt`;
+        a.download = `Comprehensive_Tax_Report_${selectedYear}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -166,14 +289,14 @@ const Reports: React.FC = () => {
             const blob = await api.generateTaxReport({
                 company_id: user.company_id,
                 fiscal_year: selectedYear,
-                report_type: selectedReport === 'pl' ? 'pandl' : selectedReport === 'hst' ? 'hst' : selectedReport === 'retained' ? 'retained' : 'comprehensive'
+                report_type: 'comprehensive'
             });
 
             // Create download link
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${selectedReport.toUpperCase()}_Tax_Report_${selectedYear}.pdf`;
+            a.download = `Comprehensive_Tax_Report_${selectedYear}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -186,104 +309,8 @@ const Reports: React.FC = () => {
         }
     };
 
-    const generatePandLReport = (data: any) => {
-        return `
-PROFIT & LOSS STATEMENT
-${user?.company_id ? 'Company: ' + user.company_id : ''}
-Year: ${selectedYear}
-Generated: ${new Date().toLocaleDateString('en-CA')}
 
-INCOME
-Gross Revenue: ${formatCurrency(data.grossIncome)}
-
-EXPENSES
-Total Business Expenses: ${formatCurrency(data.totalExpenses)}
-
-NET INCOME BEFORE TAX
-${formatCurrency(data.netIncomeBeforeTax)}
-
-TAXES
-Small Business Tax (12.5%): ${formatCurrency(data.smallBusinessTax)}
-
-NET INCOME AFTER TAX
-${formatCurrency(data.netIncomeAfterTax)}
-
-DIVIDENDS PAID
-Total Dividends: ${formatCurrency(data.totalDividends)}
-
-RETAINED EARNINGS
-${formatCurrency(data.retainedEarnings)}
-
-DETAILED INCOME BREAKDOWN
-${data.paidInvoices.map((inv: Invoice) =>
-            `${inv.invoice_number} - ${inv.client?.name || 'Unknown'} - ${formatCurrency(inv.subtotal)}`
-        ).join('\n')}
-
-DETAILED EXPENSE BREAKDOWN
-${data.expenses.map((exp: Expense) =>
-            `${formatDate(exp.expense_date)} - ${exp.description} - ${formatCurrency(exp.amount)}`
-        ).join('\n')}
-`;
-    };
-
-    const generateHSTReport = (data: any) => {
-        return `
-HST REPORT
-${user?.company_id ? 'Company: ' + user.company_id : ''}
-Year: ${selectedYear}
-Generated: ${new Date().toLocaleDateString('en-CA')}
-
-HST COLLECTED
-Total HST Collected: ${formatCurrency(data.hstCollected)}
-
-HST PAID (INPUT TAX CREDITS)
-Total HST Paid: ${formatCurrency(data.hstPaid)}
-
-HST REMITTANCE
-Amount Owed to CRA: ${formatCurrency(data.hstRemittance)}
-
-MONTHLY BREAKDOWN
-${generateMonthlyBreakdown(data.paidInvoices, data.expenses)}
-
-DETAILED HST COLLECTED
-${data.paidInvoices.map((inv: Invoice) =>
-            `${inv.invoice_number} - ${formatDate(inv.issue_date)} - ${formatCurrency(inv.hst_amount)}`
-        ).join('\n')}
-
-DETAILED HST PAID
-${data.expenses.map((exp: Expense) =>
-            `${formatDate(exp.expense_date)} - ${exp.description} - ${formatCurrency(exp.hst_paid)}`
-        ).join('\n')}
-`;
-    };
-
-    const generateRetainedEarningsReport = (data: any) => {
-        return `
-RETAINED EARNINGS REPORT
-${user?.company_id ? 'Company: ' + user.company_id : ''}
-Year: ${selectedYear}
-Generated: ${new Date().toLocaleDateString('en-CA')}
-
-NET INCOME AFTER TAX
-${formatCurrency(data.netIncomeAfterTax)}
-
-DIVIDENDS DECLARED
-${data.dividends.map((div: Dividend) =>
-            `${formatDate(div.declaration_date)} - ${formatCurrency(div.amount)} - ${div.status}`
-        ).join('\n')}
-
-TOTAL DIVIDENDS PAID
-${formatCurrency(data.totalDividends)}
-
-RETAINED EARNINGS
-${formatCurrency(data.retainedEarnings)}
-
-AVAILABLE FOR DISTRIBUTION
-${formatCurrency(data.retainedEarnings)}
-`;
-    };
-
-    const generateMonthlyBreakdown = (invoices: Invoice[], expenses: Expense[]) => {
+    const generateMonthlyBreakdown = (invoices: Invoice[], expenses: Expense[], clientIncomeEntries: IncomeEntry[]) => {
         const months = Array.from({ length: 12 }, (_, i) => i + 1);
         let breakdown = '';
 
@@ -294,14 +321,303 @@ ${formatCurrency(data.retainedEarnings)}
             const monthExpenses = expenses.filter(exp =>
                 new Date(exp.expense_date).getMonth() + 1 === month
             );
+            const monthClientIncome = clientIncomeEntries.filter(entry =>
+                new Date(entry.income_date).getMonth() + 1 === month
+            );
 
-            const hstCollected = monthInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
+            const hstCollectedFromInvoices = monthInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
+            const hstCollectedFromIncome = monthClientIncome.reduce((sum, entry) => sum + entry.hst_amount, 0);
+            const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
             const hstPaid = monthExpenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
 
-            breakdown += `${month.toString().padStart(2, '0')}/2024: Collected ${formatCurrency(hstCollected)}, Paid ${formatCurrency(hstPaid)}, Net ${formatCurrency(hstCollected - hstPaid)}\n`;
+            const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
+            breakdown += `${monthName} ${selectedYear}:\n`;
+            breakdown += `  HST Collected: ${formatCurrency(hstCollected)} (Invoices: ${formatCurrency(hstCollectedFromInvoices)}, Income: ${formatCurrency(hstCollectedFromIncome)})\n`;
+            breakdown += `  HST Paid (ITC): ${formatCurrency(hstPaid)}\n`;
+            breakdown += `  Net HST: ${formatCurrency(hstCollected - hstPaid)}\n\n`;
         });
 
         return breakdown;
+    };
+
+    const generateComprehensiveReport = (data: any) => {
+        const companyName = user?.company?.name || 'Company';
+        const businessNumber = user?.company?.business_number || 'N/A';
+        const hstNumber = user?.company?.hst_number || 'N/A';
+
+        return `
+================================================================================
+COMPREHENSIVE TAX REPORT
+================================================================================
+
+COMPANY INFORMATION
+Company Name: ${companyName}
+Business Number: ${businessNumber}
+HST Number: ${hstNumber || 'Not Registered'}
+Fiscal Year: ${selectedYear}
+Report Generated: ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+================================================================================
+1. COMPLETE PROFIT & LOSS STATEMENT
+================================================================================
+
+INCOME
+Invoice Revenue: ${formatCurrency(data.invoiceRevenue)}
+Client Income: ${formatCurrency(data.clientIncome)}
+Other Income: ${formatCurrency(data.otherIncome || 0)}
+────────────────────────────────────────────────────────────────────────────
+Gross Revenue: ${formatCurrency(data.grossIncome)}
+
+EXPENSES
+Total Business Expenses: ${formatCurrency(data.totalExpenses)}
+${data.totalDepreciationForYear > 0 ? `Depreciation (CCA): ${formatCurrency(data.totalDepreciationForYear)}` : ''}
+────────────────────────────────────────────────────────────────────────────
+Total Expenses (including Depreciation): ${formatCurrency(data.totalExpenses + (data.totalDepreciationForYear || 0))}
+
+EXPENSE BREAKDOWN BY CATEGORY
+${(() => {
+                const categoryTotals: { [key: string]: { name: string; total: number; count: number } } = {};
+                data.expenses.forEach((exp: Expense) => {
+                    const categoryName = exp.category?.name || 'Uncategorized';
+                    if (!categoryTotals[categoryName]) {
+                        categoryTotals[categoryName] = { name: categoryName, total: 0, count: 0 };
+                    }
+                    categoryTotals[categoryName].total += exp.amount;
+                    categoryTotals[categoryName].count += 1;
+                });
+                return Object.values(categoryTotals)
+                    .sort((a, b) => b.total - a.total)
+                    .map(cat => `  ${cat.name}: ${formatCurrency(cat.total)} (${cat.count} ${cat.count === 1 ? 'expense' : 'expenses'})`)
+                    .join('\n') || '  No expenses by category';
+            })()}
+
+────────────────────────────────────────────────────────────────────────────
+NET INCOME BEFORE TAX: ${formatCurrency(data.netIncomeBeforeTax)}
+
+TAXES
+Small Business Tax (${((user?.company?.small_business_rate || 0.125) * 100).toFixed(2)}%): ${formatCurrency(data.smallBusinessTax)}
+
+────────────────────────────────────────────────────────────────────────────
+NET INCOME AFTER TAX: ${formatCurrency(data.netIncomeAfterTax)}
+
+DIVIDENDS PAID
+Total Dividends: ${formatCurrency(data.totalDividends)}
+
+OWNER PAYMENTS
+Total Owner Payments: ${formatCurrency(data.totalOwnerPayments || 0)}
+
+────────────────────────────────────────────────────────────────────────────
+RETAINED EARNINGS: ${formatCurrency(data.retainedEarnings)}
+
+================================================================================
+2. DETAILED HST SUMMARY WITH MONTHLY BREAKDOWN
+================================================================================
+
+HST COLLECTED
+Total HST Collected: ${formatCurrency(data.hstCollected)}
+  From Invoices: ${formatCurrency(data.hstFromInvoices)}
+  From Client Income: ${formatCurrency(data.hstFromClientIncome)}
+
+HST INPUT TAX CREDITS
+${data.isHSTRegistered
+                ? `Total HST Input Tax Credits: ${formatCurrency(data.hstInputTaxCredits)}`
+                : 'Company is not HST registered - no Input Tax Credits available'}
+
+HST ALREADY PAID TO CRA
+Total HST Already Paid: ${formatCurrency(data.hstAlreadyPaid || 0)}
+
+────────────────────────────────────────────────────────────────────────────
+HST REMITTANCE
+Amount Owed to CRA: ${formatCurrency(data.hstRemittance)}
+
+MONTHLY BREAKDOWN
+${generateMonthlyBreakdown(data.paidInvoices, data.expenses, data.clientIncomeEntries || [])}
+
+================================================================================
+3. CAPITAL ASSETS AND DEPRECIATION (CCA)
+================================================================================
+
+SUMMARY
+Total Capital Asset Cost: ${formatCurrency(data.totalCapitalAssetCost || 0)}
+Total Accumulated Depreciation: ${formatCurrency(data.totalAccumulatedDepreciation || 0)}
+Depreciation for ${selectedYear}: ${formatCurrency(data.totalDepreciationForYear || 0)}
+
+DETAILED CAPITAL ASSETS
+${data.capitalAssets && data.capitalAssets.length > 0
+                ? data.capitalAssets.map((asset: any) => {
+                    const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
+                    const depreciationEntries = asset.yearDepreciationEntries || [];
+                    return `
+Asset: ${asset.description}
+  Category: ${asset.category?.name || 'Uncategorized'}
+  Purchase Date: ${formatDate(asset.purchase_date)}
+  Purchase Amount: ${formatCurrency(asset.purchase_amount)}
+  HST Paid: ${formatCurrency(asset.hst_paid)}
+  Total Cost: ${formatCurrency(asset.total_cost)}
+  CCA Class: ${asset.cca_class}
+  CCA Rate: ${(Number(asset.cca_rate) * 100).toFixed(2)}%
+  Depreciable Amount: ${formatCurrency(asset.depreciable_amount)}
+  Depreciation for ${selectedYear}: ${formatCurrency(yearDepreciation)}
+  ${depreciationEntries.length > 0 ? depreciationEntries.map((entry: DepreciationEntry) =>
+                        `    - ${formatDate(entry.entry_date)}: ${formatCurrency(entry.depreciation_amount)}${entry.is_half_year_rule ? ' (Half-Year Rule Applied)' : ''}`
+                    ).join('\n') : `    No depreciation entries for ${selectedYear}`}
+  Accumulated Depreciation: ${formatCurrency(asset.accumulated_depreciation)}
+  Book Value: ${formatCurrency(asset.book_value)}
+  Paid By: ${asset.paid_by}
+  ${asset.disposal_date ? `Disposal Date: ${formatDate(asset.disposal_date)} | Disposal Amount: ${formatCurrency(asset.disposal_amount || 0)}` : ''}
+`;
+                }).join('\n')
+                : 'No capital assets recorded for this year'}
+
+CAPITAL ASSETS BY CCA CLASS
+${(() => {
+                const classTotals: { [key: string]: { cost: number; depreciation: number; count: number } } = {};
+                data.capitalAssets.forEach((asset: any) => {
+                    const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
+                    if (!classTotals[asset.cca_class]) {
+                        classTotals[asset.cca_class] = { cost: 0, depreciation: 0, count: 0 };
+                    }
+                    classTotals[asset.cca_class].cost += Number(asset.total_cost);
+                    classTotals[asset.cca_class].depreciation += yearDepreciation;
+                    classTotals[asset.cca_class].count += 1;
+                });
+                return Object.entries(classTotals)
+                    .map(([ccaClass, totals]) =>
+                        `  CCA Class ${ccaClass}: ${formatCurrency(totals.cost)} cost, ${formatCurrency(totals.depreciation)} depreciation (${totals.count} ${totals.count === 1 ? 'asset' : 'assets'})`
+                    )
+                    .join('\n') || '  No capital assets by CCA class';
+            })()}
+
+================================================================================
+4. DIVIDEND DISTRIBUTIONS
+================================================================================
+
+DIVIDENDS DECLARED
+${data.dividends && data.dividends.length > 0
+                ? data.dividends.map((div: Dividend) =>
+                    `${formatDate(div.declaration_date)} - ${formatCurrency(div.amount)} - Status: ${div.status}${div.payment_date ? ` - Paid: ${formatDate(div.payment_date)}` : ''}${div.notes ? ` - Notes: ${div.notes}` : ''}`
+                ).join('\n')
+                : 'No dividends declared'}
+
+────────────────────────────────────────────────────────────────────────────
+TOTAL DIVIDENDS PAID: ${formatCurrency(data.totalDividends)}
+
+================================================================================
+5. RETAINED EARNINGS CALCULATION
+================================================================================
+
+NET INCOME AFTER TAX: ${formatCurrency(data.netIncomeAfterTax)}
+
+LESS:
+  Dividends Paid: ${formatCurrency(data.totalDividends)}
+  Owner Payments: ${formatCurrency(data.totalOwnerPayments || 0)}
+  ────────────────────────────────────────────────────────────────────────────
+  Total Distributions: ${formatCurrency(data.totalDividends + (data.totalOwnerPayments || 0))}
+
+────────────────────────────────────────────────────────────────────────────
+RETAINED EARNINGS: ${formatCurrency(data.retainedEarnings)}
+
+AVAILABLE FOR DISTRIBUTION: ${formatCurrency(data.retainedEarnings)}
+
+================================================================================
+6. ALL SUPPORTING TRANSACTION DETAILS
+================================================================================
+
+DETAILED INCOME BREAKDOWN
+
+INVOICES:
+${data.paidInvoices && data.paidInvoices.length > 0
+                ? data.paidInvoices
+                    .sort((a: Invoice, b: Invoice) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime())
+                    .map((inv: Invoice) =>
+                        `${inv.invoice_number} - ${inv.client?.name || 'Unknown'} - ${formatDate(inv.issue_date)} - Subtotal: ${formatCurrency(inv.subtotal)} - HST: ${formatCurrency(inv.hst_amount)} - Total: ${formatCurrency(inv.total)}${inv.paid_date ? ` - Paid: ${formatDate(inv.paid_date)}` : ''}`
+                    ).join('\n')
+                : 'No paid invoices'}
+
+INVOICE SUMMARY BY CLIENT
+${(() => {
+                const clientTotals: { [key: string]: { name: string; total: number; count: number; hst: number } } = {};
+                data.paidInvoices.forEach((inv: Invoice) => {
+                    const clientName = inv.client?.name || 'Unknown';
+                    if (!clientTotals[clientName]) {
+                        clientTotals[clientName] = { name: clientName, total: 0, count: 0, hst: 0 };
+                    }
+                    clientTotals[clientName].total += inv.subtotal;
+                    clientTotals[clientName].hst += inv.hst_amount;
+                    clientTotals[clientName].count += 1;
+                });
+                return Object.values(clientTotals)
+                    .sort((a, b) => b.total - a.total)
+                    .map(client =>
+                        `  ${client.name}: ${formatCurrency(client.total)} (${client.count} ${client.count === 1 ? 'invoice' : 'invoices'}) - HST: ${formatCurrency(client.hst)}`
+                    )
+                    .join('\n') || '  No invoices by client';
+            })()}
+
+CLIENT INCOME ENTRIES:
+${data.clientIncomeEntries && data.clientIncomeEntries.length > 0
+                ? data.clientIncomeEntries.map((entry: IncomeEntry) =>
+                    `${formatDate(entry.income_date)} - ${entry.description} - Amount: ${formatCurrency(entry.amount)} - HST: ${formatCurrency(entry.hst_amount)} - Total: ${formatCurrency(entry.total)}`
+                ).join('\n')
+                : 'No client income entries'}
+
+OTHER INCOME ENTRIES:
+${data.otherIncomeEntries && data.otherIncomeEntries.length > 0
+                ? data.otherIncomeEntries.map((entry: IncomeEntry) =>
+                    `${formatDate(entry.income_date)} - ${entry.description} - Amount: ${formatCurrency(entry.amount)}`
+                ).join('\n')
+                : 'No other income entries'}
+
+DETAILED EXPENSE BREAKDOWN
+${data.expenses && data.expenses.length > 0
+                ? data.expenses
+                    .sort((a: Expense, b: Expense) => new Date(a.expense_date).getTime() - new Date(b.expense_date).getTime())
+                    .map((exp: Expense) =>
+                        `${formatDate(exp.expense_date)} - ${exp.description} - Category: ${exp.category?.name || 'Uncategorized'} - Amount: ${formatCurrency(exp.amount)} - HST Paid: ${formatCurrency(exp.hst_paid)} - Paid By: ${exp.paid_by}${exp.receipt_attached ? ' - Receipt Attached' : ''}`
+                    ).join('\n')
+                : 'No expenses recorded'}
+
+EXPENSE SUMMARY BY PAYMENT METHOD
+${(() => {
+                const paidByTotals: { [key: string]: { total: number; count: number; hst: number } } = {};
+                data.expenses.forEach((exp: Expense) => {
+                    if (!paidByTotals[exp.paid_by]) {
+                        paidByTotals[exp.paid_by] = { total: 0, count: 0, hst: 0 };
+                    }
+                    paidByTotals[exp.paid_by].total += exp.amount;
+                    paidByTotals[exp.paid_by].hst += exp.hst_paid;
+                    paidByTotals[exp.paid_by].count += 1;
+                });
+                return Object.entries(paidByTotals)
+                    .map(([paidBy, totals]) =>
+                        `  ${paidBy === 'corp' ? 'Corporation' : 'Owner'}: ${formatCurrency(totals.total)} (${totals.count} ${totals.count === 1 ? 'expense' : 'expenses'}) - HST: ${formatCurrency(totals.hst)}`
+                    )
+                    .join('\n') || '  No expenses by payment method';
+            })()}
+
+OWNER PAYMENTS
+${data.ownerPayments && data.ownerPayments.length > 0
+                ? data.ownerPayments.map((payment: OwnerPayment) =>
+                    `${formatDate(payment.payment_date)} - ${payment.description} - Amount: ${formatCurrency(payment.amount)} - Type: ${payment.payment_type}${payment.reference ? ` - Reference: ${payment.reference}` : ''}${payment.notes ? ` - Notes: ${payment.notes}` : ''}`
+                ).join('\n')
+                : 'No owner payments recorded'}
+
+HST PAYMENTS TO CRA
+${data.hstPayments && data.hstPayments.length > 0
+                ? data.hstPayments.map((payment: HSTPayment) =>
+                    `${formatDate(payment.payment_date)} - Amount: ${formatCurrency(payment.amount)} - Period: ${formatDate(payment.period_start)} to ${formatDate(payment.period_end)}${payment.reference ? ` - Reference: ${payment.reference}` : ''}${payment.notes ? ` - Notes: ${payment.notes}` : ''}`
+                ).join('\n')
+                : 'No HST payments recorded'}
+
+================================================================================
+END OF COMPREHENSIVE TAX REPORT
+================================================================================
+
+This report includes all financial data needed for tax submission to your accountant.
+Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
+
+Generated on: ${new Date().toLocaleString('en-CA')}
+`;
     };
 
     if (!user?.company_id) {
@@ -330,8 +646,8 @@ ${formatCurrency(data.retainedEarnings)}
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports</h1>
-                    <p className="text-muted-foreground mt-2">Generate financial reports for your business and tax submission</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Comprehensive Tax Report</h1>
+                    <p className="text-muted-foreground mt-2">Generate a comprehensive tax report with all financial data needed for tax submission</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Button
@@ -359,7 +675,7 @@ ${formatCurrency(data.retainedEarnings)}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                     <div className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <label className="text-sm font-medium text-foreground">Year:</label>
+                        <label className="text-sm font-medium text-foreground">Fiscal Year:</label>
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
@@ -370,48 +686,8 @@ ${formatCurrency(data.retainedEarnings)}
                             ))}
                         </select>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-foreground">Report Type:</label>
-                        <select
-                            value={selectedReport}
-                            onChange={(e) => setSelectedReport(e.target.value as 'pl' | 'hst' | 'retained' | 'comprehensive')}
-                            className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                            <option value="pl">Profit & Loss</option>
-                            <option value="hst">HST Report</option>
-                            <option value="retained">Retained Earnings</option>
-                            <option value="comprehensive">Comprehensive Tax Report</option>
-                        </select>
-                    </div>
                 </div>
             </Card>
-
-            {/* Comprehensive Tax Report Info */}
-            {selectedReport === 'comprehensive' && (
-                <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-3">
-                        <FileSpreadsheet className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1 flex-shrink-0" />
-                        <div>
-                            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">Comprehensive Tax Report</h3>
-                            <p className="text-blue-800 dark:text-blue-300 mb-3">
-                                This comprehensive report includes all financial data needed for tax submission to your accountant:
-                            </p>
-                            <ul className="text-blue-800 dark:text-blue-300 text-sm space-y-1 ml-4">
-                                <li>• Complete Profit & Loss Statement</li>
-                                <li>• Detailed HST Summary with monthly breakdown</li>
-                                <li>• Capital Assets and Depreciation (CCA)</li>
-                                <li>• Dividend distributions</li>
-                                <li>• Retained earnings calculation</li>
-                                <li>• All supporting transaction details</li>
-                            </ul>
-                            <p className="text-blue-800 dark:text-blue-300 text-sm mt-3 font-medium">
-                                Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
-                            </p>
-                        </div>
-                    </div>
-                </Card>
-            )}
 
             {/* Report Summary */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -430,6 +706,12 @@ ${formatCurrency(data.retainedEarnings)}
                             <span className="text-sm text-muted-foreground">Total Expenses:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
                         </div>
+                        {reportData.totalDepreciationForYear > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Depreciation (CCA):</span>
+                                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDepreciationForYear)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-t border-border pt-2">
                             <span className="text-sm font-medium text-foreground">Net Income (Pre-tax):</span>
                             <span className={`font-bold ${reportData.netIncomeBeforeTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -460,10 +742,18 @@ ${formatCurrency(data.retainedEarnings)}
                             <span className="text-sm text-muted-foreground">HST Collected:</span>
                             <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.hstCollected)}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">HST Paid:</span>
-                            <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstPaid)}</span>
-                        </div>
+                        {reportData.isHSTRegistered && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">HST Input Tax Credits:</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstInputTaxCredits)}</span>
+                            </div>
+                        )}
+                        {reportData.hstAlreadyPaid > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">HST Already Paid to CRA:</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstAlreadyPaid)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-t border-border pt-2">
                             <span className="text-sm font-bold text-foreground">HST Remittance:</span>
                             <span className={`font-bold text-lg ${reportData.hstRemittance >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
@@ -488,6 +778,12 @@ ${formatCurrency(data.retainedEarnings)}
                             <span className="text-sm text-muted-foreground">Dividends Paid:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDividends)}</span>
                         </div>
+                        {reportData.totalOwnerPayments > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Owner Payments:</span>
+                                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalOwnerPayments)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-t border-border pt-2">
                             <span className="text-sm font-bold text-foreground">Retained Earnings:</span>
                             <span className={`font-bold text-lg ${reportData.retainedEarnings >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -498,32 +794,284 @@ ${formatCurrency(data.retainedEarnings)}
                 </Card>
             </div>
 
-            {/* Detailed Tables */}
-            {selectedReport === 'pl' && (
+            {/* Detailed Sections */}
+            <div className="space-y-6">
+                {/* Expense Breakdown by Category */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Expense Breakdown by Category</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Total expenses organized by category</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-3">Category</th>
+                                    <th className="px-6 py-3 text-right">Count</th>
+                                    <th className="px-6 py-3 text-right">Total Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {(() => {
+                                    const categoryTotals: { [key: string]: { name: string; total: number; count: number } } = {};
+                                    reportData.expenses.forEach((exp: Expense) => {
+                                        const categoryName = exp.category?.name || 'Uncategorized';
+                                        if (!categoryTotals[categoryName]) {
+                                            categoryTotals[categoryName] = { name: categoryName, total: 0, count: 0 };
+                                        }
+                                        categoryTotals[categoryName].total += exp.amount;
+                                        categoryTotals[categoryName].count += 1;
+                                    });
+                                    return Object.values(categoryTotals)
+                                        .sort((a, b) => b.total - a.total)
+                                        .map(cat => (
+                                            <tr key={cat.name} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-foreground">{cat.name}</td>
+                                                <td className="px-6 py-4 text-right text-muted-foreground">{cat.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(cat.total)}</td>
+                                            </tr>
+                                        ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* Capital Assets and Depreciation */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Capital Assets and Depreciation (CCA)</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Capital assets with depreciation details for {selectedYear}</p>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                                <div className="text-sm text-muted-foreground">Total Capital Asset Cost</div>
+                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalCapitalAssetCost || 0)}</div>
+                            </div>
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                                <div className="text-sm text-muted-foreground">Total Accumulated Depreciation</div>
+                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalAccumulatedDepreciation || 0)}</div>
+                            </div>
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                                <div className="text-sm text-muted-foreground">Depreciation for {selectedYear}</div>
+                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalDepreciationForYear || 0)}</div>
+                            </div>
+                        </div>
+                        {reportData.capitalAssets && reportData.capitalAssets.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                        <tr>
+                                            <th className="px-6 py-3">Asset</th>
+                                            <th className="px-6 py-3">Purchase Date</th>
+                                            <th className="px-6 py-3">Total Cost</th>
+                                            <th className="px-6 py-3">CCA Class</th>
+                                            <th className="px-6 py-3 text-right">Depreciation ({selectedYear})</th>
+                                            <th className="px-6 py-3 text-right">Book Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {reportData.capitalAssets.map((asset: any) => {
+                                            const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
+                                            return (
+                                                <tr key={asset.id} className="hover:bg-muted/50 transition-colors">
+                                                    <td className="px-6 py-4 font-medium text-foreground">{asset.description}</td>
+                                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(asset.purchase_date)}</td>
+                                                    <td className="px-6 py-4 text-foreground">{formatCurrency(asset.total_cost)}</td>
+                                                    <td className="px-6 py-4 text-muted-foreground">{asset.cca_class} ({(Number(asset.cca_rate) * 100).toFixed(2)}%)</td>
+                                                    <td className="px-6 py-4 text-right text-foreground">{formatCurrency(yearDepreciation)}</td>
+                                                    <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(asset.book_value)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground text-center py-8">No capital assets recorded for this year</p>
+                        )}
+                    </div>
+                </Card>
+
+                {/* Monthly HST Breakdown */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Monthly HST Breakdown</h2>
+                        <p className="text-sm text-muted-foreground mt-1">HST collected and paid by month for {selectedYear}</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-3">Month</th>
+                                    <th className="px-6 py-3 text-right">HST Collected (Invoices)</th>
+                                    <th className="px-6 py-3 text-right">HST Collected (Income)</th>
+                                    <th className="px-6 py-3 text-right">Total HST Collected</th>
+                                    <th className="px-6 py-3 text-right">HST Paid (ITC)</th>
+                                    <th className="px-6 py-3 text-right">Net HST</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
+                                    const monthInvoices = reportData.paidInvoices.filter((inv: Invoice) =>
+                                        new Date(inv.issue_date).getMonth() + 1 === month
+                                    );
+                                    const monthExpenses = reportData.expenses.filter((exp: Expense) =>
+                                        new Date(exp.expense_date).getMonth() + 1 === month
+                                    );
+                                    const monthClientIncome = (reportData.clientIncomeEntries || []).filter((entry: IncomeEntry) =>
+                                        new Date(entry.income_date).getMonth() + 1 === month
+                                    );
+
+                                    const hstCollectedFromInvoices = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
+                                    const hstCollectedFromIncome = monthClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
+                                    const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
+                                    const hstPaid = monthExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
+                                    const netHST = hstCollected - hstPaid;
+
+                                    const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
+                                    return (
+                                        <tr key={month} className="hover:bg-muted/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-foreground">{monthName}</td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstCollectedFromInvoices)}</td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstCollectedFromIncome)}</td>
+                                            <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(hstCollected)}</td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstPaid)}</td>
+                                            <td className={`px-6 py-4 text-right font-bold ${netHST >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                {formatCurrency(netHST)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* Invoice Summary by Client */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Invoice Summary by Client</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Total revenue and HST collected per client</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-3">Client</th>
+                                    <th className="px-6 py-3 text-right">Invoice Count</th>
+                                    <th className="px-6 py-3 text-right">Total Revenue</th>
+                                    <th className="px-6 py-3 text-right">HST Collected</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {(() => {
+                                    const clientTotals: { [key: string]: { name: string; total: number; count: number; hst: number } } = {};
+                                    reportData.paidInvoices.forEach((inv: Invoice) => {
+                                        const clientName = inv.client?.name || 'Unknown';
+                                        if (!clientTotals[clientName]) {
+                                            clientTotals[clientName] = { name: clientName, total: 0, count: 0, hst: 0 };
+                                        }
+                                        clientTotals[clientName].total += inv.subtotal;
+                                        clientTotals[clientName].hst += inv.hst_amount;
+                                        clientTotals[clientName].count += 1;
+                                    });
+                                    return Object.values(clientTotals)
+                                        .sort((a, b) => b.total - a.total)
+                                        .map(client => (
+                                            <tr key={client.name} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-foreground">{client.name}</td>
+                                                <td className="px-6 py-4 text-right text-muted-foreground">{client.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(client.total)}</td>
+                                                <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(client.hst)}</td>
+                                            </tr>
+                                        ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* Expense Summary by Payment Method */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Expense Summary by Payment Method</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Expenses categorized by who paid (Corporation vs Owner)</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-3">Payment Method</th>
+                                    <th className="px-6 py-3 text-right">Count</th>
+                                    <th className="px-6 py-3 text-right">Total Amount</th>
+                                    <th className="px-6 py-3 text-right">HST Paid</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {(() => {
+                                    const paidByTotals: { [key: string]: { total: number; count: number; hst: number } } = {};
+                                    reportData.expenses.forEach((exp: Expense) => {
+                                        if (!paidByTotals[exp.paid_by]) {
+                                            paidByTotals[exp.paid_by] = { total: 0, count: 0, hst: 0 };
+                                        }
+                                        paidByTotals[exp.paid_by].total += exp.amount;
+                                        paidByTotals[exp.paid_by].hst += exp.hst_paid;
+                                        paidByTotals[exp.paid_by].count += 1;
+                                    });
+                                    return Object.entries(paidByTotals)
+                                        .map(([paidBy, totals]) => (
+                                            <tr key={paidBy} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-foreground">{paidBy === 'corp' ? 'Corporation' : 'Owner'}</td>
+                                                <td className="px-6 py-4 text-right text-muted-foreground">{totals.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(totals.total)}</td>
+                                                <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(totals.hst)}</td>
+                                            </tr>
+                                        ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* Dividends and Owner Payments */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <Card className="overflow-hidden">
                         <div className="p-6 border-b border-border">
-                            <h3 className="text-lg font-medium text-foreground">Recent Invoices</h3>
+                            <h2 className="text-xl font-semibold tracking-tight text-foreground">Dividend Distributions</h2>
+                            <p className="text-sm text-muted-foreground mt-1">All dividends declared and paid</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                     <tr>
-                                        <th className="px-6 py-3">Invoice #</th>
-                                        <th className="px-6 py-3">Client</th>
-                                        <th className="px-6 py-3">Amount</th>
                                         <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3">Amount</th>
+                                        <th className="px-6 py-3">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {reportData.paidInvoices.slice(0, 10).map((invoice) => (
-                                        <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-foreground">{invoice.invoice_number}</td>
-                                            <td className="px-6 py-4 text-muted-foreground">{invoice.client?.name || 'Unknown'}</td>
-                                            <td className="px-6 py-4 text-foreground">{formatCurrency(invoice.subtotal)}</td>
-                                            <td className="px-6 py-4 text-muted-foreground">{formatDate(invoice.issue_date)}</td>
+                                    {reportData.dividends && reportData.dividends.length > 0 ? (
+                                        reportData.dividends.map((div: Dividend) => (
+                                            <tr key={div.id} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 text-muted-foreground">{formatDate(div.declaration_date)}</td>
+                                                <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(div.amount)}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${div.status === 'paid'
+                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                                        }`}>
+                                                        {div.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">No dividends declared</td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -531,33 +1079,64 @@ ${formatCurrency(data.retainedEarnings)}
 
                     <Card className="overflow-hidden">
                         <div className="p-6 border-b border-border">
-                            <h3 className="text-lg font-medium text-foreground">Recent Expenses</h3>
+                            <h2 className="text-xl font-semibold tracking-tight text-foreground">Owner Payments</h2>
+                            <p className="text-sm text-muted-foreground mt-1">Payments made to owners</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                                     <tr>
-                                        <th className="px-6 py-3">Description</th>
-                                        <th className="px-6 py-3">Category</th>
-                                        <th className="px-6 py-3">Amount</th>
                                         <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3">Description</th>
+                                        <th className="px-6 py-3">Type</th>
+                                        <th className="px-6 py-3 text-right">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {reportData.expenses.slice(0, 10).map((expense) => (
-                                        <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-foreground">{expense.description}</td>
-                                            <td className="px-6 py-4 text-muted-foreground">{expense.category?.name || 'Uncategorized'}</td>
-                                            <td className="px-6 py-4 text-foreground">{formatCurrency(expense.amount)}</td>
-                                            <td className="px-6 py-4 text-muted-foreground">{formatDate(expense.expense_date)}</td>
+                                    {reportData.ownerPayments && reportData.ownerPayments.length > 0 ? (
+                                        reportData.ownerPayments.map((payment: OwnerPayment) => (
+                                            <tr key={payment.id} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 text-muted-foreground">{formatDate(payment.payment_date)}</td>
+                                                <td className="px-6 py-4 text-foreground">{payment.description}</td>
+                                                <td className="px-6 py-4 text-muted-foreground">{payment.payment_type}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(payment.amount)}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No owner payments recorded</td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </Card>
                 </div>
-            )}
+            </div>
+
+            {/* Comprehensive Tax Report Info */}
+            <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-3">
+                    <FileSpreadsheet className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1 flex-shrink-0" />
+                    <div>
+                        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">Comprehensive Tax Report</h3>
+                        <p className="text-blue-800 dark:text-blue-300 mb-3">
+                            This comprehensive report includes all financial data needed for tax submission to your accountant:
+                        </p>
+                        <ul className="text-blue-800 dark:text-blue-300 text-sm space-y-1 ml-4">
+                            <li>• Complete Profit & Loss Statement</li>
+                            <li>• Detailed HST Summary with monthly breakdown</li>
+                            <li>• Capital Assets and Depreciation (CCA)</li>
+                            <li>• Dividend distributions</li>
+                            <li>• Retained earnings calculation</li>
+                            <li>• All supporting transaction details</li>
+                        </ul>
+                        <p className="text-blue-800 dark:text-blue-300 text-sm mt-3 font-medium">
+                            Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
+                        </p>
+                    </div>
+                </div>
+            </Card>
         </div>
     );
 };
