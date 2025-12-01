@@ -6,6 +6,7 @@ interface CardProps {
   padding?: 'sm' | 'md' | 'lg';
   hover?: boolean;
   className?: string;
+  glass?: 'default' | 'light' | 'heavy' | 'emerald' | 'golden';
   // Legacy props to ignore
   gradient?: string;
 }
@@ -15,6 +16,7 @@ const Card: React.FC<CardProps> = ({
   padding = 'md',
   hover = true,
   className = '',
+  glass = 'default',
 }) => {
   const paddingClasses = {
     sm: 'p-4',
@@ -22,11 +24,20 @@ const Card: React.FC<CardProps> = ({
     lg: 'p-8',
   };
 
+  const glassClasses = {
+    default: 'glass',
+    light: 'glass-light',
+    heavy: 'glass-heavy',
+    emerald: 'glass-emerald',
+    golden: 'glass-golden',
+  };
+
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-200",
-        hover && "hover:shadow-md",
+        "rounded-2xl text-white transition-all duration-200",
+        glassClasses[glass],
+        hover && "hover:bg-opacity-80",
         paddingClasses[padding],
         className
       )}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type OwnerPayment } from '../lib/api';
+import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type OwnerPayment, type Salary } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import {
     DollarSign,
@@ -19,6 +20,7 @@ import {
 import StatCard from '../components/ui/StatCard';
 import Card from '../components/ui/Card';
 import { cn } from '../lib/utils';
+import { staggerContainer, staggerItem } from '../lib/animations';
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
@@ -57,6 +59,7 @@ const Dashboard: React.FC = () => {
     const [recentHSTPayments, setRecentHSTPayments] = useState<HSTPayment[]>([]);
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
+    const [recentSalaries, setRecentSalaries] = useState<Salary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
         // Load saved preference on component mount
@@ -98,7 +101,8 @@ const Dashboard: React.FC = () => {
                 hstPaymentsResponse,
                 dividendsResponse,
                 capitalAssetsResponse,
-                ownerPaymentsResponse
+                ownerPaymentsResponse,
+                salariesResponse
             ] = await Promise.all([
                 // Fetch all invoices once (we'll filter by status and date client-side)
                 api.getInvoices({
@@ -144,6 +148,13 @@ const Dashboard: React.FC = () => {
                     start_date: startDateStr,
                     end_date: endDateStr,
                     limit: 1000
+                }),
+                // Fetch salaries with date filtering
+                api.getSalaries({
+                    company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
+                    limit: 1000
                 })
             ]);
 
@@ -164,6 +175,7 @@ const Dashboard: React.FC = () => {
             const dividends = dividendsResponse.data;
             const capitalAssets = capitalAssetsResponse.data;
             const ownerPayments = ownerPaymentsResponse.data;
+            const salaries = salariesResponse.data;
 
             // Calculate stats
             const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
@@ -175,12 +187,19 @@ const Dashboard: React.FC = () => {
                 .reduce((sum, entry) => sum + entry.amount, 0);
             const totalRevenue = invoiceRevenue + clientIncome;
             const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-            const netIncome = totalRevenue + otherIncome - totalExpenses;
+            const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
+            const netIncome = totalRevenue + otherIncome - totalExpenses - totalSalaries;
 
-            // Calculate owner reimbursement owed (expenses paid by owner that need to be reimbursed)
+            // Calculate owner reimbursement owed (expenses and capital assets paid by owner that need to be reimbursed)
             const ownerExpenses = expenses.filter(expense => expense.paid_by === 'owner');
-            const ownerReimbursementOwed = ownerExpenses
+            const ownerExpensesOwed = ownerExpenses
                 .reduce((sum, expense) => sum + expense.amount + expense.hst_paid, 0);
+            
+            const ownerCapitalAssets = capitalAssets.filter(asset => asset.paid_by === 'owner');
+            const ownerCapitalAssetsOwed = ownerCapitalAssets
+                .reduce((sum, asset) => sum + asset.total_cost, 0);
+            
+            const ownerReimbursementOwed = ownerExpensesOwed + ownerCapitalAssetsOwed;
 
             // Calculate corporate expenses (for comparison)
             const corporateExpenses = expenses.filter(expense => expense.paid_by === 'corp');
@@ -216,8 +235,8 @@ const Dashboard: React.FC = () => {
             // Calculate tax information
             const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
 
-            // Taxable income = Total Revenue + Other Income - Business Expenses
-            const taxableIncome = totalRevenue + otherIncome - totalExpenses;
+            // Taxable income = Total Revenue + Other Income - Business Expenses - Salaries
+            const taxableIncome = totalRevenue + otherIncome - totalExpenses - totalSalaries;
             const smallBusinessTaxOwed = Math.max(0, taxableIncome * smallBusinessTaxRate);
 
             // Tax paid through dividends (dividends are paid from after-tax income)
@@ -228,8 +247,8 @@ const Dashboard: React.FC = () => {
             const netIncomeAfterTax = taxableIncome - smallBusinessTaxOwed;
             const availableDividends = Math.max(0, netIncomeAfterTax - totalDividendsPaid);
 
-            // Tax deductible expenses (all business expenses reduce taxable income)
-            const taxDeductibleExpenses = totalExpenses;
+            // Tax deductible expenses (all business expenses and salaries reduce taxable income)
+            const taxDeductibleExpenses = totalExpenses + totalSalaries;
 
             // Calculate capital asset stats
             const totalAssetCost = capitalAssets.reduce((sum, asset) => sum + asset.total_cost, 0);
@@ -282,6 +301,9 @@ const Dashboard: React.FC = () => {
             // Recent HST payments - already sorted by payment_date descending from API
             setRecentHSTPayments(hstPayments.slice(0, 5));
 
+            // Recent salaries - already sorted by payment_date descending from API
+            setRecentSalaries(salaries.slice(0, 5));
+
             setAllDividends(dividends);
             setOwnerPayments(ownerPayments);
         } catch (error) {
@@ -302,6 +324,10 @@ const Dashboard: React.FC = () => {
         return new Date(dateString).toLocaleDateString('en-CA');
     };
 
+    // Hooks must be called before any early returns
+    // Note: Removed scroll reveal hooks as they were causing content to be hidden
+    // Content will animate on mount instead
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -312,7 +338,12 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+            <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"
+            >
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
                     <p className="text-muted-foreground mt-2">Welcome back, {user?.name}</p>
@@ -320,7 +351,7 @@ const Dashboard: React.FC = () => {
 
                 {/* Time Period Selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <div className="flex rounded-md shadow-sm border border-input overflow-hidden">
+                    <div className="flex rounded-lg glass border border-white/10 overflow-hidden">
                         <button
                             type="button"
                             onClick={() => {
@@ -330,8 +361,8 @@ const Dashboard: React.FC = () => {
                             className={cn(
                                 "px-4 py-2 text-sm font-medium transition-all duration-200",
                                 timePeriod === 'month'
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    ? 'bg-primary/20 text-primary border-r border-border'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                             )}
                         >
                             Month
@@ -345,8 +376,8 @@ const Dashboard: React.FC = () => {
                             className={cn(
                                 "px-4 py-2 text-sm font-medium transition-all duration-200",
                                 timePeriod === 'year'
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                    ? 'bg-primary/20 text-primary'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                             )}
                         >
                             Year
@@ -369,181 +400,264 @@ const Dashboard: React.FC = () => {
                                     setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                 }
                             }}
-                            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="input"
                         />
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Financial Overview Section */}
-            <div className="space-y-6">
+            <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
+                className="space-y-6"
+            >
                 <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Financial Overview</h2>
 
                 {/* Key Metrics Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                    <StatCard
-                        title="Total Revenue"
-                        value={formatCurrency(stats.totalRevenue)}
-                        subtitle="From invoices & income"
-                        icon={DollarSign}
-                        gradient="green"
-                    />
-                    <StatCard
-                        title="Total Expenses"
-                        value={formatCurrency(stats.totalExpenses)}
-                        subtitle="Business operations"
-                        icon={Receipt}
-                        gradient="red"
-                    />
-                    <StatCard
-                        title="Net Income"
-                        value={formatCurrency(stats.netIncome)}
-                        subtitle="After expenses"
-                        icon={TrendingUp}
-                        gradient="blue"
-                    />
-                    <StatCard
-                        title="Available Dividends"
-                        value={formatCurrency(stats.availableDividends)}
-                        subtitle="For distribution"
-                        icon={Banknote}
-                        gradient="purple"
-                    />
-                </div>
+                <motion.div
+                    variants={staggerContainer}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+                >
+                    <motion.div variants={staggerItem}>
+                        <StatCard
+                            title="Total Revenue"
+                            value={formatCurrency(stats.totalRevenue)}
+                            subtitle="From invoices & income"
+                            icon={DollarSign}
+                            gradient="emerald"
+                            accent="emerald"
+                        />
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                        <StatCard
+                            title="Total Expenses"
+                            value={formatCurrency(stats.totalExpenses)}
+                            subtitle="Business operations"
+                            icon={Receipt}
+                            gradient="red"
+                            accent="default"
+                        />
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                        <StatCard
+                            title="Net Income"
+                            value={formatCurrency(stats.netIncome)}
+                            subtitle="After expenses"
+                            icon={TrendingUp}
+                            gradient={stats.netIncome >= 0 ? "emerald" : "red"}
+                            accent={stats.netIncome >= 0 ? "emerald" : "default"}
+                        />
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                        <StatCard
+                            title="Available Dividends"
+                            value={formatCurrency(stats.availableDividends)}
+                            subtitle="For distribution"
+                            icon={Banknote}
+                            gradient="amber"
+                            accent="golden"
+                        />
+                    </motion.div>
+                </motion.div>
 
                 {/* Owner Balance Section */}
                 {(stats.ownerReimbursementOwed > 0 || stats.ownerPaymentsTotal > 0) && (
-                    <Card
-                        className={cn("p-6",
-                            stats.netOwnerBalance > 0 ? 'border-l-4 border-l-orange-500 bg-orange-50/10 dark:bg-orange-900/10' :
-                                stats.netOwnerBalance < 0 ? 'border-l-4 border-l-green-500 bg-green-50/10 dark:bg-green-900/10' : ''
-                        )}
+                    <motion.div
+                        variants={staggerItem}
+                        className="relative"
                     >
-                        <div className="flex items-start">
-                            <div className="flex-shrink-0">
-                                {stats.netOwnerBalance > 0 ? (
-                                    <AlertCircle className="h-6 w-6 text-orange-500" />
-                                ) : stats.netOwnerBalance < 0 ? (
-                                    <Check className="h-6 w-6 text-green-500" />
-                                ) : (
-                                    <Banknote className="h-6 w-6 text-muted-foreground" />
-                                )}
-                            </div>
-                            <div className="ml-4 flex-1">
-                                <h3 className={cn("text-lg font-semibold mb-2",
-                                    stats.netOwnerBalance > 0 ? 'text-orange-700 dark:text-orange-400' :
-                                        stats.netOwnerBalance < 0 ? 'text-green-700 dark:text-green-400' :
-                                            'text-foreground'
-                                )}>
-                                    {stats.netOwnerBalance > 0
-                                        ? 'Owner Reimbursement Required'
-                                        : stats.netOwnerBalance < 0
-                                            ? 'Owner Overpaid'
-                                            : 'Owner Balance Settled'
-                                    }
-                                </h3>
+                        <Card
+                            glass={stats.netOwnerBalance > 0 ? 'golden' : stats.netOwnerBalance < 0 ? 'emerald' : 'default'}
+                            className={cn(
+                                "relative overflow-hidden",
+                                stats.netOwnerBalance > 0 && "border-l-4 border-l-golden-hour glow-golden",
+                                stats.netOwnerBalance < 0 && "border-l-4 border-l-neon-emerald glow-emerald"
+                            )}
+                            padding="lg"
+                        >
+                            {/* Decorative gradient overlay */}
+                            <div className={cn(
+                                "absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-20 -z-0",
+                                stats.netOwnerBalance > 0 ? "bg-golden-hour" :
+                                    stats.netOwnerBalance < 0 ? "bg-neon-emerald" :
+                                        "bg-white/10"
+                            )} />
 
-                                {stats.netOwnerBalance > 0 && (
-                                    <p className="text-muted-foreground mb-4">
-                                        The corporation owes the owner <span className="font-bold text-foreground">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
-                                    </p>
-                                )}
-
-                                {stats.netOwnerBalance < 0 && (
-                                    <p className="text-muted-foreground mb-4">
-                                        The corporation has overpaid the owner by <span className="font-bold text-foreground">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
-                                    </p>
-                                )}
-
-                                {stats.netOwnerBalance === 0 && stats.ownerReimbursementOwed > 0 && (
-                                    <p className="text-muted-foreground mb-4">
-                                        Owner balance is settled. All reimbursements have been paid.
-                                    </p>
-                                )}
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4">
-                                    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-4 rounded-lg">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className="font-semibold text-orange-900 dark:text-orange-300">Owner Paid</div>
-                                                <div className="text-2xl font-bold text-orange-800 dark:text-orange-400">{formatCurrency(stats.ownerReimbursementOwed)}</div>
-                                                <div className="text-sm text-orange-600 dark:text-orange-500">{stats.ownerExpenseCount} expenses</div>
-                                            </div>
-                                            <div className="text-orange-500">
-                                                <AlertCircle className="h-8 w-8" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className="font-semibold text-blue-900 dark:text-blue-300">Corp Paid Back</div>
-                                                <div className="text-2xl font-bold text-blue-800 dark:text-blue-400">{formatCurrency(stats.ownerPaymentsTotal)}</div>
-                                                <div className="text-sm text-blue-600 dark:text-blue-500">payments made</div>
-                                            </div>
-                                            <div className="text-blue-500">
-                                                <Banknote className="h-8 w-8" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className={cn("border p-4 rounded-lg",
-                                        stats.netOwnerBalance > 0 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' :
-                                            stats.netOwnerBalance < 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
-                                                'bg-muted/50 border-border'
+                            <div className="relative z-10">
+                                {/* Header Section */}
+                                <div className="flex items-start gap-4 mb-6">
+                                    <div className={cn(
+                                        "flex-shrink-0 p-3 rounded-xl border",
+                                        stats.netOwnerBalance > 0 ? "bg-golden-hour/20 border-golden-hour/30" :
+                                            stats.netOwnerBalance < 0 ? "bg-neon-emerald/20 border-neon-emerald/30" :
+                                                "bg-muted/50 border-border"
                                     )}>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className={cn("font-semibold",
-                                                    stats.netOwnerBalance > 0 ? 'text-orange-900 dark:text-orange-300' :
-                                                        stats.netOwnerBalance < 0 ? 'text-green-900 dark:text-green-300' :
-                                                            'text-foreground'
-                                                )}>Net Balance</div>
-                                                <div className={cn("text-2xl font-bold",
-                                                    stats.netOwnerBalance > 0 ? 'text-orange-800 dark:text-orange-400' :
-                                                        stats.netOwnerBalance < 0 ? 'text-green-800 dark:text-green-400' :
-                                                            'text-foreground'
-                                                )}>{formatCurrency(stats.netOwnerBalance)}</div>
-                                                <div className={cn("text-sm",
-                                                    stats.netOwnerBalance > 0 ? 'text-orange-600 dark:text-orange-500' :
-                                                        stats.netOwnerBalance < 0 ? 'text-green-600 dark:text-green-500' :
-                                                            'text-muted-foreground'
-                                                )}>
-                                                    {stats.netOwnerBalance > 0 ? 'owed to owner' : stats.netOwnerBalance < 0 ? 'overpaid' : 'settled'}
-                                                </div>
-                                            </div>
-                                            <div className={cn(
-                                                stats.netOwnerBalance > 0 ? 'text-orange-500' :
-                                                    stats.netOwnerBalance < 0 ? 'text-green-500' :
-                                                        'text-muted-foreground'
-                                            )}>
-                                                {stats.netOwnerBalance > 0 ? (
-                                                    <AlertCircle className="h-8 w-8" />
-                                                ) : stats.netOwnerBalance < 0 ? (
-                                                    <Check className="h-8 w-8" />
-                                                ) : (
-                                                    <Banknote className="h-8 w-8" />
-                                                )}
-                                            </div>
-                                        </div>
+                                        {stats.netOwnerBalance > 0 ? (
+                                            <AlertCircle className={cn("h-6 w-6", stats.netOwnerBalance > 0 ? "text-golden-hour" : "text-foreground")} />
+                                        ) : stats.netOwnerBalance < 0 ? (
+                                            <Check className="h-6 w-6 text-neon-emerald" />
+                                        ) : (
+                                            <Banknote className="h-6 w-6 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className={cn(
+                                            "text-2xl font-bold tracking-tight mb-2",
+                                            stats.netOwnerBalance > 0 ? 'text-golden-hour' :
+                                                stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
+                                                    'text-foreground'
+                                        )}>
+                                            {stats.netOwnerBalance > 0
+                                                ? 'Owner Reimbursement Required'
+                                                : stats.netOwnerBalance < 0
+                                                    ? 'Owner Overpaid'
+                                                    : 'Owner Balance Settled'
+                                            }
+                                        </h3>
+                                        {stats.netOwnerBalance > 0 && (
+                                            <p className="text-muted-foreground text-base leading-relaxed">
+                                                The corporation owes the owner <span className="font-bold text-foreground tabular-nums">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
+                                            </p>
+                                        )}
+                                        {stats.netOwnerBalance < 0 && (
+                                            <p className="text-muted-foreground text-base leading-relaxed">
+                                                The corporation has overpaid the owner by <span className="font-bold text-foreground tabular-nums">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
+                                            </p>
+                                        )}
+                                        {stats.netOwnerBalance === 0 && stats.ownerReimbursementOwed > 0 && (
+                                            <p className="text-muted-foreground text-base leading-relaxed">
+                                                Owner balance is settled. All reimbursements have been paid.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className={cn("border p-3 rounded-lg",
-                                    stats.netOwnerBalance > 0 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' :
-                                        'bg-muted/50 border-border'
+                                {/* Metrics Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                    {/* Owner Paid Card */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02 }}
+                                        transition={{ duration: 0.2 }}
+                                        className={cn(
+                                            "glass-golden border border-golden-hour/30 p-5 rounded-xl relative overflow-hidden"
+                                        )}
+                                    >
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-golden-hour/10 rounded-full blur-2xl -z-0" />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-sm font-semibold text-golden-hour uppercase tracking-wide">Owner Paid</span>
+                                                <div className="p-2 rounded-lg bg-golden-hour/20 border border-golden-hour/30">
+                                                    <AlertCircle className="h-5 w-5 text-golden-hour" />
+                                                </div>
+                                            </div>
+                                            <div className="text-3xl font-bold text-foreground tabular-nums mb-1">
+                                                {formatCurrency(stats.ownerReimbursementOwed)}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                {stats.ownerExpenseCount} {stats.ownerExpenseCount === 1 ? 'expense' : 'expenses'}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Corp Paid Back Card */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="glass border border-border p-5 rounded-xl relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-neon-emerald/10 rounded-full blur-2xl -z-0" />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-sm font-semibold text-foreground uppercase tracking-wide">Corp Paid Back</span>
+                                                <div className="p-2 rounded-lg bg-neon-emerald/20 border border-neon-emerald/30">
+                                                    <Banknote className="h-5 w-5 text-neon-emerald" />
+                                                </div>
+                                            </div>
+                                            <div className="text-3xl font-bold text-foreground tabular-nums mb-1">
+                                                {formatCurrency(stats.ownerPaymentsTotal)}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                {stats.ownerPaymentsTotal > 0 ? 'payments made' : 'no payments yet'}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Net Balance Card */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02 }}
+                                        transition={{ duration: 0.2 }}
+                                        className={cn(
+                                            "border p-5 rounded-xl relative overflow-hidden",
+                                            stats.netOwnerBalance > 0 ? 'glass-golden border-golden-hour/30' :
+                                                stats.netOwnerBalance < 0 ? 'glass-emerald border-neon-emerald/30' :
+                                                    'glass border-border'
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -z-0",
+                                            stats.netOwnerBalance > 0 ? "bg-golden-hour/20" :
+                                                stats.netOwnerBalance < 0 ? "bg-neon-emerald/20" :
+                                                    "bg-white/5"
+                                        )} />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className={cn(
+                                                    "text-sm font-semibold uppercase tracking-wide",
+                                                    stats.netOwnerBalance > 0 ? 'text-golden-hour' :
+                                                        stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
+                                                            'text-foreground'
+                                                )}>
+                                                    Net Balance
+                                                </span>
+                                                <div className={cn(
+                                                    "p-2 rounded-lg border",
+                                                    stats.netOwnerBalance > 0 ? 'bg-golden-hour/20 border-golden-hour/30' :
+                                                        stats.netOwnerBalance < 0 ? 'bg-neon-emerald/20 border-neon-emerald/30' :
+                                                            'bg-muted/50 border-border'
+                                                )}>
+                                                    {stats.netOwnerBalance > 0 ? (
+                                                        <AlertCircle className={cn("h-5 w-5", stats.netOwnerBalance > 0 ? "text-golden-hour" : "text-foreground")} />
+                                                    ) : stats.netOwnerBalance < 0 ? (
+                                                        <Check className="h-5 w-5 text-neon-emerald" />
+                                                    ) : (
+                                                        <Banknote className="h-5 w-5 text-muted-foreground" />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className={cn(
+                                                "text-3xl font-bold tabular-nums mb-1",
+                                                stats.netOwnerBalance > 0 ? 'text-golden-hour' :
+                                                    stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
+                                                        'text-foreground'
+                                            )}>
+                                                {formatCurrency(stats.netOwnerBalance)}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                {stats.netOwnerBalance > 0 ? 'owed to owner' : stats.netOwnerBalance < 0 ? 'overpaid' : 'settled'}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </div>
+
+                                {/* Info Note */}
+                                <div className={cn(
+                                    "glass border p-4 rounded-lg",
+                                    stats.netOwnerBalance > 0 ? 'border-golden-hour/30 glass-golden' :
+                                        'border-border'
                                 )}>
-                                    <p className={cn("text-sm",
-                                        stats.netOwnerBalance > 0 ? 'text-orange-800 dark:text-orange-300' : 'text-muted-foreground'
+                                    <p className={cn(
+                                        "text-sm leading-relaxed",
+                                        stats.netOwnerBalance > 0 ? 'text-golden-hour' : 'text-muted-foreground'
                                     )}>
-                                        <strong>Note:</strong> Owner reimbursement includes both the expense amount and HST paid on owner-funded expenses.
+                                        <strong className="text-foreground">Note:</strong> Owner reimbursement includes both the expense amount and HST paid on owner-funded expenses.
                                         {stats.netOwnerBalance > 0 && ' This amount should be paid to the owner to reimburse their personal funds used for business expenses.'}
                                     </p>
                                 </div>
                             </div>
-                        </div>
-                    </Card>
+                        </Card>
+                    </motion.div>
                 )}
 
                 {/* Dividend Summary */}
@@ -553,248 +667,342 @@ const Dashboard: React.FC = () => {
                         value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'paid').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
                         icon={Check}
                         gradient="emerald"
+                        accent="emerald"
                     />
                     <StatCard
                         title="Declared (Unpaid)"
                         value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'declared').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
                         icon={AlertCircle}
                         gradient="amber"
+                        accent="golden"
                     />
                 </div>
-            </div>
+            </motion.div>
 
             {/* Tax & Compliance Section */}
-            <div className="space-y-6">
+            <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
+                className="space-y-6"
+            >
                 <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Tax & Compliance</h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                    <StatCard
-                        title="HST Owed"
-                        value={formatCurrency(stats.hstOwed)}
-                        subtitle="To CRA"
-                        icon={AlertCircle}
-                        gradient="orange"
-                    />
-                    <StatCard
-                        title="HST Paid"
-                        value={formatCurrency(stats.hstPaid)}
-                        subtitle="To CRA"
-                        icon={Check}
-                        gradient="green"
-                    />
-                    {user?.company?.hst_registered && stats.inputTaxCredits > 0 && (
+                <motion.div
+                    variants={staggerContainer}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+                >
+                    <motion.div variants={staggerItem}>
                         <StatCard
-                            title="Input Tax Credits"
-                            value={formatCurrency(stats.inputTaxCredits)}
-                            subtitle="HST on expenses"
-                            icon={Percent}
-                            gradient="blue"
+                            title="HST Owed"
+                            value={formatCurrency(stats.hstOwed)}
+                            subtitle="To CRA"
+                            icon={AlertCircle}
+                            gradient="red"
+                            accent="default"
                         />
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                        <StatCard
+                            title="HST Paid"
+                            value={formatCurrency(stats.hstPaid)}
+                            subtitle="To CRA"
+                            icon={Check}
+                            gradient="emerald"
+                            accent="emerald"
+                        />
+                    </motion.div>
+                    {user?.company?.hst_registered && stats.inputTaxCredits > 0 && (
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Input Tax Credits"
+                                value={formatCurrency(stats.inputTaxCredits)}
+                                subtitle="HST on expenses"
+                                icon={Percent}
+                                gradient="cyan"
+                                accent="default"
+                            />
+                        </motion.div>
                     )}
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
 
             {/* Capital Assets Section */}
             {stats.totalCapitalAssets > 0 && (
-                <div className="space-y-6">
+                <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={staggerContainer}
+                    className="space-y-6"
+                >
                     <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Capital Assets</h2>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                        <StatCard
-                            title="Total Assets"
-                            value={stats.totalCapitalAssets}
-                            subtitle="Capital assets"
-                            icon={Building2}
-                            gradient="indigo"
-                        />
-                        <StatCard
-                            title="Total Cost"
-                            value={formatCurrency(stats.totalAssetCost)}
-                            subtitle="Original cost"
-                            icon={DollarSign}
-                            gradient="cyan"
-                        />
-                        <StatCard
-                            title="Depreciation"
-                            value={formatCurrency(stats.totalAccumulatedDepreciation)}
-                            subtitle="Accumulated"
-                            icon={Calculator}
-                            gradient="amber"
-                        />
-                        <StatCard
-                            title="Book Value"
-                            value={formatCurrency(stats.totalAssetBookValue)}
-                            subtitle="Current value"
-                            icon={TrendingUp}
-                            gradient="emerald"
-                        />
-                    </div>
-                </div>
+                    <motion.div
+                        variants={staggerContainer}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+                    >
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Total Assets"
+                                value={stats.totalCapitalAssets}
+                                subtitle="Capital assets"
+                                icon={Building2}
+                                gradient="cyan"
+                                accent="default"
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Total Cost"
+                                value={formatCurrency(stats.totalAssetCost)}
+                                subtitle="Original cost"
+                                icon={DollarSign}
+                                gradient="amber"
+                                accent="golden"
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Depreciation"
+                                value={formatCurrency(stats.totalAccumulatedDepreciation)}
+                                subtitle="Accumulated"
+                                icon={Calculator}
+                                gradient="amber"
+                                accent="default"
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Book Value"
+                                value={formatCurrency(stats.totalAssetBookValue)}
+                                subtitle="Current value"
+                                icon={TrendingUp}
+                                gradient="amber"
+                                accent="golden"
+                            />
+                        </motion.div>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Alerts & Notifications Section */}
             {(stats.outstandingInvoices > 0 || stats.overdueInvoices > 0) && (
-                <div className="space-y-4">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="space-y-4"
+                >
                     <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2">Alerts & Notifications</h2>
-                    <Card className="p-6 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
-                        <div className="flex items-start">
-                            <div className="flex-shrink-0">
-                                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-500" />
+                    <Card className="p-6 border-l-4 border-l-golden-hour glass-golden" padding="lg">
+                        <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 p-3 rounded-xl bg-golden-hour/20 border border-golden-hour/30">
+                                <AlertCircle className="h-6 w-6 text-golden-hour" />
                             </div>
-                            <div className="ml-4">
-                                <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-400 mb-2">
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-golden-hour mb-3">
                                     Invoice Alerts
                                 </h3>
-                                <div className="text-amber-800 dark:text-amber-300">
-                                    <ul className="list-disc pl-5 space-y-1">
+                                <div className="text-muted-foreground">
+                                    <ul className="list-disc pl-5 space-y-2">
                                         {stats.outstandingInvoices > 0 && (
-                                            <li><strong>{stats.outstandingInvoices}</strong> outstanding invoices need attention</li>
+                                            <li><strong className="text-foreground">{stats.outstandingInvoices}</strong> outstanding invoices need attention</li>
                                         )}
                                         {stats.overdueInvoices > 0 && (
-                                            <li><strong>{stats.overdueInvoices}</strong> overdue invoices require immediate action</li>
+                                            <li><strong className="text-foreground">{stats.overdueInvoices}</strong> overdue invoices require immediate action</li>
                                         )}
                                     </ul>
                                 </div>
                             </div>
                         </div>
                     </Card>
-                </div>
+                </motion.div>
             )}
 
 
             {/* Recent Activity Section */}
-            <div className="space-y-6">
+            <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
+                className="space-y-6"
+            >
                 <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Recent Activity</h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <motion.div
+                    variants={staggerContainer}
+                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                >
                     {/* Recent Invoices */}
-                    <Card>
-                        <div className="flex items-center mb-4">
-                            <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg mr-3">
-                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground">Recent Invoices</h3>
-                        </div>
-                        <div className="space-y-3">
-                            {recentInvoices.map((invoice) => (
-                                <div key={invoice.id} className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground">
-                                            {invoice.invoice_number}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {invoice.client?.name || 'Unknown Client'}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {formatCurrency(invoice.total)}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatDate(invoice.issue_date)}
-                                        </p>
-                                    </div>
+                    <motion.div variants={staggerItem}>
+                        <Card>
+                            <div className="flex items-center mb-4">
+                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
+                                    <FileText className="h-5 w-5 text-neon-emerald" />
                                 </div>
-                            ))}
-                        </div>
-                    </Card>
+                                <h3 className="text-lg font-semibold text-foreground">Recent Invoices</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentInvoices.map((invoice) => (
+                                    <div key={invoice.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {invoice.invoice_number}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {invoice.client?.name || 'Unknown Client'}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-foreground tabular-nums">
+                                                {formatCurrency(invoice.total)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(invoice.issue_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </motion.div>
 
                     {/* Recent Expenses */}
-                    <Card>
-                        <div className="flex items-center mb-4">
-                            <div className="bg-red-100 dark:bg-red-900/20 p-2 rounded-lg mr-3">
-                                <Receipt className="h-5 w-5 text-red-600 dark:text-red-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground">Recent Expenses</h3>
-                        </div>
-                        <div className="space-y-3">
-                            {recentExpenses.map((expense) => (
-                                <div key={expense.id} className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground">
-                                            {expense.description}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {expense.category?.name || 'Uncategorized'} • {expense.paid_by}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {formatCurrency(expense.amount)}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatDate(expense.expense_date)}
-                                        </p>
-                                    </div>
+                    <motion.div variants={staggerItem}>
+                        <Card>
+                            <div className="flex items-center mb-4">
+                                <div className="bg-red-500/20 border border-red-500/30 p-2 rounded-lg mr-3">
+                                    <Receipt className="h-5 w-5 text-red-400" />
                                 </div>
-                            ))}
-                        </div>
-                    </Card>
+                                <h3 className="text-lg font-semibold text-foreground">Recent Expenses</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentExpenses.map((expense) => (
+                                    <div key={expense.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {expense.description}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {expense.category?.name || 'Uncategorized'} • {expense.paid_by}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-foreground tabular-nums">
+                                                {formatCurrency(expense.amount)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(expense.expense_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </motion.div>
 
                     {/* Recent Income Entries */}
-                    <Card>
-                        <div className="flex items-center mb-4">
-                            <div className="bg-green-100 dark:bg-green-900/20 p-2 rounded-lg mr-3">
-                                <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground">Recent Income Entries</h3>
-                        </div>
-                        <div className="space-y-3">
-                            {recentIncomeEntries.map((entry) => (
-                                <div key={entry.id} className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground">
-                                            {entry.description}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {entry.income_type} {entry.client ? `• ${entry.client.name}` : ''}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {formatCurrency(entry.amount)}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatDate(entry.income_date)}
-                                        </p>
-                                    </div>
+                    <motion.div variants={staggerItem}>
+                        <Card>
+                            <div className="flex items-center mb-4">
+                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
+                                    <DollarSign className="h-5 w-5 text-neon-emerald" />
                                 </div>
-                            ))}
-                        </div>
-                    </Card>
+                                <h3 className="text-lg font-semibold text-foreground">Recent Income Entries</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentIncomeEntries.map((entry) => (
+                                    <div key={entry.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {entry.description}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {entry.income_type} {entry.client ? `• ${entry.client.name}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-foreground tabular-nums">
+                                                {formatCurrency(entry.amount)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(entry.income_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </motion.div>
 
                     {/* Recent HST Payments */}
-                    <Card>
-                        <div className="flex items-center mb-4">
-                            <div className="bg-orange-100 dark:bg-orange-900/20 p-2 rounded-lg mr-3">
-                                <CreditCard className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-foreground">Recent HST Payments</h3>
-                        </div>
-                        <div className="space-y-3">
-                            {recentHSTPayments.map((payment) => (
-                                <div key={payment.id} className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-foreground">
-                                            HST Payment
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {payment.reference ? `Ref: ${payment.reference}` : 'No reference'}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {formatCurrency(payment.amount)}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatDate(payment.payment_date)}
-                                        </p>
-                                    </div>
+                    <motion.div variants={staggerItem}>
+                        <Card>
+                            <div className="flex items-center mb-4">
+                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
+                                    <CreditCard className="h-5 w-5 text-neon-emerald" />
                                 </div>
-                            ))}
-                        </div>
-                    </Card>
-                </div>
-            </div>
+                                <h3 className="text-lg font-semibold text-foreground">Recent HST Payments</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentHSTPayments.map((payment) => (
+                                    <div key={payment.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">
+                                                HST Payment
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {payment.reference ? `Ref: ${payment.reference}` : 'No reference'}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-foreground tabular-nums">
+                                                {formatCurrency(payment.amount)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(payment.payment_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </motion.div>
+
+                    {/* Recent Salaries */}
+                    <motion.div variants={staggerItem}>
+                        <Card>
+                            <div className="flex items-center mb-4">
+                                <div className="bg-blue-500/20 border border-blue-500/30 p-2 rounded-lg mr-3">
+                                    <DollarSign className="h-5 w-5 text-blue-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">Recent Salaries</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {recentSalaries.map((salary) => (
+                                    <div key={salary.id} className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {salary.employee_name}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(salary.period_start)} - {formatDate(salary.period_end)}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium text-foreground tabular-nums">
+                                                {formatCurrency(salary.amount)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(salary.payment_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </motion.div>
+                </motion.div>
+            </motion.div>
         </div>
     );
 };

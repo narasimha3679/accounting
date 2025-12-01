@@ -44,7 +44,7 @@ const Clients: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -53,8 +53,8 @@ const Clients: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Clients</h1>
-                    <p className="text-muted-foreground mt-2">Manage your client information</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Clients</h1>
+                    <p className="text-slate-muted mt-2">Manage your client information</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
@@ -70,7 +70,7 @@ const Clients: React.FC = () => {
                 {clients?.map((client) => (
                     <Card key={client.id} className="p-6">
                         <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-lg font-medium text-foreground">{client.name}</h3>
+                            <h3 className="text-lg font-medium text-white">{client.name}</h3>
                             <div className="flex items-center gap-2">
                                 <Button
                                     variant="ghost"
@@ -93,21 +93,21 @@ const Clients: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="space-y-2 text-sm text-slate-muted">
                             {client.contact_person && (
-                                <p><span className="font-medium text-foreground">Contact:</span> {client.contact_person}</p>
+                                <p><span className="font-medium text-white">Contact:</span> {client.contact_person}</p>
                             )}
                             {client.email && (
-                                <p><span className="font-medium text-foreground">Email:</span> {client.email}</p>
+                                <p><span className="font-medium text-white">Email:</span> {client.email}</p>
                             )}
                             {client.phone && (
-                                <p><span className="font-medium text-foreground">Phone:</span> {client.phone}</p>
+                                <p><span className="font-medium text-white">Phone:</span> {client.phone}</p>
                             )}
                             {client.address && (
-                                <p><span className="font-medium text-foreground">Address:</span> {client.address}</p>
+                                <p><span className="font-medium text-white">Address:</span> {client.address}</p>
                             )}
                             <p>
-                                <span className="font-medium text-foreground">HST Exempt:</span>{' '}
+                                <span className="font-medium text-white">HST Exempt:</span>{' '}
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${client.hst_exempt
                                     ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                     : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
@@ -122,8 +122,8 @@ const Clients: React.FC = () => {
 
             {clients?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-muted-foreground text-lg">No clients found</p>
-                    <p className="text-muted-foreground/60">Add your first client to get started</p>
+                    <p className="text-slate-muted text-lg">No clients found</p>
+                    <p className="text-slate-muted/60">Add your first client to get started</p>
                 </div>
             )}
 
@@ -199,9 +199,9 @@ function ClientModal({ client, onClose, onSave }: ClientModalProps) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-card p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-foreground">
+                    <h3 className="text-lg font-semibold text-white">
                         {client ? 'Edit Client' : 'Add New Client'}
                     </h3>
                     <Button
@@ -217,57 +217,57 @@ function ClientModal({ client, onClose, onSave }: ClientModalProps) {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label htmlFor="client-name" className="block text-sm font-medium text-foreground mb-2">Company Name *</label>
+                            <label htmlFor="client-name" className="block text-sm font-medium text-white mb-2">Company Name *</label>
                             <input
                                 id="client-name"
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="client-contact-person" className="block text-sm font-medium text-foreground mb-2">Contact Person</label>
+                            <label htmlFor="client-contact-person" className="block text-sm font-medium text-white mb-2">Contact Person</label>
                             <input
                                 id="client-contact-person"
                                 type="text"
                                 value={formData.contact_person}
                                 onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="client-email" className="block text-sm font-medium text-foreground mb-2">Email</label>
+                            <label htmlFor="client-email" className="block text-sm font-medium text-white mb-2">Email</label>
                             <input
                                 id="client-email"
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="client-phone" className="block text-sm font-medium text-foreground mb-2">Phone</label>
+                            <label htmlFor="client-phone" className="block text-sm font-medium text-white mb-2">Phone</label>
                             <input
                                 id="client-phone"
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
 
                         <div className="sm:col-span-2">
-                            <label htmlFor="client-address" className="block text-sm font-medium text-foreground mb-2">Address</label>
+                            <label htmlFor="client-address" className="block text-sm font-medium text-white mb-2">Address</label>
                             <textarea
                                 id="client-address"
                                 value={formData.address}
                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex min-h-[80px] w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 rows={3}
                             />
                         </div>
@@ -281,17 +281,17 @@ function ClientModal({ client, onClose, onSave }: ClientModalProps) {
                                     onChange={(e) => setFormData({ ...formData, hst_exempt: e.target.checked })}
                                     className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
                                 />
-                                <label htmlFor="hst_exempt" className="ml-2 block text-sm text-foreground">
+                                <label htmlFor="hst_exempt" className="ml-2 block text-sm text-white">
                                     HST Exempt
                                 </label>
                             </div>
-                            <p className="mt-1 text-sm text-muted-foreground">
+                            <p className="mt-1 text-sm text-slate-muted">
                                 Check if this client is exempt from HST charges
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                         <Button
                             type="button"
                             variant="outline"

@@ -76,12 +76,12 @@ const Invoices: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'draft': return 'bg-muted text-muted-foreground';
+            case 'draft': return 'bg-muted text-slate-muted';
             case 'sent': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
             case 'paid': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
             case 'overdue': return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive-foreground';
-            case 'cancelled': return 'bg-muted text-muted-foreground';
-            default: return 'bg-muted text-muted-foreground';
+            case 'cancelled': return 'bg-muted text-slate-muted';
+            default: return 'bg-muted text-slate-muted';
         }
     };
 
@@ -105,7 +105,7 @@ const Invoices: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -114,8 +114,8 @@ const Invoices: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Invoices</h1>
-                    <p className="text-muted-foreground mt-2">Manage your client invoices</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Invoices</h1>
+                    <p className="text-slate-muted mt-2">Manage your client invoices</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
@@ -130,7 +130,7 @@ const Invoices: React.FC = () => {
             <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                        <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-4">Invoice #</th>
                                 <th className="px-6 py-4">Client</th>
@@ -144,11 +144,11 @@ const Invoices: React.FC = () => {
                         <tbody className="divide-y divide-border">
                             {invoices?.map((invoice) => (
                                 <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-foreground">{invoice.invoice_number}</td>
-                                    <td className="px-6 py-4 text-foreground">{invoice.client?.name || 'Unknown Client'}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(invoice.issue_date)}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(invoice.due_date)}</td>
-                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(invoice.total)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{invoice.invoice_number}</td>
+                                    <td className="px-6 py-4 text-white">{invoice.client?.name || 'Unknown Client'}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatDate(invoice.issue_date)}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatDate(invoice.due_date)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{formatCurrency(invoice.total)}</td>
                                     <td className="px-6 py-4">
                                         <span className={cn("inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full", getStatusColor(invoice.status))}>
                                             {invoice.status}
@@ -170,7 +170,7 @@ const Invoices: React.FC = () => {
                                                 size="icon"
                                                 onClick={() => window.open(`/invoices/${invoice.id}/preview`, '_blank')}
                                                 title="Preview"
-                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                className="h-8 w-8 text-slate-muted hover:text-white"
                                             >
                                                 <Eye className="h-4 w-4" />
                                             </Button>
@@ -389,10 +389,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-6">
-            <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-card border border-white/10 rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-foreground">
+                        <h3 className="text-xl font-semibold text-white">
                             {invoice ? 'Edit Invoice' : 'Create New Invoice'}
                         </h3>
                         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -406,7 +406,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                             <div className="space-y-2">
                                 <label
                                     htmlFor="invoice-client"
-                                    className="text-sm font-medium text-foreground"
+                                    className="text-sm font-medium text-white"
                                 >
                                     Client
                                 </label>
@@ -414,7 +414,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     id="invoice-client"
                                     value={formData.client_id}
                                     onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 >
                                     <option value="">Select a client</option>
@@ -424,35 +424,35 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="invoice-issue-date" className="text-sm font-medium text-foreground">Issue Date</label>
+                                <label htmlFor="invoice-issue-date" className="text-sm font-medium text-white">Issue Date</label>
                                 <input
                                     id="invoice-issue-date"
                                     type="date"
                                     value={formData.issue_date}
                                     onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="invoice-due-date" className="text-sm font-medium text-foreground">Due Date</label>
+                                <label htmlFor="invoice-due-date" className="text-sm font-medium text-white">Due Date</label>
                                 <input
                                     id="invoice-due-date"
                                     type="date"
                                     value={formData.due_date}
                                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="invoice-description" className="text-sm font-medium text-foreground">Description</label>
+                                <label htmlFor="invoice-description" className="text-sm font-medium text-white">Description</label>
                                 <input
                                     id="invoice-description"
                                     type="text"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     placeholder="Invoice description"
                                 />
                             </div>
@@ -460,43 +460,43 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
 
                         {/* Invoice Items */}
                         <div className="space-y-4">
-                            <h4 className="text-base font-semibold text-foreground">Invoice Items</h4>
+                            <h4 className="text-base font-semibold text-white">Invoice Items</h4>
 
                             {/* Add New Item */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-muted/30 p-4 rounded-lg border border-border">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-muted/30 p-4 rounded-lg border border-white/10">
                                 <div className="md:col-span-5 space-y-2">
-                                    <label htmlFor="item-description" className="text-sm font-medium text-foreground">Description</label>
+                                    <label htmlFor="item-description" className="text-sm font-medium text-white">Description</label>
                                     <input
                                         id="item-description"
                                         type="text"
                                         placeholder="Item description"
                                         value={newItem.description}
                                         onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
                                 </div>
                                 <div className="md:col-span-2 space-y-2">
-                                    <label htmlFor="item-quantity" className="text-sm font-medium text-foreground">Qty</label>
+                                    <label htmlFor="item-quantity" className="text-sm font-medium text-white">Qty</label>
                                     <input
                                         id="item-quantity"
                                         type="number"
                                         placeholder="1"
                                         value={newItem.quantity}
                                         onChange={(e) => setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         min="0"
                                         step="0.01"
                                     />
                                 </div>
                                 <div className="md:col-span-3 space-y-2">
-                                    <label htmlFor="item-unit-price" className="text-sm font-medium text-foreground">Unit Price</label>
+                                    <label htmlFor="item-unit-price" className="text-sm font-medium text-white">Unit Price</label>
                                     <input
                                         id="item-unit-price"
                                         type="number"
                                         placeholder="0.00"
                                         value={newItem.unit_price}
                                         onChange={(e) => setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         min="0"
                                         step="0.01"
                                     />
@@ -514,9 +514,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                             </div>
 
                             {/* Items List */}
-                            <div className="border border-border rounded-lg overflow-hidden">
+                            <div className="border border-white/10 rounded-lg overflow-hidden">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                                    <thead className="bg-muted text-slate-muted uppercase text-xs font-semibold">
                                         <tr>
                                             <th className="px-4 py-3">Description</th>
                                             <th className="px-4 py-3 w-24">Qty</th>
@@ -528,17 +528,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     <tbody className="divide-y divide-border bg-card">
                                         {items.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                                                <td colSpan={5} className="px-4 py-8 text-center text-slate-muted">
                                                     No items added yet.
                                                 </td>
                                             </tr>
                                         ) : (
                                             items.map((item, index) => (
                                                 <tr key={item.id} className="hover:bg-muted/30">
-                                                    <td className="px-4 py-3 text-foreground">{item.description}</td>
-                                                    <td className="px-4 py-3 text-foreground">{item.quantity}</td>
-                                                    <td className="px-4 py-3 text-foreground">${item.unit_price.toFixed(2)}</td>
-                                                    <td className="px-4 py-3 font-medium text-foreground">${item.total.toFixed(2)}</td>
+                                                    <td className="px-4 py-3 text-white">{item.description}</td>
+                                                    <td className="px-4 py-3 text-white">{item.quantity}</td>
+                                                    <td className="px-4 py-3 text-white">${item.unit_price.toFixed(2)}</td>
+                                                    <td className="px-4 py-3 font-medium text-white">${item.total.toFixed(2)}</td>
                                                     <td className="px-4 py-3 text-right">
                                                         <Button
                                                             type="button"
@@ -559,17 +559,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                         </div>
 
                         {/* Totals */}
-                        <div className="flex justify-end pt-4 border-t border-border">
+                        <div className="flex justify-end pt-4 border-t border-white/10">
                             <div className="w-full max-w-xs space-y-3">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Subtotal:</span>
-                                    <span className="font-medium text-foreground">${subtotal.toFixed(2)}</span>
+                                    <span className="text-slate-muted">Subtotal:</span>
+                                    <span className="font-medium text-white">${subtotal.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">HST (13%):</span>
-                                    <span className="font-medium text-foreground">${hstAmount.toFixed(2)}</span>
+                                    <span className="text-slate-muted">HST (13%):</span>
+                                    <span className="font-medium text-white">${hstAmount.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between text-lg font-bold border-t border-border pt-3 text-foreground">
+                                <div className="flex justify-between text-lg font-bold border-t border-white/10 pt-3 text-white">
                                     <span>Total:</span>
                                     <span>${total.toFixed(2)}</span>
                                 </div>

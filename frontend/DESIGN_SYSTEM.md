@@ -1,138 +1,572 @@
-# Design System Documentation
+# Cashual Design System
 
-This document outlines the modern, semantic design system used in the Corporate Accounting application. It supports both light and dark modes and prioritizes accessibility and consistency.
+A comprehensive design system document for the Cashual FinTech Luxury theme. Use this as a reference for building consistent pages across the Cashual platform and personal finance projects.
 
-## Core Principles
+## Design Philosophy
 
-- **Semantic Colors**: Use functional color names (e.g., `primary`, `destructive`, `muted`) instead of hardcoded hex values.
-- **Dark Mode First**: All components are designed to work seamlessly in both light and dark modes using Tailwind's `dark:` modifier.
-- **Component-Based**: Use pre-built UI components (`Button`, `Card`, `StatCard`) to ensure consistency.
-- **Standard Spacing**: Utilize standard Tailwind spacing (e.g., `p-4`, `p-6`, `gap-4`) instead of custom utility classes.
+**FinTech Luxury** - A sophisticated, dark-mode design language that balances data-heavy interfaces with aesthetic elegance. The design emphasizes clarity, trust, and premium feel through glassmorphism, subtle animations, and a carefully curated color palette.
+
+---
 
 ## Color Palette
 
-The application uses a semantic color system defined in `tailwind.config.js` and `index.css`.
+### Primary Colors
 
-### Base Colors
-- **Background**: `bg-background` (Page background)
-- **Foreground**: `text-foreground` (Primary text color)
-- **Card**: `bg-card` (Card background)
-- **Card Foreground**: `text-card-foreground` (Card text color)
-- **Popover**: `bg-popover` (Dropdown/Modal background)
-- **Popover Foreground**: `text-popover-foreground` (Dropdown/Modal text color)
-- **Primary**: `bg-primary` (Primary actions, active states)
-- **Primary Foreground**: `text-primary-foreground` (Text on primary background)
-- **Secondary**: `bg-secondary` (Secondary actions)
-- **Secondary Foreground**: `text-secondary-foreground` (Text on secondary background)
-- **Muted**: `bg-muted` (Subtle backgrounds)
-- **Muted Foreground**: `text-muted-foreground` (Subtle text)
-- **Accent**: `bg-accent` (Hover states, highlights)
-- **Accent Foreground**: `text-accent-foreground` (Text on accent background)
-- **Destructive**: `bg-destructive` (Error states, delete actions)
-- **Destructive Foreground**: `text-destructive-foreground` (Text on destructive background)
-- **Border**: `border-border` (Default border color)
-- **Input**: `border-input` (Input field borders)
-- **Ring**: `ring-ring` (Focus ring color)
+```css
+/* Deep Forest - Primary Background */
+--deep-forest: #020402
+/* Rich, almost-black green that provides depth and sophistication */
+
+/* Charcoal - Secondary Background */
+--charcoal: #1a1a1a
+/* Used for cards, elevated surfaces, and depth layers */
+```
+
+### Accent Colors
+
+```css
+/* Neon Emerald - Growth, Positive Actions, Primary CTAs */
+--neon-emerald: #34d399
+/* Use for: Growth indicators, positive metrics, primary buttons, success states */
+
+/* Golden Hour - Wealth, Assets, Premium Features */
+--golden-hour: #fbbf24
+/* Use for: Asset values, wealth indicators, premium highlights, secondary CTAs */
+```
+
+### Text Colors
+
+```css
+/* Primary Text */
+--white: #ffffff
+/* Headlines, important labels, primary content */
+
+/* Muted Text */
+--slate-muted: #94a3b8
+/* Body text, secondary information, descriptions */
+
+/* Accent Text */
+/* Use neon-emerald or golden-hour for emphasis */
+```
+
+### Usage Guidelines
+
+- **Backgrounds**: Always use deep-forest as base. Layer charcoal for elevated surfaces.
+- **Accents**: Neon Emerald for growth/positive actions. Golden Hour for wealth/assets.
+- **Text**: White for primary, slate-muted for secondary. Never use pure black text.
+- **Contrast**: Ensure WCAG AA compliance (4.5:1 ratio minimum).
+
+---
 
 ## Typography
 
-The application uses `Inter` as the primary font, falling back to system sans-serif fonts.
+### Font Families
 
-### Headings
-Use standard Tailwind classes for headings:
-- **H1**: `text-3xl font-bold tracking-tight`
-- **H2**: `text-2xl font-semibold tracking-tight`
-- **H3**: `text-xl font-semibold tracking-tight`
+```css
+/* Primary Font - Body & Headlines */
+font-family: 'Inter', system-ui, sans-serif;
+/* Modern, clean sans-serif. Excellent readability at all sizes. */
 
-### Body Text
-- **Default**: `text-base text-foreground`
-- **Small**: `text-sm text-muted-foreground`
-- **Large**: `text-lg font-medium`
-
-## Components
-
-### Button
-Located at: `src/components/ui/Button.tsx`
-
-```tsx
-import { Button } from "@/components/ui/Button"
-import { Plus, Trash } from "lucide-react"
-
-// Variants
-<Button variant="default">Primary</Button>
-<Button variant="secondary">Secondary</Button>
-<Button variant="outline">Outline</Button>
-<Button variant="ghost">Ghost</Button>
-<Button variant="destructive">Destructive</Button>
-<Button variant="link">Link</Button>
-
-// Sizes
-<Button size="sm">Small</Button>
-<Button size="default">Default</Button>
-<Button size="lg">Large</Button>
-<Button size="icon"><Plus /></Button>
-
-// With Icon
-<Button icon={Plus}>Add Item</Button>
+/* Monospace Font - Numbers & Financial Data */
+font-family: 'JetBrains Mono', monospace;
+/* Tabular numbers for financial data. Ensures alignment in tables/graphs. */
 ```
 
-### Card
-Located at: `src/components/ui/Card.tsx`
+### Type Scale
+
+```css
+/* Headlines */
+text-8xl: 6rem (96px)    /* Hero headlines */
+text-7xl: 4.5rem (72px)  /* Large hero */
+text-5xl: 3rem (48px)    /* Section headlines */
+text-4xl: 2.25rem (36px) /* Subsection headlines */
+text-3xl: 1.875rem (30px) /* Card headlines */
+text-2xl: 1.5rem (24px)  /* Large body emphasis */
+text-xl: 1.25rem (20px)  /* Card titles */
+
+/* Body */
+text-lg: 1.125rem (18px) /* Large body text */
+text-base: 1rem (16px)   /* Default body text */
+text-sm: 0.875rem (14px) /* Small body, captions */
+text-xs: 0.75rem (12px)  /* Tiny labels, metadata */
+```
+
+### Typography Rules
+
+1. **Numbers**: Always use `tabular-nums` class with JetBrains Mono for financial data
+2. **Headlines**: Use Inter with weights 700-900 for impact
+3. **Body**: Use Inter weight 400-500 for readability
+4. **Line Height**: 1.5 for body, 1.2 for headlines
+5. **Letter Spacing**: Default for body, slightly tighter (-0.02em) for large headlines
+
+---
+
+## Glassmorphism
+
+### Core Glass Effect
+
+```css
+.glass {
+  background: rgba(26, 26, 26, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem; /* 16px */
+}
+```
+
+### Variations
+
+```css
+/* Light Glass (more transparent) */
+.glass-light {
+  background: rgba(26, 26, 26, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+/* Heavy Glass (more opaque) */
+.glass-heavy {
+  background: rgba(26, 26, 26, 0.6);
+  backdrop-filter: blur(30px);
+}
+
+/* Colored Glass (with accent tint) */
+.glass-emerald {
+  background: rgba(52, 211, 153, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.glass-golden {
+  background: rgba(251, 191, 36, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+```
+
+### Usage
+
+- **Cards**: Use glass effect for all card components
+- **Navigation**: Sticky nav with glass effect
+- **Modals/Overlays**: Heavy glass for depth
+- **Hover States**: Slightly increase opacity on hover
+
+---
+
+## Spacing & Layout
+
+### Spacing Scale
+
+```css
+/* Tailwind spacing scale */
+0: 0px
+1: 0.25rem (4px)
+2: 0.5rem (8px)
+3: 0.75rem (12px)
+4: 1rem (16px)
+6: 1.5rem (24px)
+8: 2rem (32px)
+12: 3rem (48px)
+16: 4rem (64px)
+24: 6rem (96px)
+32: 8rem (128px)
+```
+
+### Container Widths
+
+```css
+/* Max container width */
+max-w-7xl: 80rem (1280px) /* Main content */
+max-w-4xl: 56rem (896px)  /* Narrow content */
+max-w-2xl: 42rem (672px)  /* Text content */
+```
+
+### Grid System
+
+- **Mobile First**: Design for mobile, enhance for desktop
+- **Breakpoints**: 
+  - `sm`: 640px
+  - `md`: 768px
+  - `lg`: 1024px
+  - `xl`: 1280px
+- **Columns**: Use CSS Grid or Tailwind grid (grid-cols-1 to grid-cols-12)
+
+---
+
+## Component Styles
+
+### Buttons
+
+#### Primary Button (Neon Emerald)
 
 ```tsx
-import Card from "@/components/ui/Card"
+<Button variant="default">
+  Primary Action
+</Button>
+```
 
+#### Secondary Button (Glass)
+
+```tsx
+<Button variant="secondary">
+  Secondary Action
+</Button>
+```
+
+#### CTA Button (Gradient)
+
+```tsx
+<Button variant="cta">
+  Call to Action
+</Button>
+```
+
+### Cards
+
+```tsx
 <Card className="p-6">
-  <h3 className="text-lg font-semibold">Card Title</h3>
-  <p className="text-muted-foreground">Card content goes here.</p>
+  <h3 className="text-lg font-semibold text-white">Card Title</h3>
+  <p className="text-slate-muted">Card content goes here.</p>
 </Card>
 ```
 
-### StatCard
-Located at: `src/components/ui/StatCard.tsx`
+### Borders
 
-Used for displaying metrics with an icon.
+```css
+/* Standard Border */
+border: 1px solid rgba(255, 255, 255, 0.1)
+
+/* Accent Border */
+border: 1px solid rgba(52, 211, 153, 0.3) /* neon-emerald */
+border: 1px solid rgba(251, 191, 36, 0.3) /* golden-hour */
+
+/* Subtle Border */
+border: 1px solid rgba(255, 255, 255, 0.05)
+```
+
+---
+
+## Visual Effects
+
+### Glow Effects
+
+```css
+/* Emerald Glow */
+.glow-emerald {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+}
+
+/* Golden Glow */
+.glow-golden {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+}
+```
+
+### Shadows
+
+```css
+/* Subtle Shadow */
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+
+/* Medium Shadow */
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+
+/* Glow Shadow */
+box-shadow: 0 0 30px rgba(52, 211, 153, 0.4);
+```
+
+### Gradients
+
+```css
+/* Text Gradient */
+bg-gradient-to-r from-neon-emerald to-golden-hour
+bg-clip-text
+text-transparent
+
+/* Background Gradient */
+bg-gradient-to-br from-black/60 to-black/40
+
+/* Accent Gradient */
+bg-gradient-to-r from-neon-emerald/20 to-transparent
+```
+
+---
+
+## Animation Patterns
+
+### Scroll Reveals
 
 ```tsx
-import StatCard from "@/components/ui/StatCard"
-import { DollarSign } from "lucide-react"
+import { motion } from 'framer-motion';
+import { useScrollReveal } from '@/lib/animations';
 
+const ref = useRef(null);
+const isInView = useScrollReveal(ref);
+
+<motion.div
+  ref={ref}
+  initial={{ opacity: 0, y: 30 }}
+  animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+  transition={{ duration: 0.8 }}
+>
+  Content
+</motion.div>
+```
+
+### Staggered Animations
+
+```tsx
+import { staggerContainer, staggerItem } from '@/lib/animations';
+
+<motion.div
+  variants={staggerContainer}
+  initial="hidden"
+  animate="visible"
+>
+  {items.map((item, idx) => (
+    <motion.div key={idx} variants={staggerItem}>
+      {item}
+    </motion.div>
+  ))}
+</motion.div>
+```
+
+### Number Counting
+
+```tsx
+import { useCountUp } from '@/lib/animations';
+
+const count = useCountUp(12500, 2000);
+<span className="tabular-nums">${count}</span>
+```
+
+### Hover Effects
+
+```tsx
+<motion.div
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+>
+  Hover me
+</motion.div>
+```
+
+---
+
+## Iconography
+
+### Icon Library
+
+- **Lucide React** - Primary icon library
+- **Size Scale**: 16px (sm), 20px (base), 24px (md), 32px (lg), 48px (xl)
+
+### Icon Usage
+
+```tsx
+// Standard Icon
+<Icon className="w-5 h-5 text-neon-emerald" />
+
+// With Text
+<div className="flex items-center gap-2">
+  <Icon className="w-5 h-5" />
+  <span>Label</span>
+</div>
+
+// Colored Icons
+<Icon className="w-6 h-6 text-neon-emerald" />  // Growth/Positive
+<Icon className="w-6 h-6 text-golden-hour" />   // Wealth/Assets
+<Icon className="w-6 h-6 text-slate-muted" />    // Neutral
+```
+
+---
+
+## Data Visualization
+
+### Charts & Graphs
+
+#### Line Graphs
+
+- **Stroke Color**: `#34d399` (neon-emerald)
+- **Fill Gradient**: From neon-emerald (opacity 0.8) to transparent
+- **Animation**: Path length animation from 0 to 1
+- **Duration**: 1.5-2 seconds
+
+#### Bar Charts
+
+- **Positive Bars**: neon-emerald gradient
+- **Negative Bars**: red-400 with opacity
+- **Background**: black/40 with border
+
+#### Pie Charts
+
+- **Colors**: neon-emerald, golden-hour, blue-400, purple-400
+- **Stroke**: white/10 border
+
+### Financial Data Display
+
+```css
+/* Always use tabular-nums for numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Currency Format */
+$12,345.67  /* Always include commas, 2 decimal places for currency */
+```
+
+---
+
+## Responsive Design
+
+### Mobile First Approach
+
+1. **Base Styles**: Mobile (320px+)
+2. **Tablet**: `md:` breakpoint (768px+)
+3. **Desktop**: `lg:` breakpoint (1024px+)
+4. **Large Desktop**: `xl:` breakpoint (1280px+)
+
+### Common Patterns
+
+```css
+/* Responsive Text */
+text-3xl md:text-4xl lg:text-5xl
+
+/* Responsive Padding */
+p-4 md:p-6 lg:p-8
+
+/* Responsive Grid */
+grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+
+/* Responsive Spacing */
+gap-4 md:gap-6 lg:gap-8
+```
+
+---
+
+## Accessibility
+
+### Color Contrast
+
+- **Text on Background**: Minimum 4.5:1 ratio (WCAG AA)
+- **Large Text**: Minimum 3:1 ratio
+- **Interactive Elements**: Clear focus states
+
+### Focus States
+
+```css
+/* Focus Ring */
+focus:outline-none
+focus:ring-2
+focus:ring-neon-emerald
+focus:ring-offset-2
+focus:ring-offset-deep-forest
+```
+
+### Semantic HTML
+
+- Use proper heading hierarchy (h1 → h2 → h3)
+- Include ARIA labels for icons
+- Provide alt text for images
+- Use semantic elements (nav, section, article, etc.)
+
+---
+
+## Component Examples
+
+### Metric Card
+
+```tsx
 <StatCard
   title="Total Revenue"
-  value="$50,000"
-  subtitle="+12% from last month"
+  value="$12,345"
+  subtitle="+8.2% from last month"
   icon={DollarSign}
-  gradient="green" // Maps to semantic green styles
+  accent="emerald"
 />
 ```
 
-## Layout Patterns
+### Feature Card
 
-### Page Container
 ```tsx
-<div className="space-y-8">
-  {/* Header */}
-  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-    <div>
-      <h1 className="text-3xl font-bold tracking-tight">Page Title</h1>
-      <p className="text-muted-foreground mt-2">Page description</p>
-    </div>
-    <Button>Action</Button>
-  </div>
-
-  {/* Content */}
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {/* Cards */}
-  </div>
-</div>
+<motion.div
+  initial={{ opacity: 0, y: 30 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="glass rounded-2xl p-8"
+>
+  <Icon className="w-12 h-12 text-neon-emerald mb-4" />
+  <h3 className="text-2xl font-bold text-white mb-2">Title</h3>
+  <p className="text-slate-muted">Description</p>
+</motion.div>
 ```
 
-### Data Display
-Use `Card` components to group related data. Ensure text colors use `text-foreground` for primary content and `text-muted-foreground` for secondary content.
+---
 
-## Future Development
-When creating new components or pages:
-1.  **Always** use the semantic color variables.
-2.  **Avoid** hardcoded hex values or arbitrary Tailwind colors (e.g., `bg-blue-500`) unless strictly necessary for a specific data visualization.
-3.  **Ensure** all interactive elements have focus states (`focus-visible:ring-2`).
-4.  **Test** in both light and dark modes.
+## Quick Reference
+
+### Color Classes (Tailwind)
+
+- `bg-deep-forest` / `text-deep-forest`
+- `bg-neon-emerald` / `text-neon-emerald`
+- `bg-golden-hour` / `text-golden-hour`
+- `bg-charcoal` / `text-charcoal`
+- `text-slate-muted`
+
+### Utility Classes
+
+- `.glass` - Glassmorphism effect
+- `.glass-light` - Light glass effect
+- `.glass-heavy` - Heavy glass effect
+- `.glass-emerald` - Emerald tinted glass
+- `.glass-golden` - Golden tinted glass
+- `.glow-emerald` - Emerald glow shadow
+- `.glow-golden` - Golden glow shadow
+- `.tabular-nums` - Monospace numbers
+
+### Animation Classes
+
+- `animate-glow-pulse` - Pulsing glow effect
+- `animate-float` - Floating animation
+
+---
+
+## Design Principles
+
+1. **Dark First**: Always design for dark mode. This is the primary experience.
+2. **Data Clarity**: Financial data must be clear, readable, and properly formatted.
+3. **Subtle Motion**: Animations should enhance, not distract. Keep them smooth and purposeful.
+4. **Depth Through Layers**: Use glassmorphism and shadows to create visual hierarchy.
+5. **Premium Feel**: Every element should feel polished and intentional.
+6. **Trust Building**: Security badges, certifications, and professional presentation build trust.
+7. **Responsive Excellence**: Mobile experience should be as polished as desktop.
+
+---
+
+## Implementation Notes
+
+- **Framer Motion**: Use for all complex animations
+- **Tailwind CSS**: Primary styling framework
+- **CSS Variables**: Defined in `index.css` for theme consistency
+- **Custom Hooks**: Create reusable animation hooks (e.g., `useCountUp`)
+- **Performance**: Use `transform` and `opacity` for animations (GPU accelerated)
+
+---
+
+## Future Extensions
+
+When building new pages:
+
+1. Reference this design system for consistency
+2. Maintain the color palette and typography
+3. Use the same animation patterns
+4. Follow the component style guidelines
+5. Ensure responsive design at all breakpoints
+6. Test accessibility (contrast, keyboard navigation)
+
+---
+
+**Last Updated**: 2024
+
+**Version**: 1.0
+
+**Maintained By**: Cashual Design Team

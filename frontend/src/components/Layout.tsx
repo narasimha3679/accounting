@@ -14,10 +14,10 @@ import {
     Building2,
     Menu,
     X,
-    CreditCard
+    CreditCard,
+    Briefcase
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { ThemeToggle } from './ThemeToggle';
 import { cn } from '../lib/utils';
 
 interface LayoutProps {
@@ -36,6 +36,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Expenses', href: '/expenses', icon: Receipt },
         { name: 'Capital Assets', href: '/capital-assets', icon: Building2 },
         { name: 'Dividends', href: '/dividends', icon: Banknote },
+        { name: 'Salary', href: '/salary', icon: Briefcase },
         { name: 'Owner Payments', href: '/owner-payments', icon: CreditCard },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
@@ -48,29 +49,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-deep-forest text-white">
             {/* Mobile sidebar overlay */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+                    className="fixed inset-0 z-40 bg-deep-forest/80 backdrop-blur-sm lg:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar */}
             <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border shadow-sm transform transition-transform duration-300 ease-in-out lg:translate-x-0",
+                "fixed inset-y-0 left-0 z-50 w-64 glass-heavy border-r border-white/10 transform transition-transform duration-300 ease-in-out lg:translate-x-0",
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             )}>
                 <div className="flex h-full flex-col">
                     {/* Logo */}
-                    <div className="flex h-16 items-center justify-between border-b border-border px-6">
-                        <h1 className="text-xl font-bold text-primary">
+                    <div className="flex h-16 items-center justify-between border-b border-white/10 px-6">
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-neon-emerald to-golden-hour bg-clip-text text-transparent">
                             Accounting Tool
                         </h1>
                         <button
                             onClick={() => setSidebarOpen(false)}
-                            className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            className="lg:hidden p-2 rounded-md text-slate-muted hover:text-white hover:bg-white/10 transition-colors"
                         >
                             <X className="h-5 w-5" />
                         </button>
@@ -87,18 +88,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     to={item.href}
                                     onClick={() => setSidebarOpen(false)}
                                     className={cn(
-                                        "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                                        "group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
                                         active
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                            ? 'bg-neon-emerald/20 text-neon-emerald border border-neon-emerald/30 glow-emerald'
+                                            : 'text-slate-muted hover:bg-white/10 hover:text-white'
                                     )}
                                 >
                                     <Icon
                                         className={cn(
                                             "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
                                             active
-                                                ? 'text-primary-foreground'
-                                                : 'text-muted-foreground group-hover:text-accent-foreground'
+                                                ? 'text-neon-emerald'
+                                                : 'text-slate-muted group-hover:text-white'
                                         )}
                                     />
                                     {item.name}
@@ -108,12 +109,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </nav>
 
                     {/* User info and logout */}
-                    <div className="border-t border-border p-4 bg-muted/20">
-                        <div className="flex items-center justify-between mb-4">
-                            <ThemeToggle />
+                    <div className="border-t border-white/10 p-4 bg-black/20">
+                        <div className="flex items-center justify-end mb-4">
                             <button
                                 onClick={logout}
-                                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                className="p-2 rounded-md text-slate-muted hover:text-white hover:bg-white/10 transition-colors"
                                 title="Logout"
                             >
                                 <LogOut className="h-5 w-5" />
@@ -121,15 +121,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </div>
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center shadow-sm">
-                                    <span className="text-sm font-bold text-primary-foreground">
+                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-neon-emerald to-golden-hour flex items-center justify-center shadow-sm">
+                                    <span className="text-sm font-bold text-deep-forest">
                                         {user?.name?.charAt(0).toUpperCase()}
                                     </span>
                                 </div>
                             </div>
                             <div className="ml-3 flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
-                                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                                <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                                <p className="text-xs text-slate-muted capitalize">{user?.role}</p>
                             </div>
                         </div>
                     </div>
@@ -139,24 +139,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Main content */}
             <div className="lg:pl-64 transition-all duration-300">
                 {/* Mobile header */}
-                <div className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-4 py-4">
+                <div className="lg:hidden sticky top-0 z-30 glass-heavy border-b border-white/10 px-4 py-4">
                     <div className="flex items-center justify-between">
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            className="p-2 rounded-md text-slate-muted hover:text-white hover:bg-white/10 transition-colors"
                         >
                             <Menu className="h-6 w-6" />
                         </button>
-                        <h1 className="text-lg font-bold text-foreground">
+                        <h1 className="text-lg font-bold bg-gradient-to-r from-neon-emerald to-golden-hour bg-clip-text text-transparent">
                             Accounting Tool
                         </h1>
-                        <div className="w-10 flex justify-end">
-                            <ThemeToggle />
-                        </div>
+                        <div className="w-10"></div>
                     </div>
                 </div>
 
-                <main className="py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <main className="py-8">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                         {children}
                     </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Expense, type OwnerPayment } from '../lib/api';
+import api, { type Expense, type OwnerPayment, type CapitalAsset } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import {
@@ -35,14 +35,18 @@ interface OwnerPaymentModalProps {
     ownerPayment?: OwnerPayment;
     ownerExpenses: Expense[];
     ownerExpensesLoading: boolean;
+    ownerCapitalAssets: CapitalAsset[];
+    ownerCapitalAssetsLoading: boolean;
     onClose: () => void;
-    onSave: (ownerPayment: OwnerPayment, linkedExpenseId?: number) => void;
+    onSave: (ownerPayment: OwnerPayment, linkedExpenseId?: number, linkedCapitalAssetId?: number) => void;
 }
 
 function OwnerPaymentModal({
     ownerPayment,
     ownerExpenses,
     ownerExpensesLoading,
+    ownerCapitalAssets,
+    ownerCapitalAssetsLoading,
     onClose,
     onSave
 }: OwnerPaymentModalProps) {
@@ -57,6 +61,8 @@ function OwnerPaymentModal({
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [linkedExpenseId, setLinkedExpenseId] = useState<number | ''>('');
+    const [linkedCapitalAssetId, setLinkedCapitalAssetId] = useState<number | ''>('');
+    const [linkType, setLinkType] = useState<'expense' | 'capital_asset' | ''>('');
 
     const orderedOwnerExpenses = useMemo(() => {
         if (!ownerExpenses) return [];
@@ -67,15 +73,33 @@ function OwnerPaymentModal({
         });
     }, [ownerExpenses]);
 
+    const orderedOwnerCapitalAssets = useMemo(() => {
+        if (!ownerCapitalAssets) return [];
+        return [...ownerCapitalAssets].sort((a, b) => {
+            const dateA = new Date(a.purchase_date).getTime();
+            const dateB = new Date(b.purchase_date).getTime();
+            return dateB - dateA;
+        });
+    }, [ownerCapitalAssets]);
+
     const selectedExpense = useMemo(() => {
-        if (typeof linkedExpenseId !== 'number') {
+        if (typeof linkedExpenseId !== 'number' || linkType !== 'expense') {
             return undefined;
         }
         return orderedOwnerExpenses.find(expense => expense.id === linkedExpenseId);
-    }, [linkedExpenseId, orderedOwnerExpenses]);
+    }, [linkedExpenseId, orderedOwnerExpenses, linkType]);
+
+    const selectedCapitalAsset = useMemo(() => {
+        if (typeof linkedCapitalAssetId !== 'number' || linkType !== 'capital_asset') {
+            return undefined;
+        }
+        return orderedOwnerCapitalAssets.find(asset => asset.id === linkedCapitalAssetId);
+    }, [linkedCapitalAssetId, orderedOwnerCapitalAssets, linkType]);
 
     useEffect(() => {
         setLinkedExpenseId('');
+        setLinkedCapitalAssetId('');
+        setLinkType('');
         if (ownerPayment) {
             setFormData({
                 description: ownerPayment.description,
@@ -92,11 +116,15 @@ function OwnerPaymentModal({
         const { value } = event.target;
         if (!value) {
             setLinkedExpenseId('');
+            setLinkType('');
+            setLinkedCapitalAssetId('');
             return;
         }
 
         const expenseId = Number(value);
         setLinkedExpenseId(expenseId);
+        setLinkType('expense');
+        setLinkedCapitalAssetId('');
 
         const expense = orderedOwnerExpenses.find(item => item.id === expenseId);
         if (!expense) {
@@ -115,8 +143,44 @@ function OwnerPaymentModal({
         }));
     };
 
+    const handleLinkedCapitalAssetChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const { value } = event.target;
+        if (!value) {
+            setLinkedCapitalAssetId('');
+            setLinkType('');
+            setLinkedExpenseId('');
+            return;
+        }
+
+        const assetId = Number(value);
+        setLinkedCapitalAssetId(assetId);
+        setLinkType('capital_asset');
+        setLinkedExpenseId('');
+
+        const asset = orderedOwnerCapitalAssets.find(item => item.id === assetId);
+        if (!asset) {
+            return;
+        }
+
+        const formattedDate = formatDate(asset.purchase_date);
+        setFormData(prev => ({
+            ...prev,
+            description: asset.description,
+            amount: asset.total_cost.toFixed(2),
+            payment_type: 'reimbursement',
+            payment_date: asset.purchase_date.split('T')[0],
+            notes: `Reimbursement for capital asset: ${asset.description} (${formattedDate})`
+        }));
+    };
+
     const handleLinkedExpenseClear = () => {
         setLinkedExpenseId('');
+        setLinkType('');
+    };
+
+    const handleLinkedCapitalAssetClear = () => {
+        setLinkedCapitalAssetId('');
+        setLinkType('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +206,11 @@ function OwnerPaymentModal({
                 savedPayment = await api.createOwnerPayment(paymentData);
             }
 
-            onSave(savedPayment, typeof linkedExpenseId === 'number' ? linkedExpenseId : undefined);
+            onSave(
+                savedPayment,
+                typeof linkedExpenseId === 'number' ? linkedExpenseId : undefined,
+                typeof linkedCapitalAssetId === 'number' ? linkedCapitalAssetId : undefined
+            );
             onClose();
         } catch (error) {
             console.error('Error saving owner payment:', error);
@@ -180,7 +248,7 @@ function OwnerPaymentModal({
                                 id="description"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="input"
                                 required
                             />
                         </div>
@@ -200,7 +268,7 @@ function OwnerPaymentModal({
                                     min="0"
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="input pl-10"
                                     required
                                 />
                             </div>
@@ -219,7 +287,7 @@ function OwnerPaymentModal({
                                     id="payment_date"
                                     value={formData.payment_date}
                                     onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="input pl-10"
                                     required
                                 />
                             </div>
@@ -233,7 +301,7 @@ function OwnerPaymentModal({
                                 id="payment_type"
                                 value={formData.payment_type}
                                 onChange={(e) => setFormData({ ...formData, payment_type: e.target.value as any })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="input"
                                 required
                             >
                                 <option value="reimbursement">Reimbursement</option>
@@ -262,8 +330,8 @@ function OwnerPaymentModal({
                                 id="linked_expense"
                                 value={linkedExpenseId === '' ? '' : linkedExpenseId.toString()}
                                 onChange={handleLinkedExpenseChange}
-                                disabled={ownerExpensesLoading || orderedOwnerExpenses.length === 0}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={ownerExpensesLoading || orderedOwnerExpenses.length === 0 || linkType === 'capital_asset'}
+                                className="input"
                             >
                                 <option value="">
                                     {ownerExpensesLoading
@@ -296,6 +364,57 @@ function OwnerPaymentModal({
                             )}
                         </div>
 
+                        <div className="md:col-span-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <label htmlFor="linked_capital_asset" className="block text-sm font-medium text-foreground">
+                                    Link Capital Asset Paid by Owner (Optional)
+                                </label>
+                                {typeof linkedCapitalAssetId === 'number' && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleLinkedCapitalAssetClear}
+                                    >
+                                        Clear
+                                    </Button>
+                                )}
+                            </div>
+                            <select
+                                id="linked_capital_asset"
+                                value={linkedCapitalAssetId === '' ? '' : linkedCapitalAssetId.toString()}
+                                onChange={handleLinkedCapitalAssetChange}
+                                disabled={ownerCapitalAssetsLoading || orderedOwnerCapitalAssets.length === 0 || linkType === 'expense'}
+                                className="input"
+                            >
+                                <option value="">
+                                    {ownerCapitalAssetsLoading
+                                        ? 'Loading owner-paid capital assets...'
+                                        : orderedOwnerCapitalAssets.length > 0
+                                            ? 'Select a capital asset paid by owner to reimburse'
+                                            : 'No unpaid owner capital assets available'}
+                                </option>
+                                {orderedOwnerCapitalAssets.map(asset => (
+                                    <option key={asset.id} value={asset.id}>
+                                        {`${asset.description} • ${formatCurrency(asset.total_cost)} • ${formatDate(asset.purchase_date)}`}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Selecting a capital asset pre-fills the reimbursement details, but you can still edit the fields
+                                before saving.
+                            </p>
+                            {selectedCapitalAsset && (
+                                <div className="mt-3 rounded-md border border-orange-100 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 p-3 text-sm">
+                                    <div className="font-semibold text-orange-900 dark:text-orange-200">{selectedCapitalAsset.description}</div>
+                                    <div className="mt-1 flex flex-wrap gap-4 text-orange-800 dark:text-orange-300">
+                                        <span>{formatCurrency(selectedCapitalAsset.total_cost)} total cost</span>
+                                        <span>Purchase date: {formatDate(selectedCapitalAsset.purchase_date)}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                             <label htmlFor="reference" className="block text-sm font-medium text-foreground mb-2">
                                 Reference (Optional)
@@ -306,7 +425,7 @@ function OwnerPaymentModal({
                                 value={formData.reference}
                                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                                 placeholder="Check number, transfer reference, etc."
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="input"
                             />
                         </div>
                     </div>
@@ -320,7 +439,7 @@ function OwnerPaymentModal({
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             rows={3}
-                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="input min-h-[80px]"
                             placeholder="Additional notes about this payment..."
                         />
                     </div>
@@ -350,8 +469,10 @@ const OwnerPayments: React.FC = () => {
     const { user } = useAuth();
     const [ownerPayments, setOwnerPayments] = useState<OwnerPayment[]>([]);
     const [ownerExpenses, setOwnerExpenses] = useState<Expense[]>([]);
+    const [ownerCapitalAssets, setOwnerCapitalAssets] = useState<CapitalAsset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [ownerExpensesLoading, setOwnerExpensesLoading] = useState(false);
+    const [ownerCapitalAssetsLoading, setOwnerCapitalAssetsLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editingPayment, setEditingPayment] = useState<OwnerPayment | undefined>();
     const [searchTerm, setSearchTerm] = useState('');
@@ -372,11 +493,14 @@ const OwnerPayments: React.FC = () => {
             setIsLoading(false);
             setOwnerExpenses([]);
             setOwnerExpensesLoading(false);
+            setOwnerCapitalAssets([]);
+            setOwnerCapitalAssetsLoading(false);
             return;
         }
 
         loadOwnerPayments();
         loadOwnerExpenses();
+        loadOwnerCapitalAssets();
     }, [user]);
 
     const loadOwnerPayments = async () => {
@@ -424,7 +548,33 @@ const OwnerPayments: React.FC = () => {
         }
     };
 
-    const handleSave = (savedPayment: OwnerPayment, linkedExpenseId?: number) => {
+    const loadOwnerCapitalAssets = async () => {
+        if (!user?.company_id) {
+            setOwnerCapitalAssets([]);
+            setOwnerCapitalAssetsLoading(false);
+            return;
+        }
+
+        try {
+            setOwnerCapitalAssetsLoading(true);
+            const response = await api.getCapitalAssets({
+                company_id: user.company_id,
+                limit: 1000
+            });
+
+            const ownerPaidAssets = response.data
+                .filter(asset => asset.paid_by === 'owner')
+                .sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime());
+
+            setOwnerCapitalAssets(ownerPaidAssets);
+        } catch (error) {
+            console.error('Error loading owner-paid capital assets:', error);
+        } finally {
+            setOwnerCapitalAssetsLoading(false);
+        }
+    };
+
+    const handleSave = (savedPayment: OwnerPayment, linkedExpenseId?: number, linkedCapitalAssetId?: number) => {
         if (editingPayment) {
             setOwnerPayments(prev =>
                 prev.map(payment =>
@@ -438,6 +588,10 @@ const OwnerPayments: React.FC = () => {
 
         if (linkedExpenseId) {
             setOwnerExpenses(prev => prev.filter(expense => expense.id !== linkedExpenseId));
+        }
+
+        if (linkedCapitalAssetId) {
+            setOwnerCapitalAssets(prev => prev.filter(asset => asset.id !== linkedCapitalAssetId));
         }
     };
 
@@ -489,7 +643,7 @@ const OwnerPayments: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -497,7 +651,7 @@ const OwnerPayments: React.FC = () => {
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Owner Payments</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Owner Payments</h1>
                 <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         To track owner payments, please first set up your company details in the{' '}
@@ -544,7 +698,7 @@ const OwnerPayments: React.FC = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search by description or reference..."
-                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                className="input pl-10"
                             />
                         </div>
                     </div>
@@ -557,7 +711,7 @@ const OwnerPayments: React.FC = () => {
                             id="payment_type_filter"
                             value={paymentTypeFilter}
                             onChange={(e) => setPaymentTypeFilter(e.target.value)}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="input"
                         >
                             <option value="">All Types</option>
                             <option value="reimbursement">Reimbursement</option>
@@ -574,7 +728,7 @@ const OwnerPayments: React.FC = () => {
                             id="date_filter"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="input"
                         >
                             <option value="">All Years</option>
                             <option value="2024">2024</option>
@@ -593,7 +747,7 @@ const OwnerPayments: React.FC = () => {
                         <p className="text-muted-foreground">{filteredPayments.length} payments found</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-2xl font-bold text-foreground">{formatCurrency(totalAmount)}</div>
+                        <div className="text-2xl font-bold text-foreground tabular-nums">{formatCurrency(totalAmount)}</div>
                         <div className="text-sm text-muted-foreground">Total Amount</div>
                     </div>
                 </div>
@@ -651,7 +805,7 @@ const OwnerPayments: React.FC = () => {
                                                 <span className="ml-1 capitalize">{payment.payment_type.replace('_', ' ')}</span>
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-foreground">
+                                        <td className="px-6 py-4 font-medium text-foreground tabular-nums">
                                             {formatCurrency(payment.amount)}
                                         </td>
                                         <td className="px-6 py-4 text-muted-foreground">
@@ -696,6 +850,8 @@ const OwnerPayments: React.FC = () => {
                     ownerPayment={editingPayment}
                     ownerExpenses={ownerExpenses}
                     ownerExpensesLoading={ownerExpensesLoading}
+                    ownerCapitalAssets={ownerCapitalAssets}
+                    ownerCapitalAssetsLoading={ownerCapitalAssetsLoading}
                     onClose={() => {
                         setShowModal(false);
                         setEditingPayment(undefined);

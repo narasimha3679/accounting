@@ -120,6 +120,21 @@ export interface Dividend {
     updated_at: string;
 }
 
+export interface Salary {
+    id: number;
+    amount: number;
+    payment_date: string;
+    period_start: string;
+    period_end: string;
+    employee_name: string;
+    status: 'pending' | 'paid';
+    notes?: string | null;
+    company_id: number;
+    company?: Company;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface IncomeEntry {
     id: number;
     description: string;
@@ -867,6 +882,60 @@ class SupabaseApi {
 
     async deleteDividend(id: number): Promise<void> {
         const { error } = await supabase.from('dividends').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Salaries -----------------------------------------------------------
+    async getSalaries(params?: { page?: number; limit?: number; company_id?: number; status?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<Salary>> {
+        return this.paginatedSelect<Salary>('salaries', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'payment_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.start_date) query = query.gte('payment_date', params.start_date);
+                if (params?.end_date) query = query.lte('payment_date', params.end_date);
+                return query;
+            },
+        });
+    }
+
+    async getSalary(id: number): Promise<Salary> {
+        const { data, error } = await supabase
+            .from('salaries')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<Salary>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Salary not found');
+        return data;
+    }
+
+    async createSalary(salary: Omit<Salary, 'id' | 'company' | 'created_at' | 'updated_at'>): Promise<Salary> {
+        const { data, error } = await supabase
+            .from('salaries')
+            .insert(salary)
+            .select('*, company:companies(*)')
+            .single<Salary>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateSalary(id: number, salary: Partial<Salary>): Promise<Salary> {
+        const { data, error } = await supabase
+            .from('salaries')
+            .update(salary)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<Salary>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteSalary(id: number): Promise<void> {
+        const { error } = await supabase.from('salaries').delete().eq('id', id);
         if (error) throw new Error(error.message);
     }
 

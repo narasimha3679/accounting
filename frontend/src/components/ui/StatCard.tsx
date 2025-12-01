@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 import Card from './Card';
 import { cn } from '../../lib/utils';
 
@@ -8,8 +9,9 @@ interface StatCardProps {
   value: string | number;
   subtitle?: string;
   icon: LucideIcon;
-  gradient?: string; // Legacy prop, used for icon color mapping
+  gradient?: 'green' | 'blue' | 'purple' | 'orange' | 'emerald' | 'indigo' | 'red' | 'cyan' | 'amber' | 'golden' | 'none';
   className?: string;
+  accent?: 'emerald' | 'golden' | 'default';
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -19,38 +21,59 @@ const StatCard: React.FC<StatCardProps> = ({
   icon: Icon,
   gradient = 'blue',
   className = '',
+  accent = 'default',
 }) => {
-  // Map legacy gradients to semantic colors for icons
-  const colorMap: Record<string, string> = {
-    green: "text-green-600 bg-green-100 dark:bg-green-900/20 dark:text-green-400",
-    blue: "text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400",
-    purple: "text-purple-600 bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400",
-    orange: "text-orange-600 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400",
-    emerald: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400",
-    indigo: "text-indigo-600 bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400",
-    red: "text-red-600 bg-red-100 dark:bg-red-900/20 dark:text-red-400",
-    cyan: "text-cyan-600 bg-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-400",
-    amber: "text-amber-600 bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400",
-    none: "text-primary bg-primary/10",
+  // Map gradients to Cashual colors with meaningful context
+  // Emerald: Money in, positive, completed
+  // Golden/Amber: Wealth, assets, attention needed
+  // Red: Money out, debt, negative
+  // Cyan/Blue: Neutral information, calculated values
+  const getAccentColor = () => {
+    if (accent === 'emerald') return 'text-neon-emerald';
+    if (accent === 'golden') return 'text-golden-hour';
+    if (gradient === 'green' || gradient === 'emerald') return 'text-neon-emerald';
+    if (gradient === 'amber' || gradient === 'golden') return 'text-golden-hour';
+    if (gradient === 'red' || gradient === 'orange') return 'text-red-400';
+    if (gradient === 'cyan' || gradient === 'blue') return 'text-cyan-400';
+    return 'text-foreground';
   };
 
-  const iconColorClass = colorMap[gradient] || colorMap.blue;
+  const getIconBgColor = () => {
+    if (accent === 'emerald') return 'bg-neon-emerald/20 border-neon-emerald/30';
+    if (accent === 'golden') return 'bg-golden-hour/20 border-golden-hour/30';
+    if (gradient === 'green' || gradient === 'emerald') return 'bg-neon-emerald/20 border-neon-emerald/30';
+    if (gradient === 'amber' || gradient === 'golden') return 'bg-golden-hour/20 border-golden-hour/30';
+    if (gradient === 'red' || gradient === 'orange') return 'bg-red-500/20 border-red-500/30';
+    if (gradient === 'cyan' || gradient === 'blue') return 'bg-cyan-500/20 border-cyan-500/30';
+    return 'bg-muted/50 border-border';
+  };
+
+  const accentColor = getAccentColor();
+  const iconBg = getIconBgColor();
 
   return (
-    <Card className={cn("flex flex-col justify-between", className)}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-        <div className={cn("p-2 rounded-full", iconColorClass)}>
-          <Icon className="h-4 w-4" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Card className={cn("flex flex-col justify-between", className)}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+          <div className={cn("p-2 rounded-lg border", iconBg)}>
+            <Icon className={cn("h-4 w-4", accentColor)} />
+          </div>
         </div>
-      </div>
-      <div>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-        )}
-      </div>
-    </Card>
+        <div>
+          <div className={cn("text-3xl font-bold tabular-nums", accentColor)}>
+            {value}
+          </div>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          )}
+        </div>
+      </Card>
+    </motion.div>
   );
 };
 

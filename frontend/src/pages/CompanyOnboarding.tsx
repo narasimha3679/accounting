@@ -118,7 +118,7 @@ const CompanyOnboarding: React.FC = () => {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
                                 />
                             </div>
                             <div>
@@ -134,7 +134,7 @@ const CompanyOnboarding: React.FC = () => {
                                         setBusinessNumberError('');
                                     }}
                                     required
-                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm ${
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm ${
                                         businessNumberError ? 'border-red-300' : 'border-gray-300'
                                     }`}
                                 />
@@ -151,7 +151,7 @@ const CompanyOnboarding: React.FC = () => {
                                     type="text"
                                     value={hstNumber}
                                     onChange={(e) => setHstNumber(e.target.value)}
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
                                 />
                             </div>
                             <div>
@@ -164,7 +164,7 @@ const CompanyOnboarding: React.FC = () => {
                                     value={fiscalYearEnd}
                                     onChange={(e) => setFiscalYearEnd(e.target.value)}
                                     required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
                                 />
                             </div>
                         </div>
@@ -206,7 +206,7 @@ const CompanyOnboarding: React.FC = () => {
                                     value={smallBusinessRate * 100}
                                     onChange={(e) => setSmallBusinessRate((parseFloat(e.target.value) || 0) / 100)}
                                     required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
                                 />
                                 <p className="mt-1 text-xs text-gray-500">
                                     Ontario small business tax rate (default: 12.5%).
@@ -225,7 +225,7 @@ const CompanyOnboarding: React.FC = () => {
                                     value={hstRate * 100}
                                     onChange={(e) => setHstRate((parseFloat(e.target.value) || 0) / 100)}
                                     required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
                                 />
                                 <p className="mt-1 text-xs text-gray-500">
                                     Ontario HST rate (default: 13%).

@@ -108,7 +108,7 @@ const Expenses: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -117,14 +117,14 @@ const Expenses: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Expenses</h1>
-                    <p className="text-muted-foreground mt-2">Track your business expenses</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Expenses</h1>
+                    <p className="text-slate-muted mt-2">Track your business expenses</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     {/* Time Period Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex rounded-lg shadow-sm border border-border overflow-hidden">
+                        <div className="flex rounded-lg shadow-sm border border-white/10 overflow-hidden">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -135,7 +135,7 @@ const Expenses: React.FC = () => {
                                     "px-4 py-2 text-sm font-medium transition-colors duration-200",
                                     timePeriod === 'month'
                                         ? "bg-primary text-primary-foreground"
-                                        : "bg-card text-muted-foreground hover:bg-muted"
+                                        : "bg-card text-slate-muted hover:bg-muted"
                                 )}
                             >
                                 Month
@@ -150,7 +150,7 @@ const Expenses: React.FC = () => {
                                     "px-4 py-2 text-sm font-medium transition-colors duration-200",
                                     timePeriod === 'year'
                                         ? "bg-primary text-primary-foreground"
-                                        : "bg-card text-muted-foreground hover:bg-muted"
+                                        : "bg-card text-slate-muted hover:bg-muted"
                                 )}
                             >
                                 Year
@@ -158,7 +158,7 @@ const Expenses: React.FC = () => {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                            <Calendar className="h-5 w-5 text-muted-foreground" />
+                            <Calendar className="h-5 w-5 text-slate-muted" />
                             <input
                                 type={timePeriod === 'month' ? 'month' : 'number'}
                                 value={timePeriod === 'month'
@@ -173,7 +173,7 @@ const Expenses: React.FC = () => {
                                         setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
                                     }
                                 }}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -191,11 +191,11 @@ const Expenses: React.FC = () => {
             {/* Category Filter */}
             <Card className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <label className="text-sm font-medium text-foreground">Filter by category:</label>
+                    <label className="text-sm font-medium text-white">Filter by category:</label>
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full sm:w-auto rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -214,10 +214,10 @@ const Expenses: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     Total Expenses
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalExpenses)}
                                 </dd>
                             </dl>
@@ -232,10 +232,10 @@ const Expenses: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     HST Paid
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalHSTPaid)}
                                 </dd>
                             </dl>
@@ -250,10 +250,10 @@ const Expenses: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     Total with HST
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalExpenses + totalHSTPaid)}
                                 </dd>
                             </dl>
@@ -266,7 +266,7 @@ const Expenses: React.FC = () => {
             <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                        <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-4">Date</th>
                                 <th className="px-6 py-4">Description</th>
@@ -282,11 +282,11 @@ const Expenses: React.FC = () => {
                         <tbody className="divide-y divide-border">
                             {filteredExpenses?.map((expense) => (
                                 <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(expense.expense_date)}</td>
-                                    <td className="px-6 py-4 font-medium text-foreground">{expense.description}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{expense.category?.name || 'Uncategorized'}</td>
-                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(expense.amount)}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{formatCurrency(expense.hst_paid)}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatDate(expense.expense_date)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{expense.description}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{expense.category?.name || 'Uncategorized'}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{formatCurrency(expense.amount)}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatCurrency(expense.hst_paid)}</td>
                                     <td className="px-6 py-4 font-medium text-green-600 dark:text-green-400">{formatCurrency(expense.amount + expense.hst_paid)}</td>
                                     <td className="px-6 py-4">
                                         {expense.paid_by === 'corp' ? (
@@ -305,7 +305,7 @@ const Expenses: React.FC = () => {
                                                 Yes
                                             </span>
                                         ) : (
-                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground">
+                                            <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-muted text-slate-muted">
                                                 No
                                             </span>
                                         )}
@@ -339,8 +339,8 @@ const Expenses: React.FC = () => {
 
             {filteredExpenses?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-muted-foreground text-lg">No expenses found</p>
-                    <p className="text-muted-foreground/60">Add your first expense to get started</p>
+                    <p className="text-slate-muted text-lg">No expenses found</p>
+                    <p className="text-slate-muted/60">Add your first expense to get started</p>
                 </div>
             )}
 
@@ -519,9 +519,9 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-card p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-foreground">
+                    <h3 className="text-lg font-semibold text-white">
                         {expense ? 'Edit Expense' : 'Add New Expense'}
                     </h3>
                     <Button
@@ -537,22 +537,22 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-foreground mb-2">Description *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Description *</label>
                             <input
                                 type="text"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Category *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Category *</label>
                             <select
                                 value={formData.category_id}
                                 onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value={0}>Select a category</option>
@@ -563,18 +563,18 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Expense Date *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Expense Date *</label>
                             <input
                                 type="date"
                                 value={formData.expense_date}
                                 onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Amount (before HST) *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Amount (before HST) *</label>
                             <input
                                 type="number"
                                 value={formData.amount}
@@ -583,7 +583,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                     const newHstPaid = taxApplies ? parseFloat((newAmount * HST_RATE).toFixed(2)) : formData.hst_paid;
                                     setFormData({ ...formData, amount: newAmount, hst_paid: newHstPaid });
                                 }}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 min="0"
                                 step="0.01"
                                 required
@@ -614,7 +614,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
 
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <label className="block text-sm font-medium text-foreground">HST Paid</label>
+                                <label className="block text-sm font-medium text-white">HST Paid</label>
                                 <div className="flex items-center">
                                     <input
                                         type="checkbox"
@@ -634,7 +634,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                         }}
                                         className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
                                     />
-                                    <label htmlFor="tax_applies" className="ml-2 block text-sm text-foreground">
+                                    <label htmlFor="tax_applies" className="ml-2 block text-sm text-white">
                                         Tax applies (13%)
                                     </label>
                                 </div>
@@ -644,7 +644,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                 value={formData.hst_paid}
                                 onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
                                 className={cn(
-                                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                                    "flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                                     taxApplies && "bg-muted cursor-not-allowed"
                                 )}
                                 min="0"
@@ -652,7 +652,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                 readOnly={taxApplies}
                             />
                             {taxApplies && formData.amount > 0 && (
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-xs text-slate-muted">
                                     Calculated: {formatCurrency(formData.amount)} × 13% = {formatCurrency(formData.hst_paid)}
                                 </p>
                             )}
@@ -667,14 +667,14 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                     onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
                                     className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
                                 />
-                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-foreground">
+                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-white">
                                     Receipt attached
                                 </label>
                             </div>
                         </div>
 
                         <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-foreground mb-2">Paid By *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Paid By *</label>
                             <div className="flex gap-6">
                                 <div className="flex items-center">
                                     <input
@@ -686,7 +686,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                         onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
                                         className="h-4 w-4 text-primary focus:ring-primary border-input"
                                     />
-                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-foreground">
+                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-white">
                                         Corporation
                                     </label>
                                 </div>
@@ -700,7 +700,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                         onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
                                         className="h-4 w-4 text-primary focus:ring-primary border-input"
                                     />
-                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-foreground">
+                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-white">
                                         Owner (to be reimbursed)
                                     </label>
                                 </div>
@@ -709,21 +709,21 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                     </div>
 
                     {/* File Upload Section */}
-                    <div className="border-t border-border pt-6">
-                        <h4 className="text-lg font-medium text-foreground mb-4">Files & Receipts</h4>
+                    <div className="border-t border-white/10 pt-6">
+                        <h4 className="text-lg font-medium text-white mb-4">Files & Receipts</h4>
 
                         {/* Existing Files */}
                         {expense?.files && expense.files.length > 0 && (
                             <div className="mb-6">
-                                <h5 className="text-sm font-medium text-muted-foreground mb-3">Uploaded Files</h5>
+                                <h5 className="text-sm font-medium text-slate-muted mb-3">Uploaded Files</h5>
                                 <div className="space-y-2">
                                     {expense.files.map((file) => (
-                                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+                                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-white/10">
                                             <div className="flex items-center gap-3">
-                                                <FileText className="h-5 w-5 text-muted-foreground" />
+                                                <FileText className="h-5 w-5 text-slate-muted" />
                                                 <div>
-                                                    <p className="text-sm font-medium text-foreground">{file.original_name}</p>
-                                                    <p className="text-xs text-muted-foreground">{formatFileSize(file.file_size)}</p>
+                                                    <p className="text-sm font-medium text-white">{file.original_name}</p>
+                                                    <p className="text-xs text-slate-muted">{formatFileSize(file.file_size)}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -754,8 +754,8 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
 
                         {/* File Upload */}
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Upload Files</label>
-                            <div className="border-2 border-dashed border-border rounded-lg p-6 hover:bg-muted/50 transition-colors">
+                            <label className="block text-sm font-medium text-white mb-2">Upload Files</label>
+                            <div className="border-2 border-dashed border-white/10 rounded-lg p-6 hover:bg-muted/50 transition-colors">
                                 <input
                                     type="file"
                                     multiple
@@ -766,15 +766,15 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                 />
                                 <label htmlFor="file-upload" className="cursor-pointer w-full h-full block">
                                     <div className="text-center">
-                                        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                                        <Upload className="mx-auto h-12 w-12 text-slate-muted" />
                                         <div className="mt-2">
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-sm text-slate-muted">
                                                 <span className="font-medium text-primary hover:text-primary/90">
                                                     Click to upload
                                                 </span>
                                                 {' '}or drag and drop
                                             </p>
-                                            <p className="text-xs text-muted-foreground mt-1">PDF, images, documents up to 10MB each</p>
+                                            <p className="text-xs text-slate-muted mt-1">PDF, images, documents up to 10MB each</p>
                                         </div>
                                     </div>
                                 </label>
@@ -783,11 +783,11 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                             {/* Selected Files */}
                             {selectedFiles.length > 0 && (
                                 <div className="mt-4">
-                                    <h6 className="text-sm font-medium text-foreground mb-2">Selected Files</h6>
+                                    <h6 className="text-sm font-medium text-white mb-2">Selected Files</h6>
                                     <div className="space-y-2">
                                         {selectedFiles.map((file, index) => (
                                             <div key={index} className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
-                                                <span className="text-sm text-foreground">{file.name}</span>
+                                                <span className="text-sm text-white">{file.name}</span>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -815,7 +815,7 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                         <Button
                             type="button"
                             variant="outline"

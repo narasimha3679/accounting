@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type HSTPayment, type DepreciationEntry } from '../lib/api';
+import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type HSTPayment, type DepreciationEntry, type Salary } from '../lib/api';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
@@ -156,6 +156,23 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
+    // Fetch salaries for the selected year
+    const { data: salaries } = useQuery({
+        queryKey: ['salaries_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getSalaries({
+                company_id: user?.company_id,
+                limit: 1000
+            });
+            // Filter by year on the client side
+            return result.data.filter(salary => {
+                const year = new Date(salary.payment_date).getFullYear();
+                return year === selectedYear;
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
             style: 'currency',
@@ -169,7 +186,7 @@ const Reports: React.FC = () => {
 
     // Calculate report data
     const reportData = React.useMemo(() => {
-        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets) return null;
+        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries) return null;
 
         const paidInvoices = invoices.filter(inv => inv.status === 'paid');
 
@@ -197,6 +214,7 @@ const Reports: React.FC = () => {
         const hstCollected = hstFromInvoices + hstFromClientIncome;
 
         const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const totalSalaries = salaries.reduce((sum, sal) => sum + sal.amount, 0);
 
         // Calculate HST paid from expenses (Input Tax Credits)
         const isHSTRegistered = user?.company?.hst_registered || false;
@@ -223,8 +241,8 @@ const Reports: React.FC = () => {
         const totalCapitalAssetCost = capitalAssets.reduce((sum, asset) => sum + Number(asset.total_cost), 0);
         const totalAccumulatedDepreciation = capitalAssets.reduce((sum, asset) => sum + Number(asset.accumulated_depreciation), 0);
 
-        // Net income before tax should include depreciation as an expense
-        const netIncomeBeforeTax = grossIncome - totalExpenses - totalDepreciationForYear;
+        // Net income before tax should include depreciation and salaries as expenses
+        const netIncomeBeforeTax = grossIncome - totalExpenses - totalSalaries - totalDepreciationForYear;
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125; // Use company rate, fallback to 12.5%
         const smallBusinessTax = Math.max(0, netIncomeBeforeTax * smallBusinessTaxRate);
         const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
@@ -238,6 +256,7 @@ const Reports: React.FC = () => {
             clientIncome,
             otherIncome,
             totalExpenses,
+            totalSalaries,
             totalDepreciationForYear,
             netIncomeBeforeTax,
             smallBusinessTax,
@@ -257,6 +276,7 @@ const Reports: React.FC = () => {
             clientIncomeEntries,
             otherIncomeEntries,
             expenses,
+            salaries,
             dividends,
             ownerPayments,
             hstPayments,
@@ -264,7 +284,7 @@ const Reports: React.FC = () => {
             totalCapitalAssetCost,
             totalAccumulatedDepreciation,
         };
-    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, user?.company?.small_business_rate, user?.company?.hst_registered]);
+    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, user?.company?.small_business_rate, user?.company?.hst_registered]);
 
     const generateReport = () => {
         if (!reportData) return;
@@ -343,6 +363,7 @@ const Reports: React.FC = () => {
             body: [
                 ['Gross Income', formatCurrency(data.grossIncome)],
                 ['Total Expenses', formatCurrency(data.totalExpenses)],
+                ...(data.totalSalaries > 0 ? [['Total Salaries', formatCurrency(data.totalSalaries)]] : []),
                 ...(data.totalDepreciationForYear > 0 ? [['Depreciation (CCA)', formatCurrency(data.totalDepreciationForYear)]] : []),
                 ['Net Income (Pre-tax)', formatCurrency(data.netIncomeBeforeTax)],
                 [`Small Business Tax (${((user?.company?.small_business_rate || 0.125) * 100).toFixed(2)}%)`, formatCurrency(data.smallBusinessTax)],
@@ -583,6 +604,30 @@ const Reports: React.FC = () => {
             yPosition = (pdf as any).lastAutoTable.finalY + 10;
         }
 
+        // Salaries
+        if (data.salaries && data.salaries.length > 0) {
+            checkPageBreak(30);
+            addText('SALARY PAYMENTS', 14, true);
+            const salaryRows = data.salaries.map((sal: Salary) => [
+                sal.employee_name,
+                formatDate(sal.payment_date),
+                formatDate(sal.period_start) + ' - ' + formatDate(sal.period_end),
+                formatCurrency(sal.amount),
+                sal.status,
+            ]);
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Employee', 'Payment Date', 'Period', 'Amount', 'Status']],
+                body: salaryRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
         // Owner Payments
         if (data.ownerPayments && data.ownerPayments.length > 0) {
             checkPageBreak(30);
@@ -685,9 +730,10 @@ Gross Revenue: ${formatCurrency(data.grossIncome)}
 
 EXPENSES
 Total Business Expenses: ${formatCurrency(data.totalExpenses)}
+${data.totalSalaries > 0 ? `Total Salaries: ${formatCurrency(data.totalSalaries)}` : ''}
 ${data.totalDepreciationForYear > 0 ? `Depreciation (CCA): ${formatCurrency(data.totalDepreciationForYear)}` : ''}
 ────────────────────────────────────────────────────────────────────────────
-Total Expenses (including Depreciation): ${formatCurrency(data.totalExpenses + (data.totalDepreciationForYear || 0))}
+Total Expenses (including Salaries and Depreciation): ${formatCurrency(data.totalExpenses + (data.totalSalaries || 0) + (data.totalDepreciationForYear || 0))}
 
 EXPENSE BREAKDOWN BY CATEGORY
 ${(() => {
@@ -804,7 +850,21 @@ ${(() => {
             })()}
 
 ================================================================================
-4. DIVIDEND DISTRIBUTIONS
+4. SALARY PAYMENTS
+================================================================================
+
+SALARIES PAID
+${data.salaries && data.salaries.length > 0
+                ? data.salaries.map((sal: Salary) =>
+                    `${formatDate(sal.payment_date)} - ${sal.employee_name} - ${formatCurrency(sal.amount)} - Period: ${formatDate(sal.period_start)} to ${formatDate(sal.period_end)} - Status: ${sal.status}${sal.notes ? ` - Notes: ${sal.notes}` : ''}`
+                ).join('\n')
+                : 'No salaries recorded'}
+
+────────────────────────────────────────────────────────────────────────────
+TOTAL SALARIES PAID: ${formatCurrency(data.totalSalaries || 0)}
+
+================================================================================
+5. DIVIDEND DISTRIBUTIONS
 ================================================================================
 
 DIVIDENDS DECLARED
@@ -818,7 +878,7 @@ ${data.dividends && data.dividends.length > 0
 TOTAL DIVIDENDS PAID: ${formatCurrency(data.totalDividends)}
 
 ================================================================================
-5. RETAINED EARNINGS CALCULATION
+6. RETAINED EARNINGS CALCULATION
 ================================================================================
 
 NET INCOME AFTER TAX: ${formatCurrency(data.netIncomeAfterTax)}
@@ -835,7 +895,7 @@ RETAINED EARNINGS: ${formatCurrency(data.retainedEarnings)}
 AVAILABLE FOR DISTRIBUTION: ${formatCurrency(data.retainedEarnings)}
 
 ================================================================================
-6. ALL SUPPORTING TRANSACTION DETAILS
+7. ALL SUPPORTING TRANSACTION DETAILS
 ================================================================================
 
 DETAILED INCOME BREAKDOWN
@@ -910,6 +970,13 @@ ${(() => {
                     .join('\n') || '  No expenses by payment method';
             })()}
 
+SALARY PAYMENTS
+${data.salaries && data.salaries.length > 0
+                ? data.salaries.map((sal: Salary) =>
+                    `${formatDate(sal.payment_date)} - ${sal.employee_name} - Amount: ${formatCurrency(sal.amount)} - Period: ${formatDate(sal.period_start)} to ${formatDate(sal.period_end)} - Status: ${sal.status}${sal.notes ? ` - Notes: ${sal.notes}` : ''}`
+                ).join('\n')
+                : 'No salaries recorded'}
+
 OWNER PAYMENTS
 ${data.ownerPayments && data.ownerPayments.length > 0
                 ? data.ownerPayments.map((payment: OwnerPayment) =>
@@ -938,7 +1005,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Reports</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Reports</h1>
                 <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         Reports require a company to be configured. Please go to the{' '}
@@ -952,7 +1019,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
     if (!reportData) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -961,8 +1028,8 @@ Generated on: ${new Date().toLocaleString('en-CA')}
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Comprehensive Tax Report</h1>
-                    <p className="text-muted-foreground mt-2">Generate a comprehensive tax report with all financial data needed for tax submission</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Comprehensive Tax Report</h1>
+                    <p className="text-slate-muted mt-2">Generate a comprehensive tax report with all financial data needed for tax submission</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Button
@@ -989,8 +1056,8 @@ Generated on: ${new Date().toLocaleString('en-CA')}
             <Card className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <label className="text-sm font-medium text-foreground">Fiscal Year:</label>
+                        <Calendar className="h-5 w-5 text-slate-muted" />
+                        <label className="text-sm font-medium text-white">Fiscal Year:</label>
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
@@ -1010,35 +1077,35 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
                         <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400 mr-2" />
-                        <h3 className="text-lg font-medium text-foreground">Profit & Loss</h3>
+                        <h3 className="text-lg font-medium text-white">Profit & Loss</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Gross Income:</span>
-                            <span className="font-medium text-foreground">{formatCurrency(reportData.grossIncome)}</span>
+                            <span className="text-sm text-slate-muted">Gross Income:</span>
+                            <span className="font-medium text-white">{formatCurrency(reportData.grossIncome)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Total Expenses:</span>
+                            <span className="text-sm text-slate-muted">Total Expenses:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
                         </div>
                         {reportData.totalDepreciationForYear > 0 && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Depreciation (CCA):</span>
+                                <span className="text-sm text-slate-muted">Depreciation (CCA):</span>
                                 <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDepreciationForYear)}</span>
                             </div>
                         )}
-                        <div className="flex justify-between border-t border-border pt-2">
-                            <span className="text-sm font-medium text-foreground">Net Income (Pre-tax):</span>
+                        <div className="flex justify-between border-t border-white/10 pt-2">
+                            <span className="text-sm font-medium text-white">Net Income (Pre-tax):</span>
                             <span className={`font-bold ${reportData.netIncomeBeforeTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.netIncomeBeforeTax)}
                             </span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Small Business Tax:</span>
+                            <span className="text-sm text-slate-muted">Small Business Tax:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.smallBusinessTax)}</span>
                         </div>
-                        <div className="flex justify-between border-t border-border pt-2">
-                            <span className="text-sm font-bold text-foreground">Net Income (Post-tax):</span>
+                        <div className="flex justify-between border-t border-white/10 pt-2">
+                            <span className="text-sm font-bold text-white">Net Income (Post-tax):</span>
                             <span className={`font-bold text-lg ${reportData.netIncomeAfterTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.netIncomeAfterTax)}
                             </span>
@@ -1050,27 +1117,27 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
                         <Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-                        <h3 className="text-lg font-medium text-foreground">HST Summary</h3>
+                        <h3 className="text-lg font-medium text-white">HST Summary</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">HST Collected:</span>
+                            <span className="text-sm text-slate-muted">HST Collected:</span>
                             <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.hstCollected)}</span>
                         </div>
                         {reportData.isHSTRegistered && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">HST Input Tax Credits:</span>
+                                <span className="text-sm text-slate-muted">HST Input Tax Credits:</span>
                                 <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstInputTaxCredits)}</span>
                             </div>
                         )}
                         {reportData.hstAlreadyPaid > 0 && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">HST Already Paid to CRA:</span>
+                                <span className="text-sm text-slate-muted">HST Already Paid to CRA:</span>
                                 <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(reportData.hstAlreadyPaid)}</span>
                             </div>
                         )}
-                        <div className="flex justify-between border-t border-border pt-2">
-                            <span className="text-sm font-bold text-foreground">HST Remittance:</span>
+                        <div className="flex justify-between border-t border-white/10 pt-2">
+                            <span className="text-sm font-bold text-white">HST Remittance:</span>
                             <span className={`font-bold text-lg ${reportData.hstRemittance >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                 {formatCurrency(reportData.hstRemittance)}
                             </span>
@@ -1082,25 +1149,25 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
                         <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-2" />
-                        <h3 className="text-lg font-medium text-foreground">Retained Earnings</h3>
+                        <h3 className="text-lg font-medium text-white">Retained Earnings</h3>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Net Income (Post-tax):</span>
-                            <span className="font-medium text-foreground">{formatCurrency(reportData.netIncomeAfterTax)}</span>
+                            <span className="text-sm text-slate-muted">Net Income (Post-tax):</span>
+                            <span className="font-medium text-white">{formatCurrency(reportData.netIncomeAfterTax)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Dividends Paid:</span>
+                            <span className="text-sm text-slate-muted">Dividends Paid:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDividends)}</span>
                         </div>
                         {reportData.totalOwnerPayments > 0 && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Owner Payments:</span>
+                                <span className="text-sm text-slate-muted">Owner Payments:</span>
                                 <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalOwnerPayments)}</span>
                             </div>
                         )}
-                        <div className="flex justify-between border-t border-border pt-2">
-                            <span className="text-sm font-bold text-foreground">Retained Earnings:</span>
+                        <div className="flex justify-between border-t border-white/10 pt-2">
+                            <span className="text-sm font-bold text-white">Retained Earnings:</span>
                             <span className={`font-bold text-lg ${reportData.retainedEarnings >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(reportData.retainedEarnings)}
                             </span>
@@ -1113,13 +1180,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
             <div className="space-y-6">
                 {/* Expense Breakdown by Category */}
                 <Card className="overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Expense Breakdown by Category</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Total expenses organized by category</p>
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Expense Breakdown by Category</h2>
+                        <p className="text-sm text-slate-muted mt-1">Total expenses organized by category</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-3">Category</th>
                                     <th className="px-6 py-3 text-right">Count</th>
@@ -1141,9 +1208,9 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                         .sort((a, b) => b.total - a.total)
                                         .map(cat => (
                                             <tr key={cat.name} className="hover:bg-muted/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-foreground">{cat.name}</td>
-                                                <td className="px-6 py-4 text-right text-muted-foreground">{cat.count}</td>
-                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(cat.total)}</td>
+                                                <td className="px-6 py-4 font-medium text-white">{cat.name}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{cat.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(cat.total)}</td>
                                             </tr>
                                         ));
                                 })()}
@@ -1154,29 +1221,29 @@ Generated on: ${new Date().toLocaleString('en-CA')}
 
                 {/* Capital Assets and Depreciation */}
                 <Card className="overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Capital Assets and Depreciation (CCA)</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Capital assets with depreciation details for {selectedYear}</p>
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Capital Assets and Depreciation (CCA)</h2>
+                        <p className="text-sm text-slate-muted mt-1">Capital assets with depreciation details for {selectedYear}</p>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="bg-muted/50 p-4 rounded-lg">
-                                <div className="text-sm text-muted-foreground">Total Capital Asset Cost</div>
-                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalCapitalAssetCost || 0)}</div>
+                                <div className="text-sm text-slate-muted">Total Capital Asset Cost</div>
+                                <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalCapitalAssetCost || 0)}</div>
                             </div>
                             <div className="bg-muted/50 p-4 rounded-lg">
-                                <div className="text-sm text-muted-foreground">Total Accumulated Depreciation</div>
-                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalAccumulatedDepreciation || 0)}</div>
+                                <div className="text-sm text-slate-muted">Total Accumulated Depreciation</div>
+                                <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalAccumulatedDepreciation || 0)}</div>
                             </div>
                             <div className="bg-muted/50 p-4 rounded-lg">
-                                <div className="text-sm text-muted-foreground">Depreciation for {selectedYear}</div>
-                                <div className="text-2xl font-bold text-foreground mt-1">{formatCurrency(reportData.totalDepreciationForYear || 0)}</div>
+                                <div className="text-sm text-slate-muted">Depreciation for {selectedYear}</div>
+                                <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalDepreciationForYear || 0)}</div>
                             </div>
                         </div>
                         {reportData.capitalAssets && reportData.capitalAssets.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                    <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                         <tr>
                                             <th className="px-6 py-3">Asset</th>
                                             <th className="px-6 py-3">Purchase Date</th>
@@ -1191,12 +1258,12 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                             const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
                                             return (
                                                 <tr key={asset.id} className="hover:bg-muted/50 transition-colors">
-                                                    <td className="px-6 py-4 font-medium text-foreground">{asset.description}</td>
-                                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(asset.purchase_date)}</td>
-                                                    <td className="px-6 py-4 text-foreground">{formatCurrency(asset.total_cost)}</td>
-                                                    <td className="px-6 py-4 text-muted-foreground">{asset.cca_class} ({(Number(asset.cca_rate) * 100).toFixed(2)}%)</td>
-                                                    <td className="px-6 py-4 text-right text-foreground">{formatCurrency(yearDepreciation)}</td>
-                                                    <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(asset.book_value)}</td>
+                                                    <td className="px-6 py-4 font-medium text-white">{asset.description}</td>
+                                                    <td className="px-6 py-4 text-slate-muted">{formatDate(asset.purchase_date)}</td>
+                                                    <td className="px-6 py-4 text-white">{formatCurrency(asset.total_cost)}</td>
+                                                    <td className="px-6 py-4 text-slate-muted">{asset.cca_class} ({(Number(asset.cca_rate) * 100).toFixed(2)}%)</td>
+                                                    <td className="px-6 py-4 text-right text-white">{formatCurrency(yearDepreciation)}</td>
+                                                    <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(asset.book_value)}</td>
                                                 </tr>
                                             );
                                         })}
@@ -1204,20 +1271,20 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                 </table>
                             </div>
                         ) : (
-                            <p className="text-muted-foreground text-center py-8">No capital assets recorded for this year</p>
+                            <p className="text-slate-muted text-center py-8">No capital assets recorded for this year</p>
                         )}
                     </div>
                 </Card>
 
                 {/* Monthly HST Breakdown */}
                 <Card className="overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Monthly HST Breakdown</h2>
-                        <p className="text-sm text-muted-foreground mt-1">HST collected and paid by month for {selectedYear}</p>
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Monthly HST Breakdown</h2>
+                        <p className="text-sm text-slate-muted mt-1">HST collected and paid by month for {selectedYear}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-3">Month</th>
                                     <th className="px-6 py-3 text-right">HST Collected (Invoices)</th>
@@ -1248,11 +1315,11 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                     const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
                                     return (
                                         <tr key={month} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-foreground">{monthName}</td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstCollectedFromInvoices)}</td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstCollectedFromIncome)}</td>
-                                            <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(hstCollected)}</td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(hstPaid)}</td>
+                                            <td className="px-6 py-4 font-medium text-white">{monthName}</td>
+                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromInvoices)}</td>
+                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromIncome)}</td>
+                                            <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(hstCollected)}</td>
+                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstPaid)}</td>
                                             <td className={`px-6 py-4 text-right font-bold ${netHST >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                                 {formatCurrency(netHST)}
                                             </td>
@@ -1266,13 +1333,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
 
                 {/* Invoice Summary by Client */}
                 <Card className="overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Invoice Summary by Client</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Total revenue and HST collected per client</p>
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Invoice Summary by Client</h2>
+                        <p className="text-sm text-slate-muted mt-1">Total revenue and HST collected per client</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-3">Client</th>
                                     <th className="px-6 py-3 text-right">Invoice Count</th>
@@ -1296,10 +1363,10 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                         .sort((a, b) => b.total - a.total)
                                         .map(client => (
                                             <tr key={client.name} className="hover:bg-muted/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-foreground">{client.name}</td>
-                                                <td className="px-6 py-4 text-right text-muted-foreground">{client.count}</td>
-                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(client.total)}</td>
-                                                <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(client.hst)}</td>
+                                                <td className="px-6 py-4 font-medium text-white">{client.name}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{client.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(client.total)}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(client.hst)}</td>
                                             </tr>
                                         ));
                                 })()}
@@ -1310,13 +1377,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
 
                 {/* Expense Summary by Payment Method */}
                 <Card className="overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-semibold tracking-tight text-foreground">Expense Summary by Payment Method</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Expenses categorized by who paid (Corporation vs Owner)</p>
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Expense Summary by Payment Method</h2>
+                        <p className="text-sm text-slate-muted mt-1">Expenses categorized by who paid (Corporation vs Owner)</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-3">Payment Method</th>
                                     <th className="px-6 py-3 text-right">Count</th>
@@ -1338,10 +1405,10 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                     return Object.entries(paidByTotals)
                                         .map(([paidBy, totals]) => (
                                             <tr key={paidBy} className="hover:bg-muted/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-foreground">{paidBy === 'corp' ? 'Corporation' : 'Owner'}</td>
-                                                <td className="px-6 py-4 text-right text-muted-foreground">{totals.count}</td>
-                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(totals.total)}</td>
-                                                <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(totals.hst)}</td>
+                                                <td className="px-6 py-4 font-medium text-white">{paidBy === 'corp' ? 'Corporation' : 'Owner'}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{totals.count}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(totals.total)}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(totals.hst)}</td>
                                             </tr>
                                         ));
                                 })()}
@@ -1353,13 +1420,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                 {/* Dividends and Owner Payments */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <Card className="overflow-hidden">
-                        <div className="p-6 border-b border-border">
-                            <h2 className="text-xl font-semibold tracking-tight text-foreground">Dividend Distributions</h2>
-                            <p className="text-sm text-muted-foreground mt-1">All dividends declared and paid</p>
+                        <div className="p-6 border-b border-white/10">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">Dividend Distributions</h2>
+                            <p className="text-sm text-slate-muted mt-1">All dividends declared and paid</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                     <tr>
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3">Amount</th>
@@ -1370,8 +1437,8 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                     {reportData.dividends && reportData.dividends.length > 0 ? (
                                         reportData.dividends.map((div: Dividend) => (
                                             <tr key={div.id} className="hover:bg-muted/50 transition-colors">
-                                                <td className="px-6 py-4 text-muted-foreground">{formatDate(div.declaration_date)}</td>
-                                                <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(div.amount)}</td>
+                                                <td className="px-6 py-4 text-slate-muted">{formatDate(div.declaration_date)}</td>
+                                                <td className="px-6 py-4 font-medium text-white">{formatCurrency(div.amount)}</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${div.status === 'paid'
                                                         ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
@@ -1384,7 +1451,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">No dividends declared</td>
+                                            <td colSpan={3} className="px-6 py-8 text-center text-slate-muted">No dividends declared</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -1393,13 +1460,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                     </Card>
 
                     <Card className="overflow-hidden">
-                        <div className="p-6 border-b border-border">
-                            <h2 className="text-xl font-semibold tracking-tight text-foreground">Owner Payments</h2>
-                            <p className="text-sm text-muted-foreground mt-1">Payments made to owners</p>
+                        <div className="p-6 border-b border-white/10">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">Owner Payments</h2>
+                            <p className="text-sm text-slate-muted mt-1">Payments made to owners</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                                <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                     <tr>
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3">Description</th>
@@ -1411,15 +1478,15 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                                     {reportData.ownerPayments && reportData.ownerPayments.length > 0 ? (
                                         reportData.ownerPayments.map((payment: OwnerPayment) => (
                                             <tr key={payment.id} className="hover:bg-muted/50 transition-colors">
-                                                <td className="px-6 py-4 text-muted-foreground">{formatDate(payment.payment_date)}</td>
-                                                <td className="px-6 py-4 text-foreground">{payment.description}</td>
-                                                <td className="px-6 py-4 text-muted-foreground">{payment.payment_type}</td>
-                                                <td className="px-6 py-4 text-right font-medium text-foreground">{formatCurrency(payment.amount)}</td>
+                                                <td className="px-6 py-4 text-slate-muted">{formatDate(payment.payment_date)}</td>
+                                                <td className="px-6 py-4 text-white">{payment.description}</td>
+                                                <td className="px-6 py-4 text-slate-muted">{payment.payment_type}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(payment.amount)}</td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No owner payments recorded</td>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-muted">No owner payments recorded</td>
                                         </tr>
                                     )}
                                 </tbody>

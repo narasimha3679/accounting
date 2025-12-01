@@ -75,14 +75,14 @@ const Income: React.FC = () => {
             case 'client': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
             case 'capital': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
             case 'other': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-            default: return 'bg-muted text-muted-foreground';
+            default: return 'bg-muted text-slate-muted';
         }
     };
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -91,8 +91,8 @@ const Income: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Income Entries</h1>
-                    <p className="text-muted-foreground mt-2">Track income from clients, capital contributions, and other sources</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Income Entries</h1>
+                    <p className="text-slate-muted mt-2">Track income from clients, capital contributions, and other sources</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
@@ -107,7 +107,7 @@ const Income: React.FC = () => {
             <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                        <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-4">Description</th>
                                 <th className="px-6 py-4">Type</th>
@@ -122,7 +122,7 @@ const Income: React.FC = () => {
                         <tbody className="divide-y divide-border">
                             {incomeEntries?.map((entry) => (
                                 <tr key={entry.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-foreground">
+                                    <td className="px-6 py-4 font-medium text-white">
                                         {entry.description}
                                     </td>
                                     <td className="px-6 py-4">
@@ -130,19 +130,19 @@ const Income: React.FC = () => {
                                             {getIncomeTypeLabel(entry.income_type)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-muted-foreground">
+                                    <td className="px-6 py-4 text-slate-muted">
                                         {entry.client?.name || '-'}
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-foreground">
+                                    <td className="px-6 py-4 font-medium text-white">
                                         {formatCurrency(entry.amount)}
                                     </td>
-                                    <td className="px-6 py-4 text-muted-foreground">
+                                    <td className="px-6 py-4 text-slate-muted">
                                         {formatCurrency(entry.hst_amount)}
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-foreground">
+                                    <td className="px-6 py-4 font-medium text-white">
                                         {formatCurrency(entry.total)}
                                     </td>
-                                    <td className="px-6 py-4 text-muted-foreground">
+                                    <td className="px-6 py-4 text-slate-muted">
                                         {formatDate(entry.income_date)}
                                     </td>
                                     <td className="px-6 py-4 text-right">
@@ -278,10 +278,10 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-6">
-            <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="bg-card border border-white/10 rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-foreground">
+                        <h3 className="text-xl font-semibold text-white">
                             {income ? 'Edit Income Entry' : 'Add Income Entry'}
                         </h3>
                         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -297,7 +297,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <label htmlFor="description" className="text-sm font-medium text-foreground">
+                            <label htmlFor="description" className="text-sm font-medium text-white">
                                 Description
                             </label>
                             <input
@@ -305,18 +305,18 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 id="description"
                                 value={formData.description}
                                 onChange={(e) => handleInputChange('description', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <label htmlFor="amount" className="text-sm font-medium text-foreground">
+                            <label htmlFor="amount" className="text-sm font-medium text-white">
                                 Amount
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                    <DollarSign className="h-4 w-4 text-slate-muted" />
                                 </div>
                                 <input
                                     type="number"
@@ -325,26 +325,26 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                     min="0"
                                     value={formData.amount}
                                     onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-9 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background pl-9 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
                             </div>
                         </div>
 
                         {formData.income_type === 'client' && formData.client_id && (
-                            <div className="bg-muted/50 p-3 rounded-md space-y-2 border border-border">
+                            <div className="bg-muted/50 p-3 rounded-md space-y-2 border border-white/10">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">HST ({((user?.company?.hst_rate || 0.13) * 100).toFixed(1)}%):</span>
-                                    <span className="font-medium text-foreground">
+                                    <span className="text-slate-muted">HST ({((user?.company?.hst_rate || 0.13) * 100).toFixed(1)}%):</span>
+                                    <span className="font-medium text-white">
                                         {new Intl.NumberFormat('en-CA', {
                                             style: 'currency',
                                             currency: 'CAD',
                                         }).format(hstAmount)}
                                     </span>
                                 </div>
-                                <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
-                                    <span className="text-foreground">Total:</span>
-                                    <span className="text-foreground">
+                                <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2">
+                                    <span className="text-white">Total:</span>
+                                    <span className="text-white">
                                         {new Intl.NumberFormat('en-CA', {
                                             style: 'currency',
                                             currency: 'CAD',
@@ -356,7 +356,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                     const selectedClient = clients.find(c => c.id === clientId);
                                     if (selectedClient?.hst_exempt) {
                                         return (
-                                            <p className="text-xs text-muted-foreground mt-1">
+                                            <p className="text-xs text-slate-muted mt-1">
                                                 Client is HST exempt - no HST charged
                                             </p>
                                         );
@@ -367,7 +367,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                         )}
 
                         <div className="space-y-2">
-                            <label htmlFor="income_type" className="text-sm font-medium text-foreground">
+                            <label htmlFor="income_type" className="text-sm font-medium text-white">
                                 Income Type
                             </label>
                             <select
@@ -385,7 +385,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
 
                         {formData.income_type === 'client' && (
                             <div className="space-y-2">
-                                <label htmlFor="client_id" className="text-sm font-medium text-foreground">
+                                <label htmlFor="client_id" className="text-sm font-medium text-white">
                                     Client
                                 </label>
                                 <select
@@ -405,7 +405,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                         )}
 
                         <div className="space-y-2">
-                            <label htmlFor="income_date" className="text-sm font-medium text-foreground">
+                            <label htmlFor="income_date" className="text-sm font-medium text-white">
                                 Income Date
                             </label>
                             <input
@@ -413,7 +413,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 id="income_date"
                                 value={formData.income_date}
                                 onChange={(e) => handleInputChange('income_date', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>

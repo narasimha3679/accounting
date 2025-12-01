@@ -89,7 +89,7 @@ const CapitalAssets: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -98,8 +98,8 @@ const CapitalAssets: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Capital Assets</h1>
-                    <p className="text-muted-foreground mt-2">Manage depreciable business assets over $500</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Capital Assets</h1>
+                    <p className="text-slate-muted mt-2">Manage depreciable business assets over $500</p>
                 </div>
                 <Button
                     onClick={() => setShowCreateModal(true)}
@@ -113,7 +113,7 @@ const CapitalAssets: React.FC = () => {
             {/* Filters */}
             <Card className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <label className="text-sm font-medium text-foreground">Filter by category:</label>
+                    <label className="text-sm font-medium text-white">Filter by category:</label>
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
@@ -125,7 +125,7 @@ const CapitalAssets: React.FC = () => {
                         ))}
                     </select>
 
-                    <label className="text-sm font-medium text-foreground">Filter by CCA class:</label>
+                    <label className="text-sm font-medium text-white">Filter by CCA class:</label>
                     <select
                         value={selectedCCAClass}
                         onChange={(e) => setSelectedCCAClass(e.target.value)}
@@ -150,10 +150,10 @@ const CapitalAssets: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     Total Cost
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalCost)}
                                 </dd>
                             </dl>
@@ -168,10 +168,10 @@ const CapitalAssets: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     Accumulated Depreciation
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalDepreciation)}
                                 </dd>
                             </dl>
@@ -186,10 +186,10 @@ const CapitalAssets: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                <dt className="text-sm font-medium text-slate-muted truncate">
                                     Net Book Value
                                 </dt>
-                                <dd className="text-2xl font-bold text-foreground">
+                                <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(totalBookValue)}
                                 </dd>
                             </dl>
@@ -202,7 +202,7 @@ const CapitalAssets: React.FC = () => {
             <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                        <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-4">Description</th>
                                 <th className="px-6 py-4">Category</th>
@@ -219,18 +219,18 @@ const CapitalAssets: React.FC = () => {
                         <tbody className="divide-y divide-border">
                             {filteredAssets?.map((asset) => (
                                 <tr key={asset.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-foreground">{asset.description}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{asset.category?.name || 'Uncategorized'}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{formatDate(asset.purchase_date)}</td>
-                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(asset.total_cost)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{asset.description}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{asset.category?.name || 'Uncategorized'}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatDate(asset.purchase_date)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{formatCurrency(asset.total_cost)}</td>
                                     <td className="px-6 py-4">
                                         <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                             Class {asset.cca_class}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-muted-foreground">{(asset.cca_rate * 100).toFixed(1)}%</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{formatCurrency(asset.accumulated_depreciation)}</td>
-                                    <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(asset.book_value)}</td>
+                                    <td className="px-6 py-4 text-slate-muted">{(asset.cca_rate * 100).toFixed(1)}%</td>
+                                    <td className="px-6 py-4 text-slate-muted">{formatCurrency(asset.accumulated_depreciation)}</td>
+                                    <td className="px-6 py-4 font-medium text-white">{formatCurrency(asset.book_value)}</td>
                                     <td className="px-6 py-4">
                                         {asset.paid_by === 'corp' ? (
                                             <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -280,8 +280,8 @@ const CapitalAssets: React.FC = () => {
 
             {filteredAssets?.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-muted-foreground text-lg">No capital assets found</p>
-                    <p className="text-muted-foreground/60">Add your first capital asset to get started</p>
+                    <p className="text-slate-muted text-lg">No capital assets found</p>
+                    <p className="text-slate-muted/60">Add your first capital asset to get started</p>
                 </div>
             )}
 
@@ -377,9 +377,9 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-card p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-foreground">
+                    <h3 className="text-lg font-semibold text-white">
                         {asset ? 'Edit Capital Asset' : 'Add New Capital Asset'}
                     </h3>
                     <Button
@@ -395,18 +395,18 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-foreground mb-2">Description *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Description *</label>
                             <input
                                 type="text"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Category *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Category *</label>
                             <select
                                 value={formData.category_id}
                                 onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
@@ -421,23 +421,23 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Purchase Date *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Purchase Date *</label>
                             <input
                                 type="date"
                                 value={formData.purchase_date}
                                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">Purchase Amount (before HST) *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Purchase Amount (before HST) *</label>
                             <input
                                 type="number"
                                 value={formData.purchase_amount}
                                 onChange={(e) => setFormData({ ...formData, purchase_amount: parseFloat(e.target.value) || 0 })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 min="0"
                                 step="0.01"
                                 required
@@ -445,12 +445,12 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">HST Paid</label>
+                            <label className="block text-sm font-medium text-white mb-2">HST Paid</label>
                             <input
                                 type="number"
                                 value={formData.hst_paid}
                                 onChange={(e) => setFormData({ ...formData, hst_paid: parseFloat(e.target.value) || 0 })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity
 
 -50"
                                 min="0"
@@ -459,7 +459,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">CCA Class *</label>
+                            <label className="block text-sm font-medium text-white mb-2">CCA Class *</label>
                             <select
                                 value={formData.cca_class}
                                 onChange={(e) => setFormData({ ...formData, cca_class: e.target.value })}
@@ -497,14 +497,14 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                                     onChange={(e) => setFormData({ ...formData, receipt_attached: e.target.checked })}
                                     className="h-4 w-4 text-primary focus:ring-primary border-input rounded"
                                 />
-                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-foreground">
+                                <label htmlFor="receipt_attached" className="ml-2 block text-sm text-white">
                                     Receipt attached
                                 </label>
                             </div>
                         </div>
 
                         <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-foreground mb-2">Paid By *</label>
+                            <label className="block text-sm font-medium text-white mb-2">Paid By *</label>
                             <div className="flex gap-6">
                                 <div className="flex items-center">
                                     <input
@@ -516,7 +516,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                                         onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
                                         className="h-4 w-4 text-primary focus:ring-primary border-input"
                                     />
-                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-foreground">
+                                    <label htmlFor="paid_by_corp" className="ml-2 block text-sm text-white">
                                         Corporation
                                     </label>
                                 </div>
@@ -530,7 +530,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                                         onChange={(e) => setFormData({ ...formData, paid_by: e.target.value as 'corp' | 'owner' })}
                                         className="h-4 w-4 text-primary focus:ring-primary border-input"
                                     />
-                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-foreground">
+                                    <label htmlFor="paid_by_owner" className="ml-2 block text-sm text-white">
                                         Owner (to be reimbursed)
                                     </label>
                                 </div>
@@ -541,22 +541,22 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         {asset && (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium text-foreground mb-2">Disposal Date</label>
+                                    <label className="block text-sm font-medium text-white mb-2">Disposal Date</label>
                                     <input
                                         type="date"
                                         value={formData.disposal_date}
                                         onChange={(e) => setFormData({ ...formData, disposal_date: e.target.value })}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-foreground mb-2">Disposal Amount</label>
+                                    <label className="block text-sm font-medium text-white mb-2">Disposal Amount</label>
                                     <input
                                         type="number"
                                         value={formData.disposal_amount}
                                         onChange={(e) => setFormData({ ...formData, disposal_amount: parseFloat(e.target.value) || 0 })}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         min="0"
                                         step="0.01"
                                     />
@@ -565,7 +565,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         )}
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                         <Button
                             type="button"
                             variant="outline"
@@ -699,7 +699,7 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
             <div className="relative w-full max-w-4xl my-10 mx-4">
                 <Card className="p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-semibold text-foreground">
+                        <h3 className="text-lg font-semibold text-white">
                             Depreciation Schedule - {asset.description}
                         </h3>
                         <Button
@@ -730,11 +730,11 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
                     </div>
 
                     {/* Depreciation Calculator */}
-                    <div className="mb-6 p-4 border border-border rounded-lg bg-muted/20">
-                        <h4 className="text-md font-medium text-foreground mb-3">Depreciation Calculator</h4>
+                    <div className="mb-6 p-4 border border-white/10 rounded-lg bg-muted/20">
+                        <h4 className="text-md font-medium text-white mb-3">Depreciation Calculator</h4>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">Fiscal Year</label>
+                                <label className="block text-sm font-medium text-white mb-2">Fiscal Year</label>
                                 <input
                                     type="number"
                                     value={fiscalYear}
@@ -756,23 +756,23 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
 
                         {depreciationCalculation && (
                             <div className="mt-4 space-y-3">
-                                <div className="p-3 bg-background rounded-md border border-border">
+                                <div className="p-3 bg-background rounded-md border border-white/10">
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Depreciation Amount</p>
-                                            <p className="font-semibold text-foreground">
+                                            <p className="text-sm text-slate-muted">Depreciation Amount</p>
+                                            <p className="font-semibold text-white">
                                                 {formatCurrency(depreciationCalculation.depreciation_amount)}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Half-Year Rule</p>
-                                            <p className="font-semibold text-foreground">
+                                            <p className="text-sm text-slate-muted">Half-Year Rule</p>
+                                            <p className="font-semibold text-white">
                                                 {depreciationCalculation.is_half_year_rule ? 'Yes' : 'No'}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Remaining Book Value</p>
-                                            <p className="font-semibold text-foreground">
+                                            <p className="text-sm text-slate-muted">Remaining Book Value</p>
+                                            <p className="font-semibold text-white">
                                                 {formatCurrency(depreciationCalculation.remaining_book_value)}
                                             </p>
                                         </div>
@@ -801,7 +801,7 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
                     {/* Depreciation Schedule Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-4">Fiscal Year</th>
                                     <th className="px-6 py-4">Depreciation Rate</th>
@@ -813,12 +813,12 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
                             <tbody className="divide-y divide-border">
                                 {schedule.map((entry) => (
                                     <tr key={entry.year} className="hover:bg-muted/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-foreground">{entry.year}</td>
-                                        <td className="px-6 py-4 text-muted-foreground">
+                                        <td className="px-6 py-4 font-medium text-white">{entry.year}</td>
+                                        <td className="px-6 py-4 text-slate-muted">
                                             {entry.isHalfYear ? (asset.cca_rate * 50).toFixed(1) : (asset.cca_rate * 100).toFixed(1)}%
                                         </td>
-                                        <td className="px-6 py-4 text-foreground">{formatCurrency(entry.depreciationAmount)}</td>
-                                        <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(entry.remainingBookValue)}</td>
+                                        <td className="px-6 py-4 text-white">{formatCurrency(entry.depreciationAmount)}</td>
+                                        <td className="px-6 py-4 font-medium text-white">{formatCurrency(entry.remainingBookValue)}</td>
                                         <td className="px-6 py-4">
                                             {entry.isHalfYear && (
                                                 <span className="inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">

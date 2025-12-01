@@ -12,6 +12,7 @@ import Expenses from './pages/Expenses';
 import CapitalAssets from './pages/CapitalAssets';
 import Income from './pages/Income';
 import Dividends from './pages/Dividends';
+import Salary from './pages/Salary';
 import OwnerPayments from './pages/OwnerPayments';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
@@ -128,6 +129,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dividends />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/salary"
+              element={
+                <ProtectedRoute>
+                  <Salary />
                 </ProtectedRoute>
               }
             />

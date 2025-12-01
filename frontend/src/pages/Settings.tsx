@@ -92,7 +92,7 @@ const Settings: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
             </div>
         );
     }
@@ -101,17 +101,17 @@ const Settings: React.FC = () => {
         return (
             <div className="p-6 space-y-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
-                    <p className="text-muted-foreground mt-2">
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Settings</h1>
+                    <p className="text-slate-muted mt-2">
                         You don&apos;t have a company set up yet. You&apos;ll need to create one before you can manage
                         settings.
                     </p>
                 </div>
-                <Card className="p-4 border-dashed border-primary bg-primary/5">
+                <Card className="p-4 border-dashed border-neon-emerald bg-primary/5">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
-                            <h2 className="text-lg font-semibold text-foreground">Create your company</h2>
-                            <p className="text-sm text-muted-foreground">
+                            <h2 className="text-lg font-semibold text-white">Create your company</h2>
+                            <p className="text-sm text-slate-muted">
                                 Set up your corporation details once, and we&apos;ll use them across invoices, reports, and taxes.
                             </p>
                         </div>
@@ -131,7 +131,7 @@ const Settings: React.FC = () => {
     if (!company) {
         return (
             <div className="p-6">
-                <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+                <h1 className="text-2xl font-bold text-white">Settings</h1>
                 <p className="text-destructive">Failed to load company settings</p>
             </div>
         );
@@ -140,8 +140,8 @@ const Settings: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
-                <p className="text-muted-foreground mt-2">Manage your company settings and tax preferences</p>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Settings</h1>
+                <p className="text-slate-muted mt-2">Manage your company settings and tax preferences</p>
             </div>
 
             {error && (
@@ -160,13 +160,13 @@ const Settings: React.FC = () => {
                 {/* Company Information */}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
-                        <Building2 className="h-5 w-5 text-muted-foreground mr-2" />
-                        <h2 className="text-lg font-medium text-foreground">Company Information</h2>
+                        <Building2 className="h-5 w-5 text-slate-muted mr-2" />
+                        <h2 className="text-lg font-medium text-white">Company Information</h2>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
+                            <label htmlFor="name" className="block text-sm font-medium text-white mb-2">
                                 Company Name
                             </label>
                             <input
@@ -174,13 +174,13 @@ const Settings: React.FC = () => {
                                 id="name"
                                 value={company.name}
                                 onChange={(e) => handleInputChange('name', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="business_number" className="block text-sm font-medium text-foreground mb-2">
+                            <label htmlFor="business_number" className="block text-sm font-medium text-white mb-2">
                                 Business Number
                             </label>
                             <input
@@ -188,13 +188,13 @@ const Settings: React.FC = () => {
                                 id="business_number"
                                 value={company.business_number}
                                 onChange={(e) => handleInputChange('business_number', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="hst_number" className="block text-sm font-medium text-foreground mb-2">
+                            <label htmlFor="hst_number" className="block text-sm font-medium text-white mb-2">
                                 HST Number (Optional)
                             </label>
                             <input
@@ -202,12 +202,12 @@ const Settings: React.FC = () => {
                                 id="hst_number"
                                 value={company.hst_number || ''}
                                 onChange={(e) => handleInputChange('hst_number', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="fiscal_year_end" className="block text-sm font-medium text-foreground mb-2">
+                            <label htmlFor="fiscal_year_end" className="block text-sm font-medium text-white mb-2">
                                 Fiscal Year End
                             </label>
                             <input
@@ -215,7 +215,7 @@ const Settings: React.FC = () => {
                                 id="fiscal_year_end"
                                 value={formatDate(company.fiscal_year_end)}
                                 onChange={(e) => handleInputChange('fiscal_year_end', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
                         </div>
@@ -225,16 +225,16 @@ const Settings: React.FC = () => {
                 {/* Tax Settings */}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
-                        <Percent className="h-5 w-5 text-muted-foreground mr-2" />
-                        <h2 className="text-lg font-medium text-foreground">Tax Settings</h2>
+                        <Percent className="h-5 w-5 text-slate-muted mr-2" />
+                        <h2 className="text-lg font-medium text-white">Tax Settings</h2>
                     </div>
 
                     <div className="space-y-4">
                         {/* HST Registration Toggle */}
                         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                             <div>
-                                <h3 className="text-sm font-medium text-foreground">HST Registration</h3>
-                                <p className="text-sm text-muted-foreground">
+                                <h3 className="text-sm font-medium text-white">HST Registration</h3>
+                                <p className="text-sm text-slate-muted">
                                     Enable if your business is HST/GST registered and can claim Input Tax Credits
                                 </p>
                             </div>
@@ -251,7 +251,7 @@ const Settings: React.FC = () => {
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <label htmlFor="small_business_rate" className="block text-sm font-medium text-foreground mb-2">
+                                <label htmlFor="small_business_rate" className="block text-sm font-medium text-white mb-2">
                                     Small Business Tax Rate (%)
                                 </label>
                                 <div className="relative rounded-md shadow-sm">
@@ -263,20 +263,20 @@ const Settings: React.FC = () => {
                                         max="100"
                                         value={company.small_business_rate * 100}
                                         onChange={(e) => handleInputChange('small_business_rate', parseFloat(e.target.value) / 100)}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         required
                                     />
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                        <span className="text-muted-foreground text-sm">%</span>
+                                        <span className="text-slate-muted text-sm">%</span>
                                     </div>
                                 </div>
-                                <p className="mt-1 text-sm text-muted-foreground">
+                                <p className="mt-1 text-sm text-slate-muted">
                                     Ontario small business tax rate (default: 12.5%)
                                 </p>
                             </div>
 
                             <div>
-                                <label htmlFor="hst_rate" className="block text-sm font-medium text-foreground mb-2">
+                                <label htmlFor="hst_rate" className="block text-sm font-medium text-white mb-2">
                                     HST Rate (%)
                                 </label>
                                 <div className="relative rounded-md shadow-sm">
@@ -288,14 +288,14 @@ const Settings: React.FC = () => {
                                         max="100"
                                         value={company.hst_rate * 100}
                                         onChange={(e) => handleInputChange('hst_rate', parseFloat(e.target.value) / 100)}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         required
                                     />
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                        <span className="text-muted-foreground text-sm">%</span>
+                                        <span className="text-slate-muted text-sm">%</span>
                                     </div>
                                 </div>
-                                <p className="mt-1 text-sm text-muted-foreground">
+                                <p className="mt-1 text-sm text-slate-muted">
                                     Ontario HST rate (default: 13%)
                                 </p>
                             </div>

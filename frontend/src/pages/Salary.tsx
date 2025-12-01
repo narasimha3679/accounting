@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Dividend } from '../lib/api';
+import api, { type Salary } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import {
@@ -11,15 +11,16 @@ import {
     CheckCircle,
     Clock,
     Search,
-    X
+    X,
+    Briefcase
 } from 'lucide-react';
 
-const Dividends: React.FC = () => {
+const Salary: React.FC = () => {
     const { user } = useAuth();
-    const [dividends, setDividends] = useState<Dividend[]>([]);
+    const [salaries, setSalaries] = useState<Salary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [editingDividend, setEditingDividend] = useState<Dividend | null>(null);
+    const [editingSalary, setEditingSalary] = useState<Salary | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -29,32 +30,34 @@ const Dividends: React.FC = () => {
     // Form state
     const [formData, setFormData] = useState({
         amount: '',
-        declaration_date: '',
         payment_date: '',
-        status: 'declared' as 'declared' | 'paid',
+        period_start: '',
+        period_end: '',
+        employee_name: '',
+        status: 'pending' as 'pending' | 'paid',
         notes: '',
     });
 
     useEffect(() => {
         if (user) {
-            loadDividends();
+            loadSalaries();
         }
     }, [user, currentPage, statusFilter]);
 
-    const loadDividends = async () => {
+    const loadSalaries = async () => {
         try {
             setIsLoading(true);
-            const response = await api.getDividends({
+            const response = await api.getSalaries({
                 company_id: user?.company_id,
                 page: currentPage,
                 limit: 10,
                 status: statusFilter || undefined,
             });
-            setDividends(response.data);
+            setSalaries(response.data);
             setTotalPages(response.totalPages);
             setTotal(response.total);
         } catch (error) {
-            console.error('Error loading dividends:', error);
+            console.error('Error loading salaries:', error);
         } finally {
             setIsLoading(false);
         }
@@ -63,49 +66,53 @@ const Dividends: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const dividendData = {
+            const salaryData = {
                 amount: parseFloat(formData.amount),
-                declaration_date: formData.declaration_date,
-                payment_date: formData.payment_date || undefined,
+                payment_date: formData.payment_date,
+                period_start: formData.period_start,
+                period_end: formData.period_end,
+                employee_name: formData.employee_name,
                 status: formData.status,
                 notes: formData.notes || undefined,
                 company_id: user?.company_id!,
             };
 
-            if (editingDividend) {
-                await api.updateDividend(editingDividend.id, dividendData);
+            if (editingSalary) {
+                await api.updateSalary(editingSalary.id, salaryData);
             } else {
-                await api.createDividend(dividendData);
+                await api.createSalary(salaryData);
             }
 
             setShowModal(false);
-            setEditingDividend(null);
+            setEditingSalary(null);
             resetForm();
-            loadDividends();
+            loadSalaries();
         } catch (error) {
-            console.error('Error saving dividend:', error);
+            console.error('Error saving salary:', error);
         }
     };
 
-    const handleEdit = (dividend: Dividend) => {
-        setEditingDividend(dividend);
+    const handleEdit = (salary: Salary) => {
+        setEditingSalary(salary);
         setFormData({
-            amount: dividend.amount.toString(),
-            declaration_date: dividend.declaration_date.split('T')[0],
-            payment_date: dividend.payment_date ? dividend.payment_date.split('T')[0] : '',
-            status: dividend.status,
-            notes: dividend.notes || '',
+            amount: salary.amount.toString(),
+            payment_date: salary.payment_date.split('T')[0],
+            period_start: salary.period_start.split('T')[0],
+            period_end: salary.period_end.split('T')[0],
+            employee_name: salary.employee_name,
+            status: salary.status,
+            notes: salary.notes || '',
         });
         setShowModal(true);
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this dividend?')) {
+        if (window.confirm('Are you sure you want to delete this salary record?')) {
             try {
-                await api.deleteDividend(id);
-                loadDividends();
+                await api.deleteSalary(id);
+                loadSalaries();
             } catch (error) {
-                console.error('Error deleting dividend:', error);
+                console.error('Error deleting salary:', error);
             }
         }
     };
@@ -113,22 +120,24 @@ const Dividends: React.FC = () => {
     const resetForm = () => {
         setFormData({
             amount: '',
-            declaration_date: '',
             payment_date: '',
-            status: 'declared',
+            period_start: '',
+            period_end: '',
+            employee_name: '',
+            status: 'pending',
             notes: '',
         });
     };
 
     const openModal = () => {
-        setEditingDividend(null);
+        setEditingSalary(null);
         resetForm();
         setShowModal(true);
     };
 
     const closeModal = () => {
         setShowModal(false);
-        setEditingDividend(null);
+        setEditingSalary(null);
         resetForm();
     };
 
@@ -147,7 +156,7 @@ const Dividends: React.FC = () => {
         switch (status) {
             case 'paid':
                 return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
-            case 'declared':
+            case 'pending':
                 return <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />;
             default:
                 return <Clock className="h-4 w-4 text-slate-muted" />;
@@ -158,21 +167,22 @@ const Dividends: React.FC = () => {
         switch (status) {
             case 'paid':
                 return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-            case 'declared':
+            case 'pending':
                 return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
             default:
                 return 'bg-muted text-slate-muted';
         }
     };
 
-    const filteredDividends = dividends.filter(dividend =>
-        dividend.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dividend.amount.toString().includes(searchTerm)
+    const filteredSalaries = salaries.filter(salary =>
+        salary.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        salary.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        salary.amount.toString().includes(searchTerm)
     );
 
-    const totalDividends = dividends.reduce((sum, dividend) => sum + dividend.amount, 0);
-    const paidDividends = dividends.filter(d => d.status === 'paid').reduce((sum, dividend) => sum + dividend.amount, 0);
-    const declaredDividends = dividends.filter(d => d.status === 'declared').reduce((sum, dividend) => sum + dividend.amount, 0);
+    const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
+    const paidSalaries = salaries.filter(s => s.status === 'paid').reduce((sum, salary) => sum + salary.amount, 0);
+    const pendingSalaries = salaries.filter(s => s.status === 'pending').reduce((sum, salary) => sum + salary.amount, 0);
 
     if (isLoading) {
         return (
@@ -187,15 +197,15 @@ const Dividends: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Dividends</h1>
-                    <p className="text-slate-muted mt-2">Manage corporate dividend declarations and payments</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Salary</h1>
+                    <p className="text-muted-foreground mt-2">Manage employee salary payments</p>
                 </div>
                 <Button
                     onClick={openModal}
                     icon={Plus}
                     className="w-full sm:w-auto"
                 >
-                    Create Dividend
+                    Create Salary
                 </Button>
             </div>
 
@@ -208,11 +218,11 @@ const Dividends: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-slate-muted truncate">
-                                    Total Dividends
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                    Total Salaries
                                 </dt>
-                                <dd className="text-2xl font-bold text-white">
-                                    {formatCurrency(totalDividends)}
+                                <dd className="text-2xl font-bold text-foreground">
+                                    {formatCurrency(totalSalaries)}
                                 </dd>
                             </dl>
                         </div>
@@ -226,11 +236,11 @@ const Dividends: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-slate-muted truncate">
-                                    Paid Dividends
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                    Paid Salaries
                                 </dt>
-                                <dd className="text-2xl font-bold text-white">
-                                    {formatCurrency(paidDividends)}
+                                <dd className="text-2xl font-bold text-foreground">
+                                    {formatCurrency(paidSalaries)}
                                 </dd>
                             </dl>
                         </div>
@@ -244,11 +254,11 @@ const Dividends: React.FC = () => {
                         </div>
                         <div className="ml-5 w-0 flex-1">
                             <dl>
-                                <dt className="text-sm font-medium text-slate-muted truncate">
-                                    Declared (Unpaid)
+                                <dt className="text-sm font-medium text-muted-foreground truncate">
+                                    Pending Salaries
                                 </dt>
-                                <dd className="text-2xl font-bold text-white">
-                                    {formatCurrency(declaredDividends)}
+                                <dd className="text-2xl font-bold text-foreground">
+                                    {formatCurrency(pendingSalaries)}
                                 </dd>
                             </dl>
                         </div>
@@ -261,13 +271,13 @@ const Dividends: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-muted" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <input
                                 type="text"
-                                placeholder="Search dividends..."
+                                placeholder="Search salaries..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="input pl-10"
                             />
                         </div>
                     </div>
@@ -275,57 +285,61 @@ const Dividends: React.FC = () => {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="input"
                         >
                             <option value="">All Status</option>
-                            <option value="declared">Declared</option>
+                            <option value="pending">Pending</option>
                             <option value="paid">Paid</option>
                         </select>
                     </div>
                 </div>
             </Card>
 
-            {/* Dividends Table */}
+            {/* Salaries Table */}
             <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
                             <tr>
+                                <th className="px-6 py-4">Employee</th>
                                 <th className="px-6 py-4">Amount</th>
-                                <th className="px-6 py-4">Declaration Date</th>
                                 <th className="px-6 py-4">Payment Date</th>
+                                <th className="px-6 py-4">Period</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4">Notes</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {filteredDividends.map((dividend) => (
-                                <tr key={dividend.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-white">
-                                        {formatCurrency(dividend.amount)}
+                            {filteredSalaries.map((salary) => (
+                                <tr key={salary.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-foreground">
+                                        {salary.employee_name}
                                     </td>
-                                    <td className="px-6 py-4 text-slate-muted">
-                                        {formatDate(dividend.declaration_date)}
+                                    <td className="px-6 py-4 font-medium text-foreground">
+                                        {formatCurrency(salary.amount)}
                                     </td>
-                                    <td className="px-6 py-4 text-slate-muted">
-                                        {dividend.payment_date ? formatDate(dividend.payment_date) : '-'}
+                                    <td className="px-6 py-4 text-muted-foreground">
+                                        {formatDate(salary.payment_date)}
+                                    </td>
+                                    <td className="px-6 py-4 text-muted-foreground">
+                                        {formatDate(salary.period_start)} - {formatDate(salary.period_end)}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(dividend.status)}`}>
-                                            {getStatusIcon(dividend.status)}
-                                            <span className="ml-1 capitalize">{dividend.status}</span>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(salary.status)}`}>
+                                            {getStatusIcon(salary.status)}
+                                            <span className="ml-1 capitalize">{salary.status}</span>
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-muted max-w-xs truncate">
-                                        {dividend.notes || '-'}
+                                    <td className="px-6 py-4 text-muted-foreground max-w-xs truncate">
+                                        {salary.notes || '-'}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2">
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handleEdit(dividend)}
+                                                onClick={() => handleEdit(salary)}
                                                 className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                                 title="Edit"
                                             >
@@ -334,7 +348,7 @@ const Dividends: React.FC = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handleDelete(dividend.id)}
+                                                onClick={() => handleDelete(salary.id)}
                                                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 title="Delete"
                                             >
@@ -348,12 +362,12 @@ const Dividends: React.FC = () => {
                     </table>
                 </div>
 
-                {filteredDividends.length === 0 && (
+                {filteredSalaries.length === 0 && (
                     <div className="text-center py-12">
-                        <DollarSign className="mx-auto h-12 w-12 text-slate-muted" />
-                        <h3 className="mt-2 text-sm font-medium text-white">No dividends found</h3>
-                        <p className="mt-1 text-sm text-slate-muted">
-                            {searchTerm || statusFilter ? 'Try adjusting your search or filter criteria.' : 'Get started by adding your first dividend.'}
+                        <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-2 text-sm font-medium text-foreground">No salaries found</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {searchTerm || statusFilter ? 'Try adjusting your search or filter criteria.' : 'Get started by adding your first salary record.'}
                         </p>
                         {!searchTerm && !statusFilter && (
                             <div className="mt-6">
@@ -362,7 +376,7 @@ const Dividends: React.FC = () => {
                                     icon={Plus}
                                     className="mx-auto"
                                 >
-                                    Create Dividend
+                                    Create Salary
                                 </Button>
                             </div>
                         )}
@@ -371,7 +385,7 @@ const Dividends: React.FC = () => {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-white/10 sm:px-6">
+                    <div className="bg-card px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
                         <div className="flex-1 flex justify-between sm:hidden">
                             <Button
                                 variant="outline"
@@ -390,10 +404,10 @@ const Dividends: React.FC = () => {
                         </div>
                         <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                             <div>
-                                <p className="text-sm text-slate-muted">
-                                    Showing <span className="font-medium text-white">{(currentPage - 1) * 10 + 1}</span> to{' '}
-                                    <span className="font-medium text-white">{Math.min(currentPage * 10, total)}</span> of{' '}
-                                    <span className="font-medium text-white">{total}</span> results
+                                <p className="text-sm text-muted-foreground">
+                                    Showing <span className="font-medium text-foreground">{(currentPage - 1) * 10 + 1}</span> to{' '}
+                                    <span className="font-medium text-foreground">{Math.min(currentPage * 10, total)}</span> of{' '}
+                                    <span className="font-medium text-foreground">{total}</span> results
                                 </p>
                             </div>
                             <div>
@@ -437,10 +451,10 @@ const Dividends: React.FC = () => {
             {/* Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                    <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-card p-6 shadow-lg">
+                    <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-lg">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-semibold text-white">
-                                {editingDividend ? 'Edit Dividend' : 'Add New Dividend'}
+                            <h3 className="text-lg font-semibold text-foreground">
+                                {editingSalary ? 'Edit Salary' : 'Add New Salary'}
                             </h3>
                             <Button
                                 variant="ghost"
@@ -454,7 +468,21 @@ const Dividends: React.FC = () => {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-white mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Employee Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.employee_name}
+                                    onChange={(e) => setFormData({ ...formData, employee_name: e.target.value })}
+                                    className="input"
+                                    placeholder="Employee name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Amount *
                                 </label>
                                 <input
@@ -463,65 +491,80 @@ const Dividends: React.FC = () => {
                                     required
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="input"
                                     placeholder="0.00"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-white mb-2">
-                                    Declaration Date *
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Payment Date *
                                 </label>
                                 <input
                                     type="date"
                                     required
-                                    value={formData.declaration_date}
-                                    onChange={(e) => setFormData({ ...formData, declaration_date: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-white mb-2">
-                                    Payment Date
-                                </label>
-                                <input
-                                    type="date"
                                     value={formData.payment_date}
                                     onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="input"
                                 />
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-2">
+                                        Period Start *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.period_start}
+                                        onChange={(e) => setFormData({ ...formData, period_start: e.target.value })}
+                                        className="input"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-2">
+                                        Period End *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.period_end}
+                                        onChange={(e) => setFormData({ ...formData, period_end: e.target.value })}
+                                        className="input"
+                                    />
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="block text-sm font-medium text-white mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Status *
                                 </label>
                                 <select
                                     required
                                     value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'declared' | 'paid' })}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'pending' | 'paid' })}
+                                    className="input"
                                 >
-                                    <option value="declared">Declared</option>
+                                    <option value="pending">Pending</option>
                                     <option value="paid">Paid</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-white mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Notes
                                 </label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     rows={3}
-                                    placeholder="Optional notes about this dividend..."
+                                    placeholder="Optional notes about this salary..."
                                 />
                             </div>
 
-                            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-white/10">
+                            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -532,7 +575,7 @@ const Dividends: React.FC = () => {
                                 <Button
                                     type="submit"
                                 >
-                                    {editingDividend ? 'Update' : 'Create'} Dividend
+                                    {editingSalary ? 'Update' : 'Create'} Salary
                                 </Button>
                             </div>
                         </form>
@@ -543,4 +586,5 @@ const Dividends: React.FC = () => {
     );
 };
 
-export default Dividends;
+export default Salary;
+
