@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Salary } from '../lib/api';
+import api, { type Salary as SalaryRecord } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import {
@@ -15,12 +15,12 @@ import {
     Briefcase
 } from 'lucide-react';
 
-const Salary: React.FC = () => {
+const SalaryPage: React.FC = () => {
     const { user } = useAuth();
-    const [salaries, setSalaries] = useState<Salary[]>([]);
+    const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [editingSalary, setEditingSalary] = useState<Salary | null>(null);
+    const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -92,7 +92,7 @@ const Salary: React.FC = () => {
         }
     };
 
-    const handleEdit = (salary: Salary) => {
+    const handleEdit = (salary: SalaryRecord) => {
         setEditingSalary(salary);
         setFormData({
             amount: salary.amount.toString(),
@@ -174,7 +174,7 @@ const Salary: React.FC = () => {
         }
     };
 
-    const filteredSalaries = salaries.filter(salary =>
+    const filteredSalaries = salaries.filter((salary) =>
         salary.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         salary.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         salary.amount.toString().includes(searchTerm)
@@ -586,5 +586,5 @@ const Salary: React.FC = () => {
     );
 };
 
-export default Salary;
+export default SalaryPage;
 
