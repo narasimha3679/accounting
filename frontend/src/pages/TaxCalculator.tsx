@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Salary } from '../lib/api';
+import api from '../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
