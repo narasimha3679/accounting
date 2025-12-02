@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
-import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info, HelpCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -195,7 +195,7 @@ const Expenses: React.FC = () => {
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="flex h-10 w-full sm:w-auto rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full sm:w-auto rounded-md glass border border-white/10 bg-card text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -273,6 +273,7 @@ const Expenses: React.FC = () => {
                                 <th className="px-6 py-4">Category</th>
                                 <th className="px-6 py-4">Amount</th>
                                 <th className="px-6 py-4">HST Paid</th>
+                                <th className="px-6 py-4">Deduction</th>
                                 <th className="px-6 py-4">Total</th>
                                 <th className="px-6 py-4">Paid By</th>
                                 <th className="px-6 py-4">Receipt</th>
@@ -287,6 +288,26 @@ const Expenses: React.FC = () => {
                                     <td className="px-6 py-4 text-slate-muted">{expense.category?.name || 'Uncategorized'}</td>
                                     <td className="px-6 py-4 font-medium text-white">{formatCurrency(expense.amount)}</td>
                                     <td className="px-6 py-4 text-slate-muted">{formatCurrency(expense.hst_paid)}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-white">
+                                                {((expense.deduction_percentage ?? 1.0) * 100).toFixed(0)}%
+                                            </span>
+                                            {(expense.deduction_percentage ?? 1.0) < 1.0 && (
+                                                <span 
+                                                    className="inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" 
+                                                    title={`Only ${formatCurrency(expense.amount * (expense.deduction_percentage ?? 1.0))} is deductible`}
+                                                >
+                                                    ⚠
+                                                </span>
+                                            )}
+                                        </div>
+                                        {(expense.deduction_percentage ?? 1.0) < 1.0 && (
+                                            <div className="text-xs text-slate-muted mt-1">
+                                                {formatCurrency(expense.amount * (expense.deduction_percentage ?? 1.0))} deductible
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 font-medium text-green-600 dark:text-green-400">{formatCurrency(expense.amount + expense.hst_paid)}</td>
                                     <td className="px-6 py-4">
                                         {expense.paid_by === 'corp' ? (
@@ -386,11 +407,260 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
         }).format(amount);
     };
 
+    // Helper function to get deduction guidance for a category based on Canadian CRA rules
+    const getDeductionGuidance = (categoryName: string | undefined): { default: number; explanation: string } => {
+        if (!categoryName) return { 
+            default: 1.0, 
+            explanation: 'Most business expenses are 100% deductible. If this expense has personal use, enter the business use percentage (0-100%).' 
+        };
+        
+        const name = categoryName.toLowerCase();
+        
+        // Meals & Entertainment - 50% deductible per CRA rules
+        if (name.includes('meal') || name.includes('entertainment')) {
+            return {
+                default: 0.5,
+                explanation: 'CRA Rule: Meals and entertainment are 50% deductible. This includes client meals, business lunches, and event tickets. Only business-related meals during meetings or events qualify. Personal entertainment is not deductible.'
+            };
+        }
+        
+        // Vehicle/Automobile - Based on business use percentage
+        if (name.includes('vehicle') || name.includes('automobile') || name.includes('car') || name.includes('travel')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Vehicle expenses are deductible based on business use percentage. Calculate by dividing business km by total km. If used 100% for business, enter 100%. Commuting from home to regular workplace is NOT deductible. Keep a log of business vs personal use.'
+            };
+        }
+        
+        // Home Office - Proportional to business use
+        if (name.includes('home office') || (name.includes('office') && name.includes('home'))) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Home office expenses are deductible based on the percentage of your home used exclusively and regularly for business. Calculate by: (Office square footage ÷ Total home square footage) × 100. Must be your principal place of business or used exclusively for meeting clients.'
+            };
+        }
+        
+        // Travel - 100% for transport/accommodation, 50% for meals
+        if (name.includes('travel')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Transportation and accommodation for business travel are 100% deductible. However, meals during travel are only 50% deductible. If this entry includes meals, adjust accordingly.'
+            };
+        }
+        
+        // Rent - 100% if business premises
+        if (name.includes('rent')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Rent for business premises (office, retail space, warehouse) is 100% deductible. If you rent part of your home for business, use the home office calculation method instead.'
+            };
+        }
+        
+        // Utilities - 100% if business-only, or proportional for home office
+        if (name.includes('utilit')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Utilities for business premises are 100% deductible. If for a home office, deduct the percentage of home used for business. Business phone lines are 100% deductible; personal phone lines are not.'
+            };
+        }
+        
+        // Insurance - 100% for business insurance
+        if (name.includes('insurance')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business insurance premiums (liability, property, professional) are 100% deductible. Personal insurance (life, health, auto for personal use) is not deductible.'
+            };
+        }
+        
+        // Advertising & Marketing - 100% deductible
+        if (name.includes('advertis') || name.includes('market')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Advertising and marketing expenses are 100% deductible if incurred to earn business income. This includes online ads, print ads, promotional materials, and website costs. Keep copies of advertisements.'
+            };
+        }
+        
+        // Legal Fees - 100% deductible for business matters (check before professional)
+        if (name.includes('legal')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Legal fees for business matters are 100% deductible. This includes contract review, business disputes, incorporation fees. Personal legal fees (divorce, wills) are not deductible.'
+            };
+        }
+        
+        // Accounting Fees - 100% deductible (check before professional)
+        if (name.includes('accounting') || name.includes('bookkeeping')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Accounting, bookkeeping, and tax preparation fees are 100% deductible. This includes professional services for business financial records and tax filing. Keep detailed invoices.'
+            };
+        }
+        
+        // Professional Fees - 100% deductible (general catch-all)
+        if (name.includes('professional') || name.includes('consultant')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Professional fees (consultants, advisors) for business services are 100% deductible. Keep detailed invoices. Personal professional fees are generally not deductible.'
+            };
+        }
+        
+        // Bank Charges - 100% for business accounts
+        if (name.includes('bank') || name.includes('fee')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Bank fees and interest on business loans are 100% deductible. Personal bank fees and interest on personal loans are not deductible. Ensure this is for a business account.'
+            };
+        }
+        
+        // Office Supplies - 100% deductible
+        if (name.includes('supply') || name.includes('stationery')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Office supplies (paper, pens, printer ink, postage) used in the tax year are 100% deductible. Keep receipts. Items over $500 may need to be capitalized as assets.'
+            };
+        }
+        
+        // Software & Subscriptions - 100% deductible
+        if (name.includes('software') || name.includes('subscription') || name.includes('saas')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business software and subscriptions are 100% deductible. This includes cloud services, accounting software, CRM tools, and business apps. Personal software subscriptions are not deductible. Software over $500 may need to be capitalized.'
+            };
+        }
+        
+        // Subscriptions & Memberships - 100% deductible
+        if (name.includes('membership')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business subscriptions and memberships (trade associations, professional organizations, business publications) are 100% deductible. Personal memberships are not deductible.'
+            };
+        }
+        
+        // Internet & Phone - 100% for business lines
+        if (name.includes('internet') || name.includes('phone') || name.includes('telephone')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business internet and phone services are 100% deductible. If you have a dedicated business line, deduct 100%. If shared with personal use, deduct only the business portion. Keep detailed records of business vs personal usage.'
+            };
+        }
+        
+        // Training & Education - 100% if business-related
+        if (name.includes('training') || name.includes('education') || name.includes('course') || name.includes('conference') || name.includes('seminar')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business training, courses, conferences, and seminars are 100% deductible if they maintain or improve skills for your business. Personal education or courses that lead to a new career are not deductible.'
+            };
+        }
+        
+        // Equipment & Tools - 100% deductible (under $500)
+        if (name.includes('equipment') || name.includes('tool')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business equipment and tools are 100% deductible if under $500. Items over $500 may need to be capitalized as assets and depreciated. Keep receipts and note the purchase date.'
+            };
+        }
+        
+        // Postage & Shipping - 100% deductible
+        if (name.includes('postage') || name.includes('shipping') || name.includes('courier')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Postage, shipping, and courier costs for business purposes are 100% deductible. This includes mail, packages, and delivery services. Personal shipping costs are not deductible.'
+            };
+        }
+        
+        // Legal Fees - 100% deductible for business matters
+        if (name.includes('legal')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Legal fees for business matters are 100% deductible. This includes contract review, business disputes, incorporation fees. Personal legal fees (divorce, wills) are not deductible.'
+            };
+        }
+        
+        // Accounting Fees - 100% deductible
+        if (name.includes('accounting') || name.includes('bookkeeping')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Accounting, bookkeeping, and tax preparation fees are 100% deductible. This includes professional services for business financial records and tax filing. Keep detailed invoices.'
+            };
+        }
+        
+        // Business Licenses & Permits - 100% deductible
+        if (name.includes('license') || name.includes('permit')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Business licenses, permits, and registrations required to operate your business are 100% deductible. This includes municipal licenses, professional licenses, and regulatory permits.'
+            };
+        }
+        
+        // Interest Expense - 100% deductible for business loans
+        if (name.includes('interest')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Interest on business loans, credit lines, and business credit cards is 100% deductible. Personal interest (mortgage, personal loans) is not deductible. Ensure the loan is used for business purposes.'
+            };
+        }
+        
+        // Charitable Donations - 100% deductible with limits
+        if (name.includes('charitable') || name.includes('donation')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Charitable donations made by corporations are 100% deductible up to 75% of net income. Keep receipts from registered charities. Political donations have different rules.'
+            };
+        }
+        
+        // Bad Debts - 100% deductible when written off
+        if (name.includes('bad debt')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Bad debts (uncollectible accounts receivable) are 100% deductible when written off. You must have made reasonable efforts to collect and have documentation. Can only deduct if previously included in income.'
+            };
+        }
+        
+        // Cleaning Services - 100% deductible
+        if (name.includes('cleaning') || name.includes('janitorial')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Office cleaning and janitorial services are 100% deductible. This includes regular cleaning, deep cleaning, and maintenance cleaning for business premises.'
+            };
+        }
+        
+        // Security Services - 100% deductible
+        if (name.includes('security')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Security systems, monitoring services, and guard services for business premises are 100% deductible. This includes alarm systems, security cameras, and security personnel.'
+            };
+        }
+        
+        // Printing & Copying - 100% deductible
+        if (name.includes('printing') || name.includes('copying')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Printing, copying, and document services for business purposes are 100% deductible. This includes business cards, marketing materials, reports, and document services.'
+            };
+        }
+        
+        // Repairs & Maintenance - 100% deductible
+        if (name.includes('repair') || name.includes('maintenance')) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Repairs and maintenance to business property are 100% deductible. This includes fixing equipment, painting, cleaning services. Major improvements that extend asset life may need to be capitalized.'
+            };
+        }
+        
+        // Default for other categories
+        return {
+            default: 1.0,
+            explanation: 'CRA Rule: Most business expenses are 100% deductible if incurred to earn business income. If this expense has personal use, enter the business use percentage (0-100%). Personal expenses, fines, and penalties are not deductible.'
+        };
+    };
+
     const [formData, setFormData] = useState({
         description: expense?.description || '',
         category_id: expense?.category_id || 0,
         amount: expense?.amount || 0,
         hst_paid: expense?.hst_paid || 0,
+        deduction_percentage: expense?.deduction_percentage ?? 1.0,
         expense_date: expense?.expense_date || new Date().toISOString().split('T')[0],
         receipt_attached: expense?.receipt_attached || false,
         paid_by: expense?.paid_by || 'corp',
@@ -551,8 +821,17 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                             <label className="block text-sm font-medium text-white mb-2">Category *</label>
                             <select
                                 value={formData.category_id}
-                                onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                onChange={(e) => {
+                                    const selectedCategoryId = parseInt(e.target.value);
+                                    const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
+                                    const guidance = getDeductionGuidance(selectedCategory?.name);
+                                    setFormData({ 
+                                        ...formData, 
+                                        category_id: selectedCategoryId,
+                                        deduction_percentage: selectedCategory?.default_deduction_percentage ?? guidance.default
+                                    });
+                                }}
+                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-card text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value={0}>Select a category</option>
@@ -655,6 +934,121 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                 <p className="mt-1 text-xs text-slate-muted">
                                     Calculated: {formatCurrency(formData.amount)} × 13% = {formatCurrency(formData.hst_paid)}
                                 </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <label className="block text-sm font-medium text-white">
+                                    Tax Deduction Percentage *
+                                </label>
+                                <div className="group relative">
+                                    <HelpCircle className="h-4 w-4 text-slate-muted cursor-help" />
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 w-64 p-3 bg-card border border-white/10 rounded-lg shadow-lg text-xs text-slate-muted">
+                                        <p className="font-semibold text-white mb-1">What is this?</p>
+                                        <p>This is the percentage of this expense that can be deducted from your taxable income. Most business expenses are 100% deductible, but some (like meals) are only partially deductible.</p>
+                                    </div>
+                                </div>
+                                {formData.deduction_percentage < 1.0 && (
+                                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                                        Not Fully Deductible
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="number"
+                                    value={(formData.deduction_percentage * 100).toFixed(0)}
+                                    onChange={(e) => {
+                                        const percentage = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) / 100;
+                                        setFormData({ ...formData, deduction_percentage: percentage });
+                                    }}
+                                    className="flex h-10 w-24 rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    required
+                                />
+                                <span className="flex items-center text-sm text-slate-muted">%</span>
+                                <div className="flex gap-1 flex-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, deduction_percentage: 1.0 })}
+                                        className={cn(
+                                            "px-3 py-2 text-xs rounded-md border transition-colors",
+                                            formData.deduction_percentage === 1.0
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-card text-white border-white/10 hover:bg-muted"
+                                        )}
+                                    >
+                                        100%
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, deduction_percentage: 0.5 })}
+                                        className={cn(
+                                            "px-3 py-2 text-xs rounded-md border transition-colors",
+                                            formData.deduction_percentage === 0.5
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-card text-white border-white/10 hover:bg-muted"
+                                        )}
+                                    >
+                                        50%
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, deduction_percentage: 0.0 })}
+                                        className={cn(
+                                            "px-3 py-2 text-xs rounded-md border transition-colors",
+                                            formData.deduction_percentage === 0.0
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-card text-white border-white/10 hover:bg-muted"
+                                        )}
+                                    >
+                                        0%
+                                    </button>
+                                </div>
+                            </div>
+                            {(() => {
+                                const selectedCategory = categories.find(cat => cat.id === formData.category_id);
+                                const guidance = getDeductionGuidance(selectedCategory?.name);
+                                return (
+                                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                                        <div className="flex items-start">
+                                            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                                            <div className="text-xs text-blue-800 dark:text-blue-300">
+                                                <p className="font-medium mb-1">Category Guidance:</p>
+                                                <p>{guidance.explanation}</p>
+                                                {formData.amount > 0 && (
+                                                    <p className="mt-2 font-medium">
+                                                        Deductible amount: {formatCurrency(formData.amount * formData.deduction_percentage)} of {formatCurrency(formData.amount)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {formData.deduction_percentage < 1.0 && formData.amount > 0 && (
+                                <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                    <div className="flex">
+                                        <div className="flex-shrink-0">
+                                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="ml-3">
+                                            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                                                Partial Deduction
+                                            </h3>
+                                            <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
+                                                <p>
+                                                    Only {(formData.deduction_percentage * 100).toFixed(0)}% ({formatCurrency(formData.amount * formData.deduction_percentage)}) of this expense will reduce your taxable income.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
 

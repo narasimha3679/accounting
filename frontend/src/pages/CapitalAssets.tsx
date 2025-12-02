@@ -117,7 +117,7 @@ const CapitalAssets: React.FC = () => {
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
                         {categories?.map(category => (
@@ -129,7 +129,7 @@ const CapitalAssets: React.FC = () => {
                     <select
                         value={selectedCCAClass}
                         onChange={(e) => setSelectedCCAClass(e.target.value)}
-                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All CCA Classes</option>
                         {ccaClasses?.map(ccaClass => (
@@ -410,7 +410,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                             <select
                                 value={formData.category_id}
                                 onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value={0}>Select a category</option>
@@ -463,7 +463,7 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                             <select
                                 value={formData.cca_class}
                                 onChange={(e) => setFormData({ ...formData, cca_class: e.target.value })}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value="">Select CCA class</option>

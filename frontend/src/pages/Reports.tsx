@@ -214,6 +214,11 @@ const Reports: React.FC = () => {
         const hstCollected = hstFromInvoices + hstFromClientIncome;
 
         const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        // Calculate deductible expenses using deduction percentage
+        const totalDeductibleExpenses = expenses.reduce((sum, exp) => {
+            const deductionPercentage = exp.deduction_percentage ?? 1.0;
+            return sum + (exp.amount * deductionPercentage);
+        }, 0);
         const totalSalaries = salaries.reduce((sum, sal) => sum + sal.amount, 0);
 
         // Calculate HST paid from expenses (Input Tax Credits)
@@ -242,7 +247,8 @@ const Reports: React.FC = () => {
         const totalAccumulatedDepreciation = capitalAssets.reduce((sum, asset) => sum + Number(asset.accumulated_depreciation), 0);
 
         // Net income before tax should include depreciation and salaries as expenses
-        const netIncomeBeforeTax = grossIncome - totalExpenses - totalSalaries - totalDepreciationForYear;
+        // Use deductible expenses instead of total expenses
+        const netIncomeBeforeTax = grossIncome - totalDeductibleExpenses - totalSalaries - totalDepreciationForYear;
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125; // Use company rate, fallback to 12.5%
         const smallBusinessTax = Math.max(0, netIncomeBeforeTax * smallBusinessTaxRate);
         const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
@@ -256,6 +262,7 @@ const Reports: React.FC = () => {
             clientIncome,
             otherIncome,
             totalExpenses,
+            totalDeductibleExpenses,
             totalSalaries,
             totalDepreciationForYear,
             netIncomeBeforeTax,

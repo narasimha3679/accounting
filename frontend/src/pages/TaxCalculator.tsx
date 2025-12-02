@@ -198,8 +198,13 @@ const TaxCalculator: React.FC = () => {
             .filter(entry => entry.income_type === 'other')
             .reduce((sum, entry) => sum + entry.amount, 0);
 
-        // Calculate Total Expenses
+        // Calculate Total Expenses (full amount)
         const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        // Calculate Total Deductible Expenses (using deduction percentage)
+        const totalDeductibleExpenses = filteredExpenses.reduce((sum, expense) => {
+            const deductionPercentage = expense.deduction_percentage ?? 1.0;
+            return sum + (expense.amount * deductionPercentage);
+        }, 0);
         const totalSalaries = filteredSalaries.reduce((sum, salary) => sum + salary.amount, 0);
 
         // Calculate Depreciation (CCA) for the fiscal year
@@ -209,7 +214,8 @@ const TaxCalculator: React.FC = () => {
         const totalDepreciation = depreciationEntries.reduce((sum, entry) => sum + entry.depreciation_amount, 0);
 
         // Calculate Taxable Income (salaries are business expenses that reduce taxable income)
-        const taxableIncome = Math.max(0, grossRevenue + otherIncome - totalExpenses - totalSalaries - totalDepreciation);
+        // Use deductible expenses instead of total expenses
+        const taxableIncome = Math.max(0, grossRevenue + otherIncome - totalDeductibleExpenses - totalSalaries - totalDepreciation);
 
         // Calculate Corporate Tax
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
@@ -236,6 +242,7 @@ const TaxCalculator: React.FC = () => {
             clientIncome,
             otherIncome,
             totalExpenses,
+            totalDeductibleExpenses,
             totalSalaries,
             totalDepreciation,
             taxableIncome,
@@ -497,6 +504,11 @@ const TaxCalculator: React.FC = () => {
                             <div className="bg-background rounded-lg p-4 border border-red-200 dark:border-red-800">
                                 <div className="text-sm text-slate-muted mb-1">Total Expenses</div>
                                 <div className="text-xl font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalExpenses)}</div>
+                                {taxData.totalExpenses !== taxData.totalDeductibleExpenses && (
+                                    <div className="text-xs text-slate-muted mt-1">
+                                        Deductible: {formatCurrency(taxData.totalDeductibleExpenses)}
+                                    </div>
+                                )}
                             </div>
                             <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
                                 <div className="text-sm text-slate-muted mb-1">Total Salaries</div>

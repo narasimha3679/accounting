@@ -187,8 +187,13 @@ const Dashboard: React.FC = () => {
                 .reduce((sum, entry) => sum + entry.amount, 0);
             const totalRevenue = invoiceRevenue + clientIncome;
             const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+            // Calculate deductible expenses using deduction percentage
+            const totalDeductibleExpenses = expenses.reduce((sum, expense) => {
+                const deductionPercentage = expense.deduction_percentage ?? 1.0;
+                return sum + (expense.amount * deductionPercentage);
+            }, 0);
             const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
-            const netIncome = totalRevenue + otherIncome - totalExpenses - totalSalaries;
+            const netIncome = totalRevenue + otherIncome - totalDeductibleExpenses - totalSalaries;
 
             // Calculate owner reimbursement owed (expenses and capital assets paid by owner that need to be reimbursed)
             const ownerExpenses = expenses.filter(expense => expense.paid_by === 'owner');
@@ -235,8 +240,8 @@ const Dashboard: React.FC = () => {
             // Calculate tax information
             const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
 
-            // Taxable income = Total Revenue + Other Income - Business Expenses - Salaries
-            const taxableIncome = totalRevenue + otherIncome - totalExpenses - totalSalaries;
+            // Taxable income = Total Revenue + Other Income - Deductible Business Expenses - Salaries
+            const taxableIncome = totalRevenue + otherIncome - totalDeductibleExpenses - totalSalaries;
             const smallBusinessTaxOwed = Math.max(0, taxableIncome * smallBusinessTaxRate);
 
             // Tax paid through dividends (dividends are paid from after-tax income)
@@ -247,8 +252,8 @@ const Dashboard: React.FC = () => {
             const netIncomeAfterTax = taxableIncome - smallBusinessTaxOwed;
             const availableDividends = Math.max(0, netIncomeAfterTax - totalDividendsPaid);
 
-            // Tax deductible expenses (all business expenses and salaries reduce taxable income)
-            const taxDeductibleExpenses = totalExpenses + totalSalaries;
+            // Tax deductible expenses (using deduction percentages)
+            const taxDeductibleExpenses = totalDeductibleExpenses + totalSalaries;
 
             // Calculate capital asset stats
             const totalAssetCost = capitalAssets.reduce((sum, asset) => sum + asset.total_cost, 0);

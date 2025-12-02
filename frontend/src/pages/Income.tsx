@@ -374,7 +374,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                 id="income_type"
                                 value={formData.income_type}
                                 onChange={(e) => handleInputChange('income_type', e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             >
                                 <option value="client">Client Income</option>
@@ -392,7 +392,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                                     id="client_id"
                                     value={formData.client_id}
                                     onChange={(e) => handleInputChange('client_id', e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <option value="">Select a client</option>
                                     {clients.map((client) => (

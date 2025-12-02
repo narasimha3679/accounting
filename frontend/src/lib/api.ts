@@ -74,6 +74,7 @@ export interface ExpenseCategory {
     name: string;
     description?: string | null;
     company_id?: number | null;
+    default_deduction_percentage: number;
     created_at: string;
     updated_at: string;
 }
@@ -97,6 +98,7 @@ export interface Expense {
     category?: ExpenseCategory;
     amount: number;
     hst_paid: number;
+    deduction_percentage: number;
     expense_date: string;
     receipt_attached: boolean;
     paid_by: 'corp' | 'owner';
@@ -1412,9 +1414,14 @@ class SupabaseApi {
 
         const grossIncome = paidInvoices.reduce((sum, inv) => sum + inv.subtotal, 0);
         const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        // Calculate deductible expenses using deduction percentage
+        const totalDeductibleExpenses = filteredExpenses.reduce((sum, exp) => {
+            const deductionPercentage = exp.deduction_percentage ?? 1.0;
+            return sum + (exp.amount * deductionPercentage);
+        }, 0);
         const hstCollected = paidInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
         const hstPaid = filteredExpenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
-        const netIncomeBeforeTax = grossIncome - totalExpenses;
+        const netIncomeBeforeTax = grossIncome - totalDeductibleExpenses;
         const smallBusinessTax = netIncomeBeforeTax * company.small_business_rate;
         const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
         const hstRemittance = hstCollected - hstPaid;

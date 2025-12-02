@@ -10,7 +10,14 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:chrome": "playwright test --project=chromium",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:chrome:headed": "playwright test --project=chromium --headed",
+    "test:e2e:chrome:headed:slow": "playwright test --project=chromium --headed --slow-mo=500",
+    "test:all": "npm run test && npm run test:e2e"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -30,19 +37,16 @@
     "clsx": "^2.1.1",
     "contracting-accounting-tool": "file:..",
     "framer-motion": "^12.23.12",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.542.0",
     "next-themes": "^0.4.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.2",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.48.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",

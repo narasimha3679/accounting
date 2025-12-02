@@ -414,7 +414,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, clients, onClose, 
                                     id="invoice-client"
                                     value={formData.client_id}
                                     onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-card text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 >
                                     <option value="">Select a client</option>
