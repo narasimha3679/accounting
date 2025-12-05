@@ -25,6 +25,7 @@ export interface Company {
     investment_eligible_dividend_tax_rate?: number;
     investment_noneligible_dividend_tax_rate?: number;
     investment_capital_gain_tax_rate?: number;
+    capital_loss_carryforward?: number; // Unused capital losses from previous years (50% included amount)
     created_at: string;
     updated_at: string;
 }
@@ -821,7 +822,7 @@ class SupabaseApi {
             .from('expense_files')
             .select('*')
             .eq('expense_id', id);
-        
+
         if (filesError) throw new Error(filesError.message);
 
         // Delete all files from storage
@@ -830,7 +831,7 @@ class SupabaseApi {
             const { error: storageError } = await supabase.storage
                 .from(SUPABASE_STORAGE_BUCKET)
                 .remove(storagePaths);
-            
+
             if (storageError) throw new Error(storageError.message);
 
             // Delete all file records from the database
@@ -838,7 +839,7 @@ class SupabaseApi {
                 .from('expense_files')
                 .delete()
                 .eq('expense_id', id);
-            
+
             if (deleteFilesError) throw new Error(deleteFilesError.message);
         }
 
@@ -1623,7 +1624,7 @@ class SupabaseApi {
         if (costBasis === undefined) {
             costBasis = await this.calculateInvestmentCostBasis(sale.investment_id);
         }
-        
+
         const realizedGainLoss = sale.sale_amount - costBasis;
         const { data, error } = await supabase
             .from('investment_sales')
@@ -1635,10 +1636,10 @@ class SupabaseApi {
             .select('*, investment:investments(*), company:companies(*)')
             .single<InvestmentSale>();
         if (error) throw new Error(error.message);
-        
+
         // Update investment status to 'sold'
         await this.updateInvestment(sale.investment_id, { status: 'sold' });
-        
+
         return data;
     }
 
@@ -1650,7 +1651,7 @@ class SupabaseApi {
             const costBasis = sale.cost_basis ?? existing.cost_basis;
             sale.realized_gain_loss = saleAmount - costBasis;
         }
-        
+
         const { data, error } = await supabase
             .from('investment_sales')
             .update(sale)
@@ -1678,10 +1679,10 @@ class SupabaseApi {
     }
 
     // Investment Transactions -------------------------------------------------
-    async getInvestmentTransactions(params?: { 
-        page?: number; 
-        limit?: number; 
-        investment_id?: number; 
+    async getInvestmentTransactions(params?: {
+        page?: number;
+        limit?: number;
+        investment_id?: number;
         company_id?: number;
         transaction_type?: string;
     }): Promise<PaginatedResponse<InvestmentTransaction>> {
@@ -1752,9 +1753,9 @@ class SupabaseApi {
             .select('amount')
             .eq('investment_id', investment_id)
             .order('transaction_date', { ascending: true });
-        
+
         if (error) throw new Error(error.message);
-        
+
         // Sum all transaction amounts
         return data?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
     }
@@ -1767,35 +1768,35 @@ class SupabaseApi {
             .from('investment_transactions')
             .select('transaction_type, amount')
             .eq('investment_id', investment_id);
-        
+
         if (error) throw new Error(error.message);
-        
+
         if (!data || data.length === 0) {
             // If no transactions, use purchase_amount from investment
             const investment = await this.getInvestment(investment_id);
             return Number(investment.purchase_amount);
         }
-        
+
         // Sum contributions (includes initial purchase)
         const contributions = data
             .filter(t => t.transaction_type === 'contribution')
             .reduce((sum, t) => sum + Number(t.amount), 0);
-        
+
         // Sum reinvested interest
         const reinvestedInterest = data
             .filter(t => t.transaction_type === 'interest')
             .reduce((sum, t) => sum + Number(t.amount), 0);
-        
+
         // Sum reinvested dividends
         const reinvestedDividends = data
             .filter(t => t.transaction_type === 'dividend_reinvested')
             .reduce((sum, t) => sum + Number(t.amount), 0);
-        
+
         // Subtract withdrawals
         const withdrawals = Math.abs(data
             .filter(t => t.transaction_type === 'withdrawal')
             .reduce((sum, t) => sum + Number(t.amount), 0));
-        
+
         // Cost basis = contributions + reinvested interest + reinvested dividends - withdrawals
         return contributions + reinvestedInterest + reinvestedDividends - withdrawals;
     }
@@ -1812,9 +1813,9 @@ class SupabaseApi {
         totalWithdrawals: number;
     }> {
         const investment = await this.getInvestment(id);
-        const transactionsResult = await this.getInvestmentTransactions({ 
-            investment_id: id, 
-            limit: 10000 
+        const transactionsResult = await this.getInvestmentTransactions({
+            investment_id: id,
+            limit: 10000
         });
         const transactions = transactionsResult.data;
 
@@ -1829,25 +1830,25 @@ class SupabaseApi {
         const totalContributions = transactions
             .filter(t => t.transaction_type === 'contribution')
             .reduce((sum, t) => sum + Number(t.amount), 0);
-        
+
         const totalWithdrawals = Math.abs(transactions
             .filter(t => t.transaction_type === 'withdrawal')
             .reduce((sum, t) => sum + Number(t.amount), 0));
-        
+
         // If no transactions exist, use purchase_amount as the initial investment
-        const totalInvested = transactions.length > 0 
+        const totalInvested = transactions.length > 0
             ? totalContributions - totalWithdrawals
             : Number(investment.purchase_amount);
-        
+
         const totalInterest = transactions
             .filter(t => t.transaction_type === 'interest')
             .reduce((sum, t) => sum + Number(t.amount), 0);
-        
+
         // Calculate total dividends from investment_income (includes both reinvested and non-reinvested)
         const totalDividends = investmentIncome
             .filter(inc => inc.income_type === 'dividend')
             .reduce((sum, inc) => sum + Number(inc.amount), 0);
-        
+
         // Current balance: prioritize transaction-based calculation for savings accounts
         // For savings accounts, always use transactions when available
         // For stocks, allow manual override but prefer transactions

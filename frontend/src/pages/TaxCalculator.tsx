@@ -193,6 +193,9 @@ const TaxCalculator: React.FC = () => {
             return null;
         }
 
+        // Validation: Check for fiscal year alignment issues
+        const validationWarnings: string[] = [];
+
         const invoices = invoicesResponse.data;
         const expenses = expensesResponse.data;
         const incomeEntries = incomeResponse.data;
@@ -204,6 +207,30 @@ const TaxCalculator: React.FC = () => {
         const dividends = dividendsResponse.data;
         const investments = investmentsResponse.data;
         const investmentTransactions = investmentTransactionsResponse.data;
+
+        // Check if investment income/sales fiscal_year matches selected fiscal year
+        const mismatchedFiscalYears = [
+            ...investmentIncome.filter(inc => inc.fiscal_year !== fiscalYear).map(inc => `Investment income entry (ID: ${inc.id}) has fiscal_year ${inc.fiscal_year}, expected ${fiscalYear}`),
+            ...investmentSales.filter(sale => sale.fiscal_year !== fiscalYear).map(sale => `Investment sale (ID: ${sale.id}) has fiscal_year ${sale.fiscal_year}, expected ${fiscalYear}`)
+        ];
+
+        if (mismatchedFiscalYears.length > 0) {
+            validationWarnings.push(`Fiscal year mismatch: ${mismatchedFiscalYears.length} investment entries have different fiscal_year than selected year.`);
+        }
+
+        // Validation: Check for missing linked_income_id in reinvestment transactions
+        const interestTransactions = investmentTransactions.filter(txn => txn.transaction_type === 'interest');
+        const dividendReinvestedTransactions = investmentTransactions.filter(txn => txn.transaction_type === 'dividend_reinvested');
+        const missingLinkedIncomeId = [
+            ...interestTransactions.filter(txn => !txn.linked_income_id).map(txn => `Interest transaction (ID: ${txn.id}) missing linked_income_id`),
+            ...dividendReinvestedTransactions.filter(txn => !txn.linked_income_id).map(txn => `Dividend reinvested transaction (ID: ${txn.id}) missing linked_income_id`)
+        ];
+
+        if (missingLinkedIncomeId.length > 0) {
+            validationWarnings.push(`Missing linked_income_id: ${missingLinkedIncomeId.length} reinvestment transactions are not linked to income entries. This may affect accuracy.`);
+        }
+
+        // Validation: Check tax rates are reasonable (0-1 range) - will be checked after rates are declared
 
         // Filter invoices by date and status
         const paidInvoices = invoices.filter(invoice => {
@@ -299,8 +326,12 @@ const TaxCalculator: React.FC = () => {
             .filter(inc => inc.income_type === 'interest')
             .reduce((sum, inc) => sum + Number(inc.amount), 0);
 
-        // Dividend income - eligible dividends get gross-up treatment (38% for Canadian eligible dividends)
-        const eligibleDividendGrossUp = 1.38;
+        // Dividend income - eligible dividends get gross-up treatment
+        // Canadian tax law: Eligible dividends receive a 38% gross-up (multiply by 1.38)
+        // This gross-up reflects the corporate tax already paid by the distributing corporation
+        // Non-eligible dividends do not receive a gross-up
+        // Note: Gross-up rate is set by CRA and may change by tax year
+        const eligibleDividendGrossUp = 1.38; // 38% gross-up for eligible dividends (2024 rate)
         const eligibleDividendsBase = investmentIncome
             .filter(inc => inc.income_type === 'dividend' && inc.is_eligible_dividend)
             .reduce((sum, inc) => sum + Number(inc.amount), 0);
@@ -312,40 +343,104 @@ const TaxCalculator: React.FC = () => {
         const eligibleDividendsGrossedUp = eligibleDividendsBase * eligibleDividendGrossUp;
         const investmentDividendsTaxable = eligibleDividendsGrossedUp + nonEligibleDividendsBase;
 
-        // Capital gains - 50% inclusion rate
-        const realizedCapitalGains = investmentSales
+        // Capital gains and losses - calculate separately first, then net them
+        // Note: Each sale's realized_gain_loss is the full gain/loss, we apply 50% inclusion rate
+        const totalCapitalGains = investmentSales
             .filter(sale => Number(sale.realized_gain_loss) > 0)
-            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+            .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0);
 
-        // Capital losses - 50% deductible
-        const realizedCapitalLosses = investmentSales
+        const totalCapitalLosses = Math.abs(investmentSales
             .filter(sale => Number(sale.realized_gain_loss) < 0)
-            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+            .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0));
+
+        // Get capital loss carryforward from previous years (already at 50% inclusion rate)
+        // Note: Carryforward is stored as the 50% included amount (taxable portion)
+        const previousCapitalLossCarryforward = user?.company?.capital_loss_carryforward ?? 0;
+
+        // Net capital gains/losses within the current year (losses offset gains in same year)
+        // Apply 50% inclusion rate to current year amounts
+        const currentYearCapitalGains50 = totalCapitalGains * 0.5;
+        const currentYearCapitalLosses50 = totalCapitalLosses * 0.5;
+        const currentYearNet = currentYearCapitalGains50 - currentYearCapitalLosses50;
+
+        // Apply carryforward from previous years to current year net gains
+        // If current year has net gains, carryforward offsets those gains
+        // If current year has net losses, they add to carryforward
+        let realizedCapitalGains = 0;
+        let realizedCapitalLosses = 0;
+        let newCapitalLossCarryforward = 0;
+
+        if (currentYearNet > 0) {
+            // Current year has net gains - apply carryforward to offset
+            const gainsAfterCarryforward = Math.max(0, currentYearNet - previousCapitalLossCarryforward);
+            realizedCapitalGains = gainsAfterCarryforward;
+            // Unused carryforward (if any) remains in carryforward
+            const unusedCarryforward = Math.max(0, previousCapitalLossCarryforward - currentYearNet);
+            newCapitalLossCarryforward = unusedCarryforward;
+        } else if (currentYearNet < 0) {
+            // Current year has net losses - add to carryforward
+            realizedCapitalLosses = currentYearNet;
+            // New carryforward = previous carryforward + current year losses (both already at 50% rate)
+            newCapitalLossCarryforward = previousCapitalLossCarryforward + Math.abs(currentYearNet);
+        } else {
+            // Current year is exactly zero - carryforward remains unchanged
+            newCapitalLossCarryforward = previousCapitalLossCarryforward;
+        }
+
+        // For display purposes, show the net before carryforward
+        const netCapitalGainLoss = totalCapitalGains - totalCapitalLosses;
 
         // Total investment income for display (before tax)
         const totalInvestmentIncome = investmentInterestBase + eligibleDividendsBase + nonEligibleDividendsBase + realizedCapitalGains + realizedCapitalLosses;
 
         // Investment income tax rates (configurable, with defaults for Ontario 2024)
+        // Note: These rates are for Ontario corporations. Rates may vary by province and tax year.
+        // Default rates are based on 2024 Ontario combined federal/provincial rates:
+        // - Interest: 50.17% (fully taxable)
+        // - Eligible dividends: 39.34% (on grossed-up amount)
+        // - Non-eligible dividends: 47.74% (on actual amount)
+        // - Capital gains: 25.09% (on 50% included amount)
         const investmentInterestTaxRate = user?.company?.investment_interest_tax_rate ?? 0.5017;
         const investmentEligibleDividendTaxRate = user?.company?.investment_eligible_dividend_tax_rate ?? 0.3934;
         const investmentNonEligibleDividendTaxRate = user?.company?.investment_noneligible_dividend_tax_rate ?? 0.4774;
         const investmentCapitalGainTaxRate = user?.company?.investment_capital_gain_tax_rate ?? 0.2509;
 
+        // Validation: Check tax rates are reasonable (0-1 range)
+        if (investmentInterestTaxRate < 0 || investmentInterestTaxRate > 1) {
+            validationWarnings.push(`Investment interest tax rate (${(investmentInterestTaxRate * 100).toFixed(2)}%) is outside valid range (0-100%)`);
+        }
+        if (investmentEligibleDividendTaxRate < 0 || investmentEligibleDividendTaxRate > 1) {
+            validationWarnings.push(`Eligible dividend tax rate (${(investmentEligibleDividendTaxRate * 100).toFixed(2)}%) is outside valid range (0-100%)`);
+        }
+        if (investmentNonEligibleDividendTaxRate < 0 || investmentNonEligibleDividendTaxRate > 1) {
+            validationWarnings.push(`Non-eligible dividend tax rate (${(investmentNonEligibleDividendTaxRate * 100).toFixed(2)}%) is outside valid range (0-100%)`);
+        }
+        if (investmentCapitalGainTaxRate < 0 || investmentCapitalGainTaxRate > 1) {
+            validationWarnings.push(`Capital gain tax rate (${(investmentCapitalGainTaxRate * 100).toFixed(2)}%) is outside valid range (0-100%)`);
+        }
+
         // Calculate investment income tax separately
         const investmentInterestTax = investmentInterestBase * investmentInterestTaxRate;
         const investmentEligibleDividendTax = eligibleDividendsGrossedUp * investmentEligibleDividendTaxRate;
         const investmentNonEligibleDividendTax = nonEligibleDividendsBase * investmentNonEligibleDividendTaxRate;
+        // Tax is only applied to net capital gains (after losses offset gains)
         const investmentCapitalGainTax = Math.max(0, realizedCapitalGains * investmentCapitalGainTaxRate);
 
         const totalInvestmentIncomeTax = investmentInterestTax + investmentEligibleDividendTax + investmentNonEligibleDividendTax + investmentCapitalGainTax;
 
         // ===== RDTOH (Refundable Dividend Tax on Hand) CALCULATIONS =====
+        // RDTOH is a refundable tax account that prevents double taxation of investment income
+        // When a corporation pays tax on investment income, 30.67% of that tax is added to RDTOH
+        // When dividends are paid, the corporation can claim a refund from RDTOH
+        // Refund rate: $1 refund per $2.61 of dividends paid (as of 2024)
+        // Reference: Income Tax Act section 129
 
         // RDTOH addition: 30.67% of investment income tax is added to RDTOH
-        const rdtohRate = 0.3067; // 30.67%
+        const rdtohRate = 0.3067; // 30.67% (2024 rate, may vary by tax year)
         const rdtohAddition = totalInvestmentIncomeTax * rdtohRate;
 
         // RDTOH refund: $1 refund per $2.61 of dividends paid
+        const rdtohRefundRate = 1 / 2.61; // $1 refund per $2.61 dividend (2024 rate)
         const dividendsPaid = dividends
             .filter(div => {
                 const divDate = new Date(div.declaration_date);
@@ -355,7 +450,6 @@ const TaxCalculator: React.FC = () => {
             })
             .reduce((sum, div) => sum + div.amount, 0);
 
-        const rdtohRefundRate = 1 / 2.61; // $1 refund per $2.61 dividend
         const rdtohRefund = dividendsPaid * rdtohRefundRate;
 
         // RDTOH balance (previous balance + additions - refunds)
@@ -391,11 +485,18 @@ const TaxCalculator: React.FC = () => {
                 .filter(inc => inc.income_type === 'interest')
                 .reduce((sum, inc) => sum + Number(inc.amount), 0);
 
-            // Reinvested interest (from transactions)
-            const reinvestedInterest = transactionsForThis
-                .filter(txn => txn.transaction_type === 'interest')
+            // Reinvested interest - use linked_income_id for accurate matching
+            // First, find all interest transactions with linked_income_id
+            const reinvestedInterestFromLinked = transactionsForThis
+                .filter(txn => txn.transaction_type === 'interest' && txn.linked_income_id)
                 .reduce((sum, txn) => sum + Number(txn.amount), 0);
 
+            // Fallback: if no linked_income_id, use transaction type matching (for backward compatibility)
+            const reinvestedInterestFromType = transactionsForThis
+                .filter(txn => txn.transaction_type === 'interest' && !txn.linked_income_id)
+                .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+            const reinvestedInterest = reinvestedInterestFromLinked + reinvestedInterestFromType;
             const nonReinvestedInterest = interestIncome - reinvestedInterest;
 
             // Dividend income breakdown
@@ -411,11 +512,18 @@ const TaxCalculator: React.FC = () => {
                 .filter(inc => inc.income_type === 'dividend' && !inc.is_eligible_dividend)
                 .reduce((sum, inc) => sum + Number(inc.amount), 0);
 
-            // Reinvested dividends (from transactions)
-            const reinvestedDividends = transactionsForThis
-                .filter(txn => txn.transaction_type === 'dividend_reinvested')
+            // Reinvested dividends - use linked_income_id for accurate matching
+            // First, find all dividend_reinvested transactions with linked_income_id
+            const reinvestedDividendsFromLinked = transactionsForThis
+                .filter(txn => txn.transaction_type === 'dividend_reinvested' && txn.linked_income_id)
                 .reduce((sum, txn) => sum + Number(txn.amount), 0);
 
+            // Fallback: if no linked_income_id, use transaction type matching (for backward compatibility)
+            const reinvestedDividendsFromType = transactionsForThis
+                .filter(txn => txn.transaction_type === 'dividend_reinvested' && !txn.linked_income_id)
+                .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+            const reinvestedDividends = reinvestedDividendsFromLinked + reinvestedDividendsFromType;
             const nonReinvestedDividends = totalDividends - reinvestedDividends;
 
             // Capital gains/losses from sales
@@ -428,61 +536,91 @@ const TaxCalculator: React.FC = () => {
                 .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0);
 
             // Calculate cost basis for sales (if any sales exist)
+            // For multiple sales, calculate cost basis per sale chronologically
             let costBasisBreakdown = null;
             if (salesForThis.length > 0) {
-                // Sum contributions
-                const contributions = transactionsForThis
+                // Sort sales by date to calculate cost basis chronologically
+                const sortedSales = [...salesForThis].sort((a, b) => {
+                    const dateA = new Date(a.sale_date).getTime();
+                    const dateB = new Date(b.sale_date).getTime();
+                    if (dateA !== dateB) return dateA - dateB;
+                    return a.id - b.id;
+                });
+
+                // Calculate cost basis for each sale chronologically
+                const salesWithCostBasis = sortedSales.map((sale, index) => {
+                    const saleDate = new Date(sale.sale_date);
+
+                    // Get all transactions up to and including this sale date
+                    const transactionsUpToSale = transactionsForThis.filter(txn => {
+                        const txnDate = new Date(txn.transaction_date);
+                        return txnDate <= saleDate;
+                    });
+
+                    // Calculate cost basis components up to this sale
+                    const contributions = transactionsUpToSale
+                        .filter(txn => txn.transaction_type === 'contribution')
+                        .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                    const reinvestedInterest = transactionsUpToSale
+                        .filter(txn => txn.transaction_type === 'interest')
+                        .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                    const reinvestedDividends = transactionsUpToSale
+                        .filter(txn => txn.transaction_type === 'dividend_reinvested')
+                        .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                    const withdrawals = Math.abs(transactionsUpToSale
+                        .filter(txn => txn.transaction_type === 'withdrawal')
+                        .reduce((sum, txn) => sum + Number(txn.amount), 0));
+
+                    // Subtract cost basis from previous sales (for partial sales)
+                    const previousSalesCostBasis = sortedSales
+                        .slice(0, index)
+                        .reduce((sum, prevSale) => sum + Number(prevSale.cost_basis), 0);
+
+                    const calculatedCostBasis = contributions + reinvestedInterest + reinvestedDividends - withdrawals - previousSalesCostBasis;
+
+                    return {
+                        sale,
+                        contributions,
+                        reinvestedInterest,
+                        reinvestedDividends,
+                        withdrawals,
+                        previousSalesCostBasis,
+                        calculatedCostBasis,
+                        actualCostBasis: Number(sale.cost_basis),
+                    };
+                });
+
+                // For summary, calculate total cost basis components across all sales
+                const totalContributions = transactionsForThis
                     .filter(txn => txn.transaction_type === 'contribution')
                     .reduce((sum, txn) => sum + Number(txn.amount), 0);
 
-                // Sum reinvested interest (up to sale date)
-                const reinvestedInterestForCostBasis = transactionsForThis
-                    .filter(txn => {
-                        if (txn.transaction_type !== 'interest') return false;
-                        // Only include interest before or on the sale date
-                        const txnDate = new Date(txn.transaction_date);
-                        return salesForThis.some(sale => {
-                            const saleDate = new Date(sale.sale_date);
-                            return txnDate <= saleDate;
-                        });
-                    })
+                const totalReinvestedInterest = transactionsForThis
+                    .filter(txn => txn.transaction_type === 'interest')
                     .reduce((sum, txn) => sum + Number(txn.amount), 0);
 
-                // Sum reinvested dividends (up to sale date)
-                const reinvestedDividendsForCostBasis = transactionsForThis
-                    .filter(txn => {
-                        if (txn.transaction_type !== 'dividend_reinvested') return false;
-                        // Only include dividends before or on the sale date
-                        const txnDate = new Date(txn.transaction_date);
-                        return salesForThis.some(sale => {
-                            const saleDate = new Date(sale.sale_date);
-                            return txnDate <= saleDate;
-                        });
-                    })
+                const totalReinvestedDividends = transactionsForThis
+                    .filter(txn => txn.transaction_type === 'dividend_reinvested')
                     .reduce((sum, txn) => sum + Number(txn.amount), 0);
 
-                // Sum withdrawals (up to sale date)
-                const withdrawals = Math.abs(transactionsForThis
-                    .filter(txn => {
-                        if (txn.transaction_type !== 'withdrawal') return false;
-                        const txnDate = new Date(txn.transaction_date);
-                        return salesForThis.some(sale => {
-                            const saleDate = new Date(sale.sale_date);
-                            return txnDate <= saleDate;
-                        });
-                    })
+                const totalWithdrawals = Math.abs(transactionsForThis
+                    .filter(txn => txn.transaction_type === 'withdrawal')
                     .reduce((sum, txn) => sum + Number(txn.amount), 0));
 
-                // Average cost basis from sales (if multiple sales, use average)
-                const avgCostBasis = salesForThis.reduce((sum, sale) => sum + Number(sale.cost_basis), 0) / salesForThis.length;
+                const totalActualCostBasis = salesForThis.reduce((sum, sale) => sum + Number(sale.cost_basis), 0);
+                const totalCalculatedCostBasis = totalContributions + totalReinvestedInterest + totalReinvestedDividends - totalWithdrawals;
 
                 costBasisBreakdown = {
-                    contributions,
-                    reinvestedInterest: reinvestedInterestForCostBasis,
-                    reinvestedDividends: reinvestedDividendsForCostBasis,
-                    withdrawals,
-                    calculatedCostBasis: contributions + reinvestedInterestForCostBasis + reinvestedDividendsForCostBasis - withdrawals,
-                    actualCostBasis: avgCostBasis,
+                    contributions: totalContributions,
+                    reinvestedInterest: totalReinvestedInterest,
+                    reinvestedDividends: totalReinvestedDividends,
+                    withdrawals: totalWithdrawals,
+                    calculatedCostBasis: totalCalculatedCostBasis,
+                    actualCostBasis: totalActualCostBasis,
+                    salesBreakdown: salesWithCostBasis, // Per-sale breakdown for detailed view
                 };
             }
 
@@ -548,6 +686,11 @@ const TaxCalculator: React.FC = () => {
             nonEligibleDividendsBase,
             eligibleDividendsGrossedUp,
             investmentDividendsTaxable,
+            totalCapitalGains,
+            totalCapitalLosses,
+            netCapitalGainLoss,
+            previousCapitalLossCarryforward,
+            newCapitalLossCarryforward,
             realizedCapitalGains,
             realizedCapitalLosses,
             totalInvestmentIncome,
@@ -584,6 +727,9 @@ const TaxCalculator: React.FC = () => {
 
             // Summary
             totalTaxesOwed,
+
+            // Validation warnings
+            validationWarnings,
         };
     }, [invoicesResponse, expensesResponse, incomeResponse, hstPaymentsResponse, capitalAssetsResponse, salariesResponse, investmentIncomeResponse, investmentSalesResponse, dividendsResponse, investmentsResponse, investmentTransactionsResponse, startDate, endDate, fiscalYear, user?.company]);
 
@@ -889,21 +1035,39 @@ const TaxCalculator: React.FC = () => {
                                                 <div className="text-xs text-slate-muted mt-1">Tax: {formatCurrency(taxData.investmentEligibleDividendTax + taxData.investmentNonEligibleDividendTax)}</div>
                                             </div>
                                         )}
-                                        {taxData.realizedCapitalGains !== 0 && (
+                                        {(taxData.realizedCapitalGains !== 0 || taxData.realizedCapitalLosses < 0 || taxData.previousCapitalLossCarryforward > 0) && (
                                             <div>
-                                                <div className="text-sm text-slate-muted mb-1">Capital Gains (50%)</div>
-                                                <div className={`text-lg font-bold ${taxData.realizedCapitalGains >= 0 ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>
-                                                    {formatCurrency(taxData.realizedCapitalGains)}
+                                                <div className="text-sm text-slate-muted mb-1">Net Capital Gains/Losses</div>
+                                                {taxData.totalCapitalGains > 0 && (
+                                                    <div className="text-xs text-slate-muted mb-1">
+                                                        Total Gains: {formatCurrency(taxData.totalCapitalGains)} •
+                                                        Total Losses: {formatCurrency(taxData.totalCapitalLosses)}
+                                                    </div>
+                                                )}
+                                                {taxData.previousCapitalLossCarryforward > 0 && (
+                                                    <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">
+                                                        Previous Year Carryforward: {formatCurrency(taxData.previousCapitalLossCarryforward)}
+                                                    </div>
+                                                )}
+                                                <div className={`text-lg font-bold ${taxData.netCapitalGainLoss >= 0 ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {taxData.realizedCapitalGains > 0
+                                                        ? `Net Gain (after carryforward): ${formatCurrency(taxData.realizedCapitalGains)} (50% taxable)`
+                                                        : taxData.realizedCapitalLosses < 0
+                                                            ? `Net Loss: ${formatCurrency(taxData.realizedCapitalLosses)} (50% deductible)`
+                                                            : `Net: ${formatCurrency(taxData.netCapitalGainLoss)}`
+                                                    }
                                                 </div>
                                                 {taxData.realizedCapitalGains > 0 && (
-                                                    <div className="text-xs text-slate-muted">Tax: {formatCurrency(taxData.investmentCapitalGainTax)} ({formatPercentage(taxData.investmentCapitalGainTaxRate)})</div>
+                                                    <div className="text-xs text-slate-muted mt-1">Tax: {formatCurrency(taxData.investmentCapitalGainTax)} ({formatPercentage(taxData.investmentCapitalGainTaxRate)})</div>
                                                 )}
-                                            </div>
-                                        )}
-                                        {taxData.realizedCapitalLosses < 0 && (
-                                            <div>
-                                                <div className="text-sm text-slate-muted mb-1">Capital Losses (50%)</div>
-                                                <div className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(taxData.realizedCapitalLosses)}</div>
+                                                {taxData.newCapitalLossCarryforward > 0 && (
+                                                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                                        New Carryforward Balance: {formatCurrency(taxData.newCapitalLossCarryforward)} (available for future years)
+                                                    </div>
+                                                )}
+                                                {taxData.netCapitalGainLoss < 0 && taxData.newCapitalLossCarryforward === 0 && (
+                                                    <div className="text-xs text-slate-muted mt-1">Note: Capital losses offset gains in the same year. Unused losses can be carried forward.</div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -1045,13 +1209,32 @@ const TaxCalculator: React.FC = () => {
                                                                                             </div>
                                                                                         )}
                                                                                         <div className="flex justify-between font-medium pt-1 border-t border-border">
-                                                                                            <span className="text-white">Calculated Cost Basis:</span>
+                                                                                            <span className="text-white">Total Calculated Cost Basis:</span>
                                                                                             <span className="text-white">{formatCurrency(breakdown.costBasisBreakdown.calculatedCostBasis)}</span>
                                                                                         </div>
+                                                                                        <div className="flex justify-between font-medium">
+                                                                                            <span className="text-white">Total Actual Cost Basis (from sales):</span>
+                                                                                            <span className="text-white">{formatCurrency(breakdown.costBasisBreakdown.actualCostBasis)}</span>
+                                                                                        </div>
                                                                                         {Math.abs(breakdown.costBasisBreakdown.calculatedCostBasis - breakdown.costBasisBreakdown.actualCostBasis) > 0.01 && (
-                                                                                            <div className="flex justify-between text-yellow-600 dark:text-yellow-400">
-                                                                                                <span>Actual Cost Basis (from sale):</span>
-                                                                                                <span>{formatCurrency(breakdown.costBasisBreakdown.actualCostBasis)}</span>
+                                                                                            <div className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
+                                                                                                ⚠️ Discrepancy detected. Verify cost basis calculations.
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {breakdown.costBasisBreakdown.salesBreakdown && breakdown.costBasisBreakdown.salesBreakdown.length > 1 && (
+                                                                                            <div className="mt-2 pt-2 border-t border-border">
+                                                                                                <div className="text-xs text-slate-muted mb-1">Per-Sale Cost Basis:</div>
+                                                                                                {breakdown.costBasisBreakdown.salesBreakdown.map((saleBreakdown, idx) => (
+                                                                                                    <div key={idx} className="text-xs mb-2 pl-2 border-l-2 border-border">
+                                                                                                        <div className="font-medium text-white mb-1">
+                                                                                                            Sale {idx + 1}: {formatDate(saleBreakdown.sale.sale_date)} - {formatCurrency(saleBreakdown.sale.sale_amount)}
+                                                                                                        </div>
+                                                                                                        <div className="text-slate-muted">
+                                                                                                            Cost Basis: {formatCurrency(saleBreakdown.actualCostBasis)} |
+                                                                                                            Calculated: {formatCurrency(saleBreakdown.calculatedCostBasis)}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                ))}
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
@@ -1236,6 +1419,23 @@ const TaxCalculator: React.FC = () => {
                 </Card>
             </div>
 
+            {/* Validation Warnings */}
+            {taxData.validationWarnings && taxData.validationWarnings.length > 0 && (
+                <Card className="p-6 border-2 border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+                    <div className="flex items-start">
+                        <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <h3 className="text-lg font-semibold text-white mb-2">Validation Warnings</h3>
+                            <ul className="text-sm text-slate-muted space-y-2 list-disc list-inside">
+                                {taxData.validationWarnings.map((warning, idx) => (
+                                    <li key={idx}>{warning}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
             {/* Information Card */}
             <Card className="p-6 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                 <div className="flex items-start">
@@ -1248,9 +1448,11 @@ const TaxCalculator: React.FC = () => {
                             <li>Depreciation (CCA) reduces taxable income and is calculated based on fiscal year.</li>
                             <li><strong>Active business income</strong> is taxed at the small business rate (12.5% default).</li>
                             <li><strong>Investment income</strong> (interest, dividends, capital gains) is taxed at higher rates and tracked separately.</li>
-                            <li><strong>RDTOH (Refundable Dividend Tax on Hand)</strong>: 30.67% of investment income tax is added to RDTOH, which becomes refundable when dividends are paid ($1 refund per $2.61 of dividends).</li>
-                            <li>Eligible dividends receive a 38% gross-up before tax calculation.</li>
-                            <li>Capital gains are included at 50% (half the gain is taxable).</li>
+                            <li><strong>RDTOH (Refundable Dividend Tax on Hand)</strong>: 30.67% of investment income tax is added to RDTOH, which becomes refundable when dividends are paid ($1 refund per $2.61 of dividends). Reference: Income Tax Act section 129.</li>
+                            <li>Eligible dividends receive a 38% gross-up before tax calculation (2024 rate, set by CRA).</li>
+                            <li>Capital gains and losses are netted in the same year (losses offset gains). Capital gains are included at 50% (half the gain is taxable).</li>
+                            <li>Unused capital losses can be carried forward indefinitely to offset future capital gains. The carryforward balance is stored and applied automatically.</li>
+                            <li>Tax rates are based on 2024 Ontario combined federal/provincial rates. Rates may vary by province and tax year.</li>
                             <li>These calculations are estimates. Please consult with a tax professional for official tax filings.</li>
                             <li>HST remittance periods may vary based on your filing frequency (monthly, quarterly, or annual).</li>
                         </ul>
