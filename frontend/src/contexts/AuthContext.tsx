@@ -8,8 +8,11 @@ interface AuthContextType {
     register: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
+    resetPasswordForEmail: (email: string) => Promise<void>;
+    updatePassword: (newPassword: string) => Promise<void>;
     isLoading: boolean;
     isAuthenticated: boolean;
+    isPasswordRecovery: boolean;
 }
 
 interface ProfileRow {
@@ -63,6 +66,7 @@ const mapProfileToUser = (profile: ProfileRow | null): User | null => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
     const loadProfile = async () => {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -144,7 +148,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setIsLoading(false);
             });
 
-        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                setIsPasswordRecovery(true);
+            } else {
+                setIsPasswordRecovery(false);
+            }
+
             if (session?.user) {
                 loadProfile().catch((error) => {
                     console.error('Error refreshing profile', error);
@@ -211,14 +221,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadProfile();
     };
 
+    const resetPasswordForEmail = async (email: string) => {
+        const redirectTo = `${window.location.origin}/reset-password`;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo,
+        });
+        if (error) {
+            throw error;
+        }
+    };
+
+    const updatePassword = async (newPassword: string) => {
+        const { error } = await supabase.auth.updateUser({
+            password: newPassword,
+        });
+        if (error) {
+            throw error;
+        }
+        setIsPasswordRecovery(false);
+        await loadProfile();
+    };
+
     const value = {
         user,
         login,
         register,
         logout,
         refreshUser,
+        resetPasswordForEmail,
+        updatePassword,
         isLoading,
         isAuthenticated: !!user,
+        isPasswordRecovery,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

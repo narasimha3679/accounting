@@ -263,7 +263,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
             onSave();
         } catch (error) {
             console.error('Error saving income entry:', error);
-            setError('Failed to save income entry');
+            setError('Couldn\'t save. Please check your information and try again.');
         } finally {
             setIsLoading(false);
         }
@@ -282,7 +282,7 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-xl font-semibold text-white">
-                            {income ? 'Edit Income Entry' : 'Add Income Entry'}
+                            {income ? 'Edit Income Entry' : 'Add Income'}
                         </h3>
                         <Button variant="ghost" size="icon" onClick={onClose}>
                             <X className="h-5 w-5" />

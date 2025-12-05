@@ -245,7 +245,7 @@ const Dividends: React.FC = () => {
                         <div className="ml-5 w-0 flex-1">
                             <dl>
                                 <dt className="text-sm font-medium text-slate-muted truncate">
-                                    Declared (Unpaid)
+                                    Announced (Not Paid Yet)
                                 </dt>
                                 <dd className="text-2xl font-bold text-white">
                                     {formatCurrency(declaredDividends)}

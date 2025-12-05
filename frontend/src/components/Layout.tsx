@@ -15,7 +15,8 @@ import {
     Menu,
     X,
     CreditCard,
-    Briefcase
+    Briefcase,
+    PieChart
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -35,9 +36,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Income', href: '/income', icon: DollarSign },
         { name: 'Expenses', href: '/expenses', icon: Receipt },
         { name: 'Capital Assets', href: '/capital-assets', icon: Building2 },
+        { name: 'Investments', href: '/investments', icon: PieChart },
         { name: 'Dividends', href: '/dividends', icon: Banknote },
         { name: 'Salary', href: '/salary', icon: Briefcase },
-        { name: 'Owner Payments', href: '/owner-payments', icon: CreditCard },
+        { name: 'Payments to Owner', href: '/owner-payments', icon: CreditCard },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },

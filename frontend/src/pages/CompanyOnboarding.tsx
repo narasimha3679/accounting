@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Save, Percent } from 'lucide-react';
+import { Building2, Save, Percent, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import { cn } from '../lib/utils';
 
 const CompanyOnboarding: React.FC = () => {
     const { user, refreshUser } = useAuth();
@@ -78,174 +82,230 @@ const CompanyOnboarding: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-            <div className="max-w-2xl w-full bg-white shadow-xl rounded-2xl p-8 space-y-6">
-                <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                        <Building2 className="h-6 w-6 text-primary-600" />
-                    </div>
-                    <div>
-                        <h1 className="heading-1">Set up your company</h1>
-                        <p className="text-gray-600">
-                            Welcome{user?.name ? `, ${user.name}` : ''}. Before you start using the app, we need a few details about your corporation.
-                        </p>
-                    </div>
-                </div>
-
-                {error && (
-                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                        {error}
-                    </div>
-                )}
-
-                {success && !error && (
-                    <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
-                        {success}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-4">
-                        <h2 className="text-lg font-semibold text-gray-900">Company information</h2>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                                    Company name
-                                </label>
-                                <input
-                                    id="name"
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
-                                />
+        <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="max-w-3xl w-full"
+            >
+                <Card className="p-6 md:p-8 lg:p-10" glass="heavy">
+                    {/* Header Section */}
+                    <div className="mb-8">
+                        <div className="flex items-start space-x-4 mb-4">
+                            <div className="h-12 w-12 rounded-xl bg-neon-emerald/20 flex items-center justify-center flex-shrink-0">
+                                <Building2 className="h-6 w-6 text-neon-emerald" />
                             </div>
-                            <div>
-                                <label htmlFor="business_number" className="block text-sm font-medium text-gray-700">
-                                    Business number
-                                </label>
-                                <input
-                                    id="business_number"
-                                    type="text"
-                                    value={businessNumber}
-                                    onChange={(e) => {
-                                        setBusinessNumber(e.target.value);
-                                        setBusinessNumberError('');
-                                    }}
-                                    required
-                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm ${
-                                        businessNumberError ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                />
-                                {businessNumberError && (
-                                    <p className="mt-1 text-sm text-red-600">{businessNumberError}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label htmlFor="hst_number" className="block text-sm font-medium text-gray-700">
-                                    HST number (optional)
-                                </label>
-                                <input
-                                    id="hst_number"
-                                    type="text"
-                                    value={hstNumber}
-                                    onChange={(e) => setHstNumber(e.target.value)}
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="fiscal_year_end" className="block text-sm font-medium text-gray-700">
-                                    Fiscal year end
-                                </label>
-                                <input
-                                    id="fiscal_year_end"
-                                    type="date"
-                                    value={fiscalYearEnd}
-                                    onChange={(e) => setFiscalYearEnd(e.target.value)}
-                                    required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <Percent className="h-5 w-5 text-gray-400" />
-                            <h2 className="text-lg font-semibold text-gray-900">Tax settings</h2>
-                        </div>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div>
-                                <h3 className="text-sm font-medium text-gray-900">HST registration</h3>
-                                <p className="text-sm text-gray-500">
-                                    Enable if your business is HST/GST registered and can claim Input Tax Credits.
-                                </p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={hstRegistered}
-                                    onChange={(e) => setHstRegistered(e.target.checked)}
-                                />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600" />
-                            </label>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                                <label htmlFor="small_business_rate" className="block text-sm font-medium text-gray-700">
-                                    Small business tax rate (%)
-                                </label>
-                                <input
-                                    id="small_business_rate"
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    max="100"
-                                    value={smallBusinessRate * 100}
-                                    onChange={(e) => setSmallBusinessRate((parseFloat(e.target.value) || 0) / 100)}
-                                    required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
-                                />
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Ontario small business tax rate (default: 12.5%).
-                                </p>
-                            </div>
-                            <div>
-                                <label htmlFor="hst_rate" className="block text-sm font-medium text-gray-700">
-                                    HST rate (%)
-                                </label>
-                                <input
-                                    id="hst_rate"
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    max="100"
-                                    value={hstRate * 100}
-                                    onChange={(e) => setHstRate((parseFloat(e.target.value) || 0) / 100)}
-                                    required
-                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-neon-emerald-500 sm:text-sm"
-                                />
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Ontario HST rate (default: 13%).
+                            <div className="flex-1">
+                                <h1 className="heading-1 mb-2">Set up your company</h1>
+                                <p className="text-muted-foreground text-base">
+                                    Welcome{user?.name ? `, ${user.name}` : ''}. Before you start using the app, we need a few details about your corporation.
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            disabled={isSaving}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    {/* Error Message */}
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mb-6 rounded-lg bg-destructive/20 border border-destructive/50 p-4 flex items-start space-x-3"
                         >
-                            <Save className="h-4 w-4 mr-2" />
-                            {isSaving ? 'Saving...' : 'Save and continue'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-destructive flex-1">{error}</p>
+                        </motion.div>
+                    )}
+
+                    {/* Success Message */}
+                    {success && !error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mb-6 rounded-lg bg-neon-emerald/20 border border-neon-emerald/50 p-4 flex items-start space-x-3"
+                        >
+                            <CheckCircle2 className="h-5 w-5 text-neon-emerald flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-neon-emerald flex-1">{success}</p>
+                        </motion.div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-8">
+                        {/* Company Information Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                                <Building2 className="h-5 w-5 text-neon-emerald" />
+                                <h2 className="heading-3">Company Information</h2>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label htmlFor="name" className="block text-sm font-semibold text-foreground">
+                                        Company name <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        id="name"
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                        placeholder="Enter company name"
+                                        className="input"
+                                    />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <label htmlFor="business_number" className="block text-sm font-semibold text-foreground">
+                                        Business number <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        id="business_number"
+                                        type="text"
+                                        value={businessNumber}
+                                        onChange={(e) => {
+                                            setBusinessNumber(e.target.value);
+                                            setBusinessNumberError('');
+                                        }}
+                                        required
+                                        placeholder="123456789"
+                                        className={cn(
+                                            "input",
+                                            businessNumberError && "border-destructive focus-visible:ring-destructive"
+                                        )}
+                                    />
+                                    {businessNumberError && (
+                                        <p className="text-sm text-destructive flex items-center space-x-1 mt-1">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <span>{businessNumberError}</span>
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <label htmlFor="hst_number" className="block text-sm font-semibold text-foreground">
+                                        HST number <span className="text-muted-foreground text-xs">(optional)</span>
+                                    </label>
+                                    <input
+                                        id="hst_number"
+                                        type="text"
+                                        value={hstNumber}
+                                        onChange={(e) => setHstNumber(e.target.value)}
+                                        placeholder="Enter HST number"
+                                        className="input"
+                                    />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <label htmlFor="fiscal_year_end" className="block text-sm font-semibold text-foreground">
+                                        Fiscal year end <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        id="fiscal_year_end"
+                                        type="date"
+                                        value={fiscalYearEnd}
+                                        onChange={(e) => setFiscalYearEnd(e.target.value)}
+                                        required
+                                        className="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tax Settings Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                                <Percent className="h-5 w-5 text-golden-hour" />
+                                <h2 className="heading-3">Tax Settings</h2>
+                            </div>
+
+                            {/* HST Registration Toggle */}
+                            <Card className="p-6" glass="emerald">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 space-y-1">
+                                        <div className="flex items-center space-x-2">
+                                            <h3 className="text-base font-semibold text-foreground">HST Registration</h3>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Enable if your business is HST/GST registered and can claim Input Tax Credits.
+                                        </p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={hstRegistered}
+                                            onChange={(e) => setHstRegistered(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-card border border-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-neon-emerald peer-focus:ring-offset-2 peer-focus:ring-offset-deep-forest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-emerald" />
+                                    </label>
+                                </div>
+                            </Card>
+
+                            {/* Tax Rates */}
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label htmlFor="small_business_rate" className="block text-sm font-semibold text-foreground">
+                                        Small business tax rate (%) <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        id="small_business_rate"
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        value={smallBusinessRate * 100}
+                                        onChange={(e) => setSmallBusinessRate((parseFloat(e.target.value) || 0) / 100)}
+                                        required
+                                        className="input"
+                                    />
+                                    <div className="flex items-start space-x-2 mt-2 p-3 rounded-lg bg-card/50 border border-border">
+                                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-muted-foreground">
+                                            Ontario small business tax rate (default: 12.5%).
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <label htmlFor="hst_rate" className="block text-sm font-semibold text-foreground">
+                                        HST rate (%) <span className="text-destructive">*</span>
+                                    </label>
+                                    <input
+                                        id="hst_rate"
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        value={hstRate * 100}
+                                        onChange={(e) => setHstRate((parseFloat(e.target.value) || 0) / 100)}
+                                        required
+                                        className="input"
+                                    />
+                                    <div className="flex items-start space-x-2 mt-2 p-3 rounded-lg bg-card/50 border border-border">
+                                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-muted-foreground">
+                                            Ontario HST rate (default: 13%).
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <div className="flex justify-end pt-4 border-t border-border">
+                            <Button
+                                type="submit"
+                                disabled={isSaving}
+                                icon={Save}
+                                iconPosition="left"
+                                size="lg"
+                                variant="default"
+                            >
+                                {isSaving ? 'Creating company...' : 'Save and continue'}
+                            </Button>
+                        </div>
+                    </form>
+                </Card>
+            </motion.div>
         </div>
     );
 };

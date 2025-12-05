@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Card from './ui/Card';
 import Button from './ui/Button';
 
@@ -30,7 +30,7 @@ const Login: React.FC = () => {
         } catch (err) {
             const message = err instanceof Error
                 ? err.message
-                : (isRegistering ? 'Registration failed. Please try again.' : 'Invalid email or password');
+                : (isRegistering ? 'Couldn\'t create account. Please try again.' : 'Email or password is incorrect');
             setError(message);
         } finally {
             setIsLoading(false);
@@ -94,9 +94,19 @@ const Login: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="password" className="block text-sm font-semibold text-white mb-2">
-                                            Password
-                                        </label>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label htmlFor="password" className="block text-sm font-semibold text-white">
+                                                Password
+                                            </label>
+                                            {!isRegistering && (
+                                                <Link
+                                                    to="/forgot-password"
+                                                    className="text-sm text-neon-emerald hover:text-neon-emerald/80 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-emerald focus-visible:ring-offset-2 rounded-md"
+                                                >
+                                                    Forgot password?
+                                                </Link>
+                                            )}
+                                        </div>
                                         <input
                                             id="password"
                                             name="password"

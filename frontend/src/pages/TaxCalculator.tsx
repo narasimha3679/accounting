@@ -4,6 +4,7 @@ import api from '../lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
+import HelpIcon from '../components/ui/HelpIcon';
 import { cn } from '../lib/utils';
 
 const TaxCalculator: React.FC = () => {
@@ -15,11 +16,13 @@ const TaxCalculator: React.FC = () => {
         income: boolean;
         expenses: boolean;
         depreciation: boolean;
+        investments: boolean;
     }>({
         hst: false,
         income: false,
         expenses: false,
         depreciation: false,
+        investments: false,
     });
 
     // Calculate date range based on time period
@@ -122,9 +125,71 @@ const TaxCalculator: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
+    // Fetch investment income
+    const { data: investmentIncomeResponse } = useQuery({
+        queryKey: ['investment_income_tax', user?.company_id, fiscalYear],
+        queryFn: async () => {
+            return api.getInvestmentIncome({
+                company_id: user?.company_id,
+                fiscal_year: fiscalYear,
+                limit: 1000,
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch investment sales
+    const { data: investmentSalesResponse } = useQuery({
+        queryKey: ['investment_sales_tax', user?.company_id, fiscalYear],
+        queryFn: async () => {
+            return api.getInvestmentSales({
+                company_id: user?.company_id,
+                fiscal_year: fiscalYear,
+                limit: 1000,
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch dividends for RDTOH calculation
+    const { data: dividendsResponse } = useQuery({
+        queryKey: ['dividends_tax', user?.company_id, fiscalYear],
+        queryFn: async () => {
+            return api.getDividends({
+                company_id: user?.company_id,
+                limit: 1000,
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch all investments for breakdown
+    const { data: investmentsResponse } = useQuery({
+        queryKey: ['investments_tax', user?.company_id],
+        queryFn: async () => {
+            return api.getInvestments({
+                company_id: user?.company_id,
+                limit: 1000,
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch investment transactions to identify reinvested vs non-reinvested income
+    const { data: investmentTransactionsResponse } = useQuery({
+        queryKey: ['investment_transactions_tax', user?.company_id],
+        queryFn: async () => {
+            return api.getInvestmentTransactions({
+                company_id: user?.company_id,
+                limit: 10000,
+            });
+        },
+        enabled: !!user?.company_id,
+    });
+
     // Calculate tax data
     const taxData = useMemo(() => {
-        if (!invoicesResponse || !expensesResponse || !incomeResponse || !hstPaymentsResponse || !capitalAssetsResponse || !salariesResponse) {
+        if (!invoicesResponse || !expensesResponse || !incomeResponse || !hstPaymentsResponse || !capitalAssetsResponse || !salariesResponse || !investmentIncomeResponse || !investmentSalesResponse || !dividendsResponse || !investmentsResponse || !investmentTransactionsResponse) {
             return null;
         }
 
@@ -134,6 +199,11 @@ const TaxCalculator: React.FC = () => {
         const hstPayments = hstPaymentsResponse.data;
         const capitalAssets = capitalAssetsResponse.data;
         const salaries = salariesResponse.data;
+        const investmentIncome = investmentIncomeResponse.data;
+        const investmentSales = investmentSalesResponse.data;
+        const dividends = dividendsResponse.data;
+        const investments = investmentsResponse.data;
+        const investmentTransactions = investmentTransactionsResponse.data;
 
         // Filter invoices by date and status
         const paidInvoices = invoices.filter(invoice => {
@@ -213,16 +283,238 @@ const TaxCalculator: React.FC = () => {
             .filter(entry => entry.fiscal_year === fiscalYear);
         const totalDepreciation = depreciationEntries.reduce((sum, entry) => sum + entry.depreciation_amount, 0);
 
-        // Calculate Taxable Income (salaries are business expenses that reduce taxable income)
-        // Use deductible expenses instead of total expenses
-        const taxableIncome = Math.max(0, grossRevenue + otherIncome - totalDeductibleExpenses - totalSalaries - totalDepreciation);
+        // ===== SEPARATE ACTIVE BUSINESS INCOME FROM INVESTMENT INCOME =====
 
-        // Calculate Corporate Tax
+        // Active Business Income (excludes investment income)
+        const activeBusinessIncome = Math.max(0, grossRevenue + otherIncome - totalDeductibleExpenses - totalSalaries - totalDepreciation);
+
+        // Active Business Tax (small business rate)
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
-        const corporateTaxOwed = taxableIncome * smallBusinessTaxRate;
+        const activeBusinessTax = activeBusinessIncome * smallBusinessTaxRate;
 
-        // Calculate Total Taxes Owed
-        const totalTaxesOwed = hstOwed + corporateTaxOwed;
+        // ===== INVESTMENT INCOME CALCULATIONS =====
+
+        // Interest income - 100% taxable
+        const investmentInterestBase = investmentIncome
+            .filter(inc => inc.income_type === 'interest')
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+        // Dividend income - eligible dividends get gross-up treatment (38% for Canadian eligible dividends)
+        const eligibleDividendGrossUp = 1.38;
+        const eligibleDividendsBase = investmentIncome
+            .filter(inc => inc.income_type === 'dividend' && inc.is_eligible_dividend)
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+        const nonEligibleDividendsBase = investmentIncome
+            .filter(inc => inc.income_type === 'dividend' && !inc.is_eligible_dividend)
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+        // Gross-up eligible dividends
+        const eligibleDividendsGrossedUp = eligibleDividendsBase * eligibleDividendGrossUp;
+        const investmentDividendsTaxable = eligibleDividendsGrossedUp + nonEligibleDividendsBase;
+
+        // Capital gains - 50% inclusion rate
+        const realizedCapitalGains = investmentSales
+            .filter(sale => Number(sale.realized_gain_loss) > 0)
+            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+
+        // Capital losses - 50% deductible
+        const realizedCapitalLosses = investmentSales
+            .filter(sale => Number(sale.realized_gain_loss) < 0)
+            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+
+        // Total investment income for display (before tax)
+        const totalInvestmentIncome = investmentInterestBase + eligibleDividendsBase + nonEligibleDividendsBase + realizedCapitalGains + realizedCapitalLosses;
+
+        // Investment income tax rates (configurable, with defaults for Ontario 2024)
+        const investmentInterestTaxRate = user?.company?.investment_interest_tax_rate ?? 0.5017;
+        const investmentEligibleDividendTaxRate = user?.company?.investment_eligible_dividend_tax_rate ?? 0.3934;
+        const investmentNonEligibleDividendTaxRate = user?.company?.investment_noneligible_dividend_tax_rate ?? 0.4774;
+        const investmentCapitalGainTaxRate = user?.company?.investment_capital_gain_tax_rate ?? 0.2509;
+
+        // Calculate investment income tax separately
+        const investmentInterestTax = investmentInterestBase * investmentInterestTaxRate;
+        const investmentEligibleDividendTax = eligibleDividendsGrossedUp * investmentEligibleDividendTaxRate;
+        const investmentNonEligibleDividendTax = nonEligibleDividendsBase * investmentNonEligibleDividendTaxRate;
+        const investmentCapitalGainTax = Math.max(0, realizedCapitalGains * investmentCapitalGainTaxRate);
+
+        const totalInvestmentIncomeTax = investmentInterestTax + investmentEligibleDividendTax + investmentNonEligibleDividendTax + investmentCapitalGainTax;
+
+        // ===== RDTOH (Refundable Dividend Tax on Hand) CALCULATIONS =====
+
+        // RDTOH addition: 30.67% of investment income tax is added to RDTOH
+        const rdtohRate = 0.3067; // 30.67%
+        const rdtohAddition = totalInvestmentIncomeTax * rdtohRate;
+
+        // RDTOH refund: $1 refund per $2.61 of dividends paid
+        const dividendsPaid = dividends
+            .filter(div => {
+                const divDate = new Date(div.declaration_date);
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                return divDate >= start && divDate <= end;
+            })
+            .reduce((sum, div) => sum + div.amount, 0);
+
+        const rdtohRefundRate = 1 / 2.61; // $1 refund per $2.61 dividend
+        const rdtohRefund = dividendsPaid * rdtohRefundRate;
+
+        // RDTOH balance (previous balance + additions - refunds)
+        const previousRDTOHBalance = user?.company?.rdtoh_balance ?? 0;
+        const rdtohBalance = Math.max(0, previousRDTOHBalance + rdtohAddition - rdtohRefund);
+        const rdtohRefundable = Math.min(rdtohRefund, previousRDTOHBalance + rdtohAddition);
+
+        // Total corporate tax (active business + investment income)
+        const totalCorporateTax = activeBusinessTax + totalInvestmentIncomeTax;
+
+        // Calculate Total Taxes Owed (HST + Corporate Tax - RDTOH refund)
+        const totalTaxesOwed = hstOwed + totalCorporateTax - rdtohRefundable;
+
+        // ===== INVESTMENT BREAKDOWN CALCULATIONS =====
+
+        // Filter investment income and sales by fiscal year
+        const fiscalYearInvestmentIncome = investmentIncome.filter(inc => inc.fiscal_year === fiscalYear);
+        const fiscalYearInvestmentSales = investmentSales.filter(sale => sale.fiscal_year === fiscalYear);
+
+        // Calculate investment-by-investment breakdown
+        const investmentBreakdowns = investments.map(investment => {
+            // Get income for this investment
+            const investmentIncomeForThis = fiscalYearInvestmentIncome.filter(inc => inc.investment_id === investment.id);
+
+            // Get transactions for this investment
+            const transactionsForThis = investmentTransactions.filter(txn => txn.investment_id === investment.id);
+
+            // Get sales for this investment
+            const salesForThis = fiscalYearInvestmentSales.filter(sale => sale.investment_id === investment.id);
+
+            // Interest income breakdown
+            const interestIncome = investmentIncomeForThis
+                .filter(inc => inc.income_type === 'interest')
+                .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+            // Reinvested interest (from transactions)
+            const reinvestedInterest = transactionsForThis
+                .filter(txn => txn.transaction_type === 'interest')
+                .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+            const nonReinvestedInterest = interestIncome - reinvestedInterest;
+
+            // Dividend income breakdown
+            const totalDividends = investmentIncomeForThis
+                .filter(inc => inc.income_type === 'dividend')
+                .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+            const eligibleDividends = investmentIncomeForThis
+                .filter(inc => inc.income_type === 'dividend' && inc.is_eligible_dividend)
+                .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+            const nonEligibleDividends = investmentIncomeForThis
+                .filter(inc => inc.income_type === 'dividend' && !inc.is_eligible_dividend)
+                .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+            // Reinvested dividends (from transactions)
+            const reinvestedDividends = transactionsForThis
+                .filter(txn => txn.transaction_type === 'dividend_reinvested')
+                .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+            const nonReinvestedDividends = totalDividends - reinvestedDividends;
+
+            // Capital gains/losses from sales
+            const capitalGains = salesForThis
+                .filter(sale => Number(sale.realized_gain_loss) > 0)
+                .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0);
+
+            const capitalLosses = salesForThis
+                .filter(sale => Number(sale.realized_gain_loss) < 0)
+                .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0);
+
+            // Calculate cost basis for sales (if any sales exist)
+            let costBasisBreakdown = null;
+            if (salesForThis.length > 0) {
+                // Sum contributions
+                const contributions = transactionsForThis
+                    .filter(txn => txn.transaction_type === 'contribution')
+                    .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                // Sum reinvested interest (up to sale date)
+                const reinvestedInterestForCostBasis = transactionsForThis
+                    .filter(txn => {
+                        if (txn.transaction_type !== 'interest') return false;
+                        // Only include interest before or on the sale date
+                        const txnDate = new Date(txn.transaction_date);
+                        return salesForThis.some(sale => {
+                            const saleDate = new Date(sale.sale_date);
+                            return txnDate <= saleDate;
+                        });
+                    })
+                    .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                // Sum reinvested dividends (up to sale date)
+                const reinvestedDividendsForCostBasis = transactionsForThis
+                    .filter(txn => {
+                        if (txn.transaction_type !== 'dividend_reinvested') return false;
+                        // Only include dividends before or on the sale date
+                        const txnDate = new Date(txn.transaction_date);
+                        return salesForThis.some(sale => {
+                            const saleDate = new Date(sale.sale_date);
+                            return txnDate <= saleDate;
+                        });
+                    })
+                    .reduce((sum, txn) => sum + Number(txn.amount), 0);
+
+                // Sum withdrawals (up to sale date)
+                const withdrawals = Math.abs(transactionsForThis
+                    .filter(txn => {
+                        if (txn.transaction_type !== 'withdrawal') return false;
+                        const txnDate = new Date(txn.transaction_date);
+                        return salesForThis.some(sale => {
+                            const saleDate = new Date(sale.sale_date);
+                            return txnDate <= saleDate;
+                        });
+                    })
+                    .reduce((sum, txn) => sum + Number(txn.amount), 0));
+
+                // Average cost basis from sales (if multiple sales, use average)
+                const avgCostBasis = salesForThis.reduce((sum, sale) => sum + Number(sale.cost_basis), 0) / salesForThis.length;
+
+                costBasisBreakdown = {
+                    contributions,
+                    reinvestedInterest: reinvestedInterestForCostBasis,
+                    reinvestedDividends: reinvestedDividendsForCostBasis,
+                    withdrawals,
+                    calculatedCostBasis: contributions + reinvestedInterestForCostBasis + reinvestedDividendsForCostBasis - withdrawals,
+                    actualCostBasis: avgCostBasis,
+                };
+            }
+
+            return {
+                investment,
+                interestIncome,
+                reinvestedInterest,
+                nonReinvestedInterest,
+                totalDividends,
+                eligibleDividends,
+                nonEligibleDividends,
+                reinvestedDividends,
+                nonReinvestedDividends,
+                capitalGains,
+                capitalLosses,
+                sales: salesForThis,
+                costBasisBreakdown,
+            };
+        });
+
+        // Calculate total reinvested amounts
+        const totalReinvestedInterest = investmentBreakdowns.reduce((sum, breakdown) => sum + breakdown.reinvestedInterest, 0);
+        const totalReinvestedDividends = investmentBreakdowns.reduce((sum, breakdown) => sum + breakdown.reinvestedDividends, 0);
+
+        // Calculate reinvestment summary
+        const reinvestmentSummary = {
+            totalReinvestedInterest,
+            totalReinvestedDividends,
+            totalReinvested: totalReinvestedInterest + totalReinvestedDividends,
+            // Compound interest effect: reinvested amounts will earn future returns
+            // This is informational - the actual tax impact is already captured in current year income
+        };
 
         return {
             // HST Data
@@ -236,7 +528,7 @@ const TaxCalculator: React.FC = () => {
             paidInvoices,
             clientIncomeEntries: filteredIncomeEntries.filter(entry => entry.income_type === 'client'),
 
-            // Income Tax Data
+            // Income Tax Data - Active Business
             grossRevenue,
             invoiceRevenue,
             clientIncome,
@@ -245,9 +537,40 @@ const TaxCalculator: React.FC = () => {
             totalDeductibleExpenses,
             totalSalaries,
             totalDepreciation,
-            taxableIncome,
+            activeBusinessIncome,
+            activeBusinessTax,
             smallBusinessTaxRate,
-            corporateTaxOwed,
+
+            // Investment Income Data
+            investmentInterest: investmentInterestBase,
+            investmentDividends: eligibleDividendsBase + nonEligibleDividendsBase,
+            eligibleDividendsBase,
+            nonEligibleDividendsBase,
+            eligibleDividendsGrossedUp,
+            investmentDividendsTaxable,
+            realizedCapitalGains,
+            realizedCapitalLosses,
+            totalInvestmentIncome,
+            investmentInterestTax,
+            investmentEligibleDividendTax,
+            investmentNonEligibleDividendTax,
+            investmentCapitalGainTax,
+            totalInvestmentIncomeTax,
+            investmentInterestTaxRate,
+            investmentEligibleDividendTaxRate,
+            investmentNonEligibleDividendTaxRate,
+            investmentCapitalGainTaxRate,
+
+            // RDTOH Data
+            rdtohAddition,
+            rdtohRefund,
+            rdtohBalance,
+            rdtohRefundable,
+            previousRDTOHBalance,
+            dividendsPaid,
+
+            // Combined Tax Data
+            totalCorporateTax,
             filteredExpenses,
             filteredSalaries,
             depreciationEntries,
@@ -255,10 +578,14 @@ const TaxCalculator: React.FC = () => {
                 asset.depreciation_entries?.some(entry => entry.fiscal_year === fiscalYear)
             ),
 
+            // Investment Breakdown Data
+            investmentBreakdowns,
+            reinvestmentSummary,
+
             // Summary
             totalTaxesOwed,
         };
-    }, [invoicesResponse, expensesResponse, incomeResponse, hstPaymentsResponse, capitalAssetsResponse, salariesResponse, startDate, endDate, fiscalYear, user?.company]);
+    }, [invoicesResponse, expensesResponse, incomeResponse, hstPaymentsResponse, capitalAssetsResponse, salariesResponse, investmentIncomeResponse, investmentSalesResponse, dividendsResponse, investmentsResponse, investmentTransactionsResponse, startDate, endDate, fiscalYear, user?.company]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -383,11 +710,11 @@ const TaxCalculator: React.FC = () => {
                 </div>
             </Card>
 
-            {/* HST Remittance Section */}
+            {/* HST to Pay Section */}
             <div className="space-y-4">
                 <Card className="p-6 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-white">HST Remittance</h2>
+                        <h2 className="text-xl font-bold text-white">HST to Pay</h2>
                         <button
                             onClick={() => toggleSection('hst')}
                             className="text-slate-muted hover:text-white"
@@ -402,7 +729,13 @@ const TaxCalculator: React.FC = () => {
                             <div className="text-2xl font-bold text-white">{formatCurrency(taxData.hstCollected)}</div>
                         </div>
                         <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
-                            <div className="text-sm text-slate-muted mb-1">HST Input Tax Credits</div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="text-sm text-slate-muted">HST Credits from Expenses</div>
+                                <HelpIcon
+                                    content="HST you paid on business expenses that you can claim back as a credit against HST you collected. This reduces the amount of HST you owe to the government."
+                                    size="sm"
+                                />
+                            </div>
                             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                                 {taxData.isHSTRegistered ? formatCurrency(taxData.hstInputTaxCredits) : '$0.00 (Not HST Registered)'}
                             </div>
@@ -481,7 +814,7 @@ const TaxCalculator: React.FC = () => {
             <div className="space-y-4">
                 <Card className="p-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-white">Corporate Income Tax</h2>
+                        <h2 className="text-xl font-bold text-white">Business Income Tax</h2>
                         <button
                             onClick={() => toggleSection('income')}
                             className="text-slate-muted hover:text-white"
@@ -491,57 +824,305 @@ const TaxCalculator: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                        <div className="bg-background rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                            <div className="text-sm text-slate-muted mb-1">Gross Revenue</div>
-                            <div className="text-2xl font-bold text-white">{formatCurrency(taxData.grossRevenue)}</div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-background rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                                <div className="text-sm text-slate-muted mb-1">Other Income</div>
-                                <div className="text-xl font-bold text-white">{formatCurrency(taxData.otherIncome)}</div>
-                            </div>
-                            <div className="bg-background rounded-lg p-4 border border-red-200 dark:border-red-800">
-                                <div className="text-sm text-slate-muted mb-1">Total Expenses</div>
-                                <div className="text-xl font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalExpenses)}</div>
-                                {taxData.totalExpenses !== taxData.totalDeductibleExpenses && (
-                                    <div className="text-xs text-slate-muted mt-1">
-                                        Deductible: {formatCurrency(taxData.totalDeductibleExpenses)}
+                        {/* Active Business Income Section */}
+                        <div className="bg-background rounded-lg p-4 border-2 border-blue-300 dark:border-blue-700">
+                            <h3 className="text-lg font-semibold text-white mb-3">Business Income (from operations)</h3>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <div className="text-sm text-slate-muted mb-1">Gross Revenue</div>
+                                        <div className="text-xl font-bold text-white">{formatCurrency(taxData.grossRevenue)}</div>
                                     </div>
-                                )}
-                            </div>
-                            <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
-                                <div className="text-sm text-slate-muted mb-1">Total Salaries</div>
-                                <div className="text-xl font-bold text-orange-600 dark:text-orange-400">-{formatCurrency(taxData.totalSalaries)}</div>
-                            </div>
-                            <div className="bg-background rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-                                <div className="text-sm text-slate-muted mb-1">Depreciation (CCA)</div>
-                                <div className="text-xl font-bold text-purple-600 dark:text-purple-400">-{formatCurrency(taxData.totalDepreciation)}</div>
+                                    <div>
+                                        <div className="text-sm text-slate-muted mb-1">Other Income</div>
+                                        <div className="text-xl font-bold text-white">{formatCurrency(taxData.otherIncome)}</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <div className="text-sm text-slate-muted mb-1">Deductible Expenses</div>
+                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalDeductibleExpenses)}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-muted mb-1">Salaries</div>
+                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalSalaries)}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-muted mb-1">Depreciation (CCA)</div>
+                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalDepreciation)}</div>
+                                    </div>
+                                </div>
+                                <div className="bg-muted/50 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <div className="text-sm font-medium text-white">Active Business Income</div>
+                                        <div className="text-sm text-slate-muted">Tax Rate: {formatPercentage(taxData.smallBusinessTaxRate)}</div>
+                                    </div>
+                                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(taxData.activeBusinessIncome)}</div>
+                                    <div className="text-sm text-slate-muted mt-1">Tax: {formatCurrency(taxData.activeBusinessTax)}</div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border-2 border-blue-300 dark:border-blue-700">
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="text-sm text-slate-muted">Taxable Income</div>
-                                <div className="text-sm text-slate-muted">Tax Rate: {formatPercentage(taxData.smallBusinessTaxRate)}</div>
-                            </div>
-                            <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{formatCurrency(taxData.taxableIncome)}</div>
-                        </div>
+                        {/* Investment Income Section */}
+                        {taxData.totalInvestmentIncome !== 0 && (
+                            <div className="bg-background rounded-lg p-4 border-2 border-green-300 dark:border-green-700">
+                                <h3 className="text-lg font-semibold text-white mb-3">Investment Income</h3>
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        {taxData.investmentInterest > 0 && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">Interest Income</div>
+                                                <div className="text-lg font-bold text-white">{formatCurrency(taxData.investmentInterest)}</div>
+                                                <div className="text-xs text-slate-muted">Tax: {formatCurrency(taxData.investmentInterestTax)} ({formatPercentage(taxData.investmentInterestTaxRate)})</div>
+                                            </div>
+                                        )}
+                                        {(taxData.eligibleDividendsBase > 0 || taxData.nonEligibleDividendsBase > 0) && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">Dividend Income</div>
+                                                <div className="text-lg font-bold text-white">{formatCurrency(taxData.eligibleDividendsBase + taxData.nonEligibleDividendsBase)}</div>
+                                                {taxData.eligibleDividendsBase > 0 && (
+                                                    <div className="text-xs text-slate-muted">Eligible: {formatCurrency(taxData.eligibleDividendsBase)} (grossed-up: {formatCurrency(taxData.eligibleDividendsGrossedUp)})</div>
+                                                )}
+                                                {taxData.nonEligibleDividendsBase > 0 && (
+                                                    <div className="text-xs text-slate-muted">Non-eligible: {formatCurrency(taxData.nonEligibleDividendsBase)}</div>
+                                                )}
+                                                <div className="text-xs text-slate-muted mt-1">Tax: {formatCurrency(taxData.investmentEligibleDividendTax + taxData.investmentNonEligibleDividendTax)}</div>
+                                            </div>
+                                        )}
+                                        {taxData.realizedCapitalGains !== 0 && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">Capital Gains (50%)</div>
+                                                <div className={`text-lg font-bold ${taxData.realizedCapitalGains >= 0 ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {formatCurrency(taxData.realizedCapitalGains)}
+                                                </div>
+                                                {taxData.realizedCapitalGains > 0 && (
+                                                    <div className="text-xs text-slate-muted">Tax: {formatCurrency(taxData.investmentCapitalGainTax)} ({formatPercentage(taxData.investmentCapitalGainTaxRate)})</div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {taxData.realizedCapitalLosses < 0 && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">Capital Losses (50%)</div>
+                                                <div className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(taxData.realizedCapitalLosses)}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="bg-muted/50 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="text-sm font-medium text-white">Total Investment Income Tax</div>
+                                        </div>
+                                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(taxData.totalInvestmentIncomeTax)}</div>
+                                    </div>
 
+                                    {/* Reinvestment Summary */}
+                                    {taxData.reinvestmentSummary.totalReinvested > 0 && (
+                                        <div className="bg-muted/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                                            <div className="text-sm font-medium text-white mb-2">Reinvestment Summary</div>
+                                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                                <div>
+                                                    <div className="text-xs text-slate-muted">Reinvested Interest</div>
+                                                    <div className="text-base font-semibold text-green-600 dark:text-green-400">
+                                                        {formatCurrency(taxData.reinvestmentSummary.totalReinvestedInterest)}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-slate-muted">Reinvested Dividends</div>
+                                                    <div className="text-base font-semibold text-green-600 dark:text-green-400">
+                                                        {formatCurrency(taxData.reinvestmentSummary.totalReinvestedDividends)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-slate-muted mt-2">
+                                                Note: Reinvested income is still fully taxable in the year earned, but increases cost basis for future sales.
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Expandable Investment Breakdown */}
+                                    {taxData.investmentBreakdowns.length > 0 && (
+                                        <div className="mt-4">
+                                            <button
+                                                onClick={() => toggleSection('investments')}
+                                                className="flex items-center justify-between w-full text-left text-sm font-semibold text-white hover:text-green-400 transition-colors mb-2"
+                                            >
+                                                <span>Investment-by-Investment Breakdown</span>
+                                                {expandedSections.investments ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                            </button>
+                                            {expandedSections.investments && (
+                                                <div className="space-y-3 mt-2">
+                                                    {taxData.investmentBreakdowns
+                                                        .filter(breakdown =>
+                                                            breakdown.interestIncome > 0 ||
+                                                            breakdown.totalDividends > 0 ||
+                                                            breakdown.capitalGains !== 0 ||
+                                                            breakdown.capitalLosses !== 0
+                                                        )
+                                                        .map((breakdown) => (
+                                                            <Card key={breakdown.investment.id} className="p-4 bg-background border border-green-200 dark:border-green-800">
+                                                                <div className="mb-3">
+                                                                    <div className="font-semibold text-white">{breakdown.investment.description}</div>
+                                                                    <div className="text-xs text-slate-muted">
+                                                                        {breakdown.investment.symbol && `${breakdown.investment.symbol} • `}
+                                                                        {breakdown.investment.investment_type === 'stock' ? 'Stock' : 'GIC / Savings Account'}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="space-y-2">
+                                                                    {/* Interest Income */}
+                                                                    {breakdown.interestIncome > 0 && (
+                                                                        <div className="text-sm">
+                                                                            <div className="text-slate-muted mb-1">Interest Income</div>
+                                                                            <div className="font-medium text-white">{formatCurrency(breakdown.interestIncome)}</div>
+                                                                            {breakdown.reinvestedInterest > 0 && (
+                                                                                <div className="text-xs text-slate-muted mt-1">
+                                                                                    Reinvested: {formatCurrency(breakdown.reinvestedInterest)} •
+                                                                                    Non-reinvested: {formatCurrency(breakdown.nonReinvestedInterest)}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Dividend Income */}
+                                                                    {breakdown.totalDividends > 0 && (
+                                                                        <div className="text-sm">
+                                                                            <div className="text-slate-muted mb-1">Dividend Income</div>
+                                                                            <div className="font-medium text-white">{formatCurrency(breakdown.totalDividends)}</div>
+                                                                            {breakdown.eligibleDividends > 0 && (
+                                                                                <div className="text-xs text-slate-muted">Eligible: {formatCurrency(breakdown.eligibleDividends)}</div>
+                                                                            )}
+                                                                            {breakdown.nonEligibleDividends > 0 && (
+                                                                                <div className="text-xs text-slate-muted">Non-eligible: {formatCurrency(breakdown.nonEligibleDividends)}</div>
+                                                                            )}
+                                                                            {breakdown.reinvestedDividends > 0 && (
+                                                                                <div className="text-xs text-slate-muted mt-1">
+                                                                                    Reinvested: {formatCurrency(breakdown.reinvestedDividends)} •
+                                                                                    Non-reinvested: {formatCurrency(breakdown.nonReinvestedDividends)}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Capital Gains/Losses */}
+                                                                    {(breakdown.capitalGains > 0 || breakdown.capitalLosses < 0) && (
+                                                                        <div className="text-sm">
+                                                                            <div className="text-slate-muted mb-1">Capital Gains/Losses</div>
+                                                                            {breakdown.capitalGains > 0 && (
+                                                                                <div className="font-medium text-green-600 dark:text-green-400">
+                                                                                    Gains: {formatCurrency(breakdown.capitalGains)} (50% taxable: {formatCurrency(breakdown.capitalGains * 0.5)})
+                                                                                </div>
+                                                                            )}
+                                                                            {breakdown.capitalLosses < 0 && (
+                                                                                <div className="font-medium text-red-600 dark:text-red-400">
+                                                                                    Losses: {formatCurrency(breakdown.capitalLosses)} (50% deductible: {formatCurrency(breakdown.capitalLosses * 0.5)})
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Cost Basis Breakdown */}
+                                                                            {breakdown.costBasisBreakdown && (
+                                                                                <div className="mt-2 pt-2 border-t border-border">
+                                                                                    <div className="text-xs text-slate-muted mb-1">Cost Basis Breakdown</div>
+                                                                                    <div className="text-xs space-y-1">
+                                                                                        <div className="flex justify-between">
+                                                                                            <span className="text-slate-muted">Contributions:</span>
+                                                                                            <span className="text-white">{formatCurrency(breakdown.costBasisBreakdown.contributions)}</span>
+                                                                                        </div>
+                                                                                        {breakdown.costBasisBreakdown.reinvestedInterest > 0 && (
+                                                                                            <div className="flex justify-between">
+                                                                                                <span className="text-slate-muted">+ Reinvested Interest:</span>
+                                                                                                <span className="text-green-600 dark:text-green-400">{formatCurrency(breakdown.costBasisBreakdown.reinvestedInterest)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {breakdown.costBasisBreakdown.reinvestedDividends > 0 && (
+                                                                                            <div className="flex justify-between">
+                                                                                                <span className="text-slate-muted">+ Reinvested Dividends:</span>
+                                                                                                <span className="text-green-600 dark:text-green-400">{formatCurrency(breakdown.costBasisBreakdown.reinvestedDividends)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {breakdown.costBasisBreakdown.withdrawals > 0 && (
+                                                                                            <div className="flex justify-between">
+                                                                                                <span className="text-slate-muted">- Withdrawals:</span>
+                                                                                                <span className="text-red-600 dark:text-red-400">{formatCurrency(breakdown.costBasisBreakdown.withdrawals)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        <div className="flex justify-between font-medium pt-1 border-t border-border">
+                                                                                            <span className="text-white">Calculated Cost Basis:</span>
+                                                                                            <span className="text-white">{formatCurrency(breakdown.costBasisBreakdown.calculatedCostBasis)}</span>
+                                                                                        </div>
+                                                                                        {Math.abs(breakdown.costBasisBreakdown.calculatedCostBasis - breakdown.costBasisBreakdown.actualCostBasis) > 0.01 && (
+                                                                                            <div className="flex justify-between text-yellow-600 dark:text-yellow-400">
+                                                                                                <span>Actual Cost Basis (from sale):</span>
+                                                                                                <span>{formatCurrency(breakdown.costBasisBreakdown.actualCostBasis)}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </Card>
+                                                        ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* RDTOH Section */}
+                        {(taxData.totalInvestmentIncomeTax > 0 || taxData.rdtohBalance > 0 || taxData.dividendsPaid > 0) && (
+                            <div className="bg-background rounded-lg p-4 border-2 border-purple-300 dark:border-purple-700">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <h3 className="text-lg font-semibold text-white">Refundable Tax Account</h3>
+                                    <HelpIcon
+                                        content="RDTOH (Refundable Dividend Tax on Hand) is a tax account that accumulates when you pay tax on investment income. When you pay dividends, you can get a refund from this account ($1 refund per $2.61 of dividends paid). This helps prevent double taxation of investment income."
+                                        size="sm"
+                                    />
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {taxData.totalInvestmentIncomeTax > 0 && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">RDTOH Addition (30.67% of investment tax)</div>
+                                                <div className="text-lg font-bold text-green-600 dark:text-green-400">+{formatCurrency(taxData.rdtohAddition)}</div>
+                                            </div>
+                                        )}
+                                        {taxData.dividendsPaid > 0 && (
+                                            <div>
+                                                <div className="text-sm text-slate-muted mb-1">Dividends Paid</div>
+                                                <div className="text-lg font-bold text-white">{formatCurrency(taxData.dividendsPaid)}</div>
+                                                <div className="text-xs text-slate-muted">RDTOH Refund: {formatCurrency(taxData.rdtohRefund)} ($1 per $2.61 dividend)</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="bg-muted/50 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="text-sm font-medium text-white">RDTOH Balance</div>
+                                        </div>
+                                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(taxData.rdtohBalance)}</div>
+                                        {taxData.rdtohRefundable > 0 && (
+                                            <div className="text-sm text-green-600 dark:text-green-400 mt-1">Refundable: {formatCurrency(taxData.rdtohRefundable)}</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Total Corporate Tax */}
                         <div className={cn(
                             "bg-background rounded-lg p-4 border-2",
-                            taxData.corporateTaxOwed > 0
+                            taxData.totalCorporateTax > 0
                                 ? "border-red-300 dark:border-red-700"
                                 : "border-green-300 dark:border-green-700"
                         )}>
-                            <div className="text-sm text-slate-muted mb-1">Corporate Income Tax Owed</div>
-                            <div className={cn(
-                                "text-3xl font-bold",
-                                taxData.corporateTaxOwed > 0
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "text-green-600 dark:text-green-400"
-                            )}>
-                                {formatCurrency(taxData.corporateTaxOwed)}
+                            <div className="text-sm text-slate-muted mb-1">Total Corporate Income Tax</div>
+                            <div className="text-3xl font-bold text-white mb-2">{formatCurrency(taxData.totalCorporateTax)}</div>
+                            <div className="text-sm text-slate-muted">
+                                Active Business: {formatCurrency(taxData.activeBusinessTax)} + Investment: {formatCurrency(taxData.totalInvestmentIncomeTax)}
+                                {taxData.rdtohRefundable > 0 && (
+                                    <span className="text-green-600 dark:text-green-400"> - RDTOH Refund: {formatCurrency(taxData.rdtohRefundable)}</span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -665,6 +1246,11 @@ const TaxCalculator: React.FC = () => {
                             <li>HST Input Tax Credits (ITCs) are only available if your company is HST registered.</li>
                             <li>Capital contributions are not included in taxable income.</li>
                             <li>Depreciation (CCA) reduces taxable income and is calculated based on fiscal year.</li>
+                            <li><strong>Active business income</strong> is taxed at the small business rate (12.5% default).</li>
+                            <li><strong>Investment income</strong> (interest, dividends, capital gains) is taxed at higher rates and tracked separately.</li>
+                            <li><strong>RDTOH (Refundable Dividend Tax on Hand)</strong>: 30.67% of investment income tax is added to RDTOH, which becomes refundable when dividends are paid ($1 refund per $2.61 of dividends).</li>
+                            <li>Eligible dividends receive a 38% gross-up before tax calculation.</li>
+                            <li>Capital gains are included at 50% (half the gain is taxable).</li>
                             <li>These calculations are estimates. Please consult with a tax professional for official tax filings.</li>
                             <li>HST remittance periods may vary based on your filing frequency (monthly, quarterly, or annual).</li>
                         </ul>

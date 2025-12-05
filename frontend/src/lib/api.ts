@@ -20,6 +20,11 @@ export interface Company {
     fiscal_year_end: string;
     small_business_rate: number;
     hst_rate: number;
+    rdtoh_balance?: number;
+    investment_interest_tax_rate?: number;
+    investment_eligible_dividend_tax_rate?: number;
+    investment_noneligible_dividend_tax_rate?: number;
+    investment_capital_gain_tax_rate?: number;
     created_at: string;
     updated_at: string;
 }
@@ -243,6 +248,76 @@ export interface CCAClass {
     class_number: string;
     description: string;
     rate: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Investment {
+    id: number;
+    company_id: number;
+    company?: Company;
+    investment_type: 'stock' | 'gic';
+    description: string;
+    symbol?: string | null;
+    institution?: string | null;
+    purchase_date: string;
+    purchase_amount: number;
+    funding_source: 'retained_earnings' | 'total_cash';
+    current_value?: number | null;
+    maturity_date?: string | null;
+    status: 'active' | 'sold' | 'matured';
+    notes?: string | null;
+    interest_rate?: number | null;
+    current_balance?: number | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InvestmentIncome {
+    id: number;
+    investment_id: number;
+    investment?: Investment;
+    company_id: number;
+    company?: Company;
+    income_type: 'dividend' | 'interest' | 'capital_gain' | 'capital_loss';
+    amount: number;
+    income_date: string;
+    fiscal_year: number;
+    is_eligible_dividend: boolean;
+    notes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InvestmentSale {
+    id: number;
+    investment_id: number;
+    investment?: Investment;
+    company_id: number;
+    company?: Company;
+    sale_date: string;
+    sale_amount: number;
+    cost_basis: number;
+    realized_gain_loss: number;
+    fiscal_year: number;
+    notes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InvestmentTransaction {
+    id: number;
+    investment_id: number;
+    investment?: Investment;
+    company_id: number;
+    company?: Company;
+    transaction_type: 'contribution' | 'interest' | 'withdrawal' | 'dividend_reinvested' | 'price_update';
+    amount: number;
+    transaction_date: string;
+    balance_after: number;
+    linked_income_id?: number | null;
+    linked_income?: InvestmentIncome | null;
+    notes?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -1393,6 +1468,422 @@ class SupabaseApi {
         const { data, error } = await supabase.from('cca_classes').select('*').order('class_number', { ascending: true });
         if (error) throw new Error(error.message);
         return data ?? [];
+    }
+
+    // Investments ---------------------------------------------------------
+    async getInvestments(params?: { page?: number; limit?: number; company_id?: number; status?: string; investment_type?: string }): Promise<PaginatedResponse<Investment>> {
+        return this.paginatedSelect<Investment>('investments', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'purchase_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.investment_type) query = query.eq('investment_type', params.investment_type);
+                return query;
+            },
+        });
+    }
+
+    async getInvestment(id: number): Promise<Investment> {
+        const { data, error } = await supabase
+            .from('investments')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<Investment>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Investment not found');
+        return data;
+    }
+
+    async createInvestment(investment: {
+        company_id: number;
+        investment_type: 'stock' | 'gic';
+        description: string;
+        symbol?: string;
+        institution?: string;
+        purchase_date: string;
+        purchase_amount: number;
+        funding_source: 'retained_earnings' | 'total_cash';
+        current_value?: number;
+        maturity_date?: string;
+        status?: 'active' | 'sold' | 'matured';
+        notes?: string;
+    }): Promise<Investment> {
+        const { data, error } = await supabase
+            .from('investments')
+            .insert({
+                ...investment,
+                status: investment.status || 'active',
+            })
+            .select('*, company:companies(*)')
+            .single<Investment>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateInvestment(id: number, investment: Partial<Investment>): Promise<Investment> {
+        const { data, error } = await supabase
+            .from('investments')
+            .update(investment)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<Investment>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteInvestment(id: number): Promise<void> {
+        const { error } = await supabase.from('investments').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Investment Income ---------------------------------------------------
+    async getInvestmentIncome(params?: { page?: number; limit?: number; company_id?: number; investment_id?: number; fiscal_year?: number }): Promise<PaginatedResponse<InvestmentIncome>> {
+        return this.paginatedSelect<InvestmentIncome>('investment_income', {
+            columns: '*, investment:investments(*), company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'income_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.investment_id) query = query.eq('investment_id', params.investment_id);
+                if (params?.fiscal_year) query = query.eq('fiscal_year', params.fiscal_year);
+                return query;
+            },
+        });
+    }
+
+    async createInvestmentIncome(income: {
+        investment_id: number;
+        company_id: number;
+        income_type: 'dividend' | 'interest' | 'capital_gain' | 'capital_loss';
+        amount: number;
+        income_date: string;
+        fiscal_year: number;
+        is_eligible_dividend?: boolean;
+        notes?: string;
+    }): Promise<InvestmentIncome> {
+        const { data, error } = await supabase
+            .from('investment_income')
+            .insert({
+                ...income,
+                is_eligible_dividend: income.is_eligible_dividend || false,
+            })
+            .select('*, investment:investments(*), company:companies(*)')
+            .single<InvestmentIncome>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateInvestmentIncome(id: number, income: Partial<InvestmentIncome>): Promise<InvestmentIncome> {
+        const { data, error } = await supabase
+            .from('investment_income')
+            .update(income)
+            .eq('id', id)
+            .select('*, investment:investments(*), company:companies(*)')
+            .single<InvestmentIncome>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteInvestmentIncome(id: number): Promise<void> {
+        const { error } = await supabase.from('investment_income').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Investment Sales ----------------------------------------------------
+    async getInvestmentSales(params?: { page?: number; limit?: number; company_id?: number; investment_id?: number; fiscal_year?: number }): Promise<PaginatedResponse<InvestmentSale>> {
+        return this.paginatedSelect<InvestmentSale>('investment_sales', {
+            columns: '*, investment:investments(*), company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'sale_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.investment_id) query = query.eq('investment_id', params.investment_id);
+                if (params?.fiscal_year) query = query.eq('fiscal_year', params.fiscal_year);
+                return query;
+            },
+        });
+    }
+
+    async createInvestmentSale(sale: {
+        investment_id: number;
+        company_id: number;
+        sale_date: string;
+        sale_amount: number;
+        cost_basis?: number; // Optional - will be calculated if not provided
+        fiscal_year: number;
+        notes?: string;
+    }): Promise<InvestmentSale> {
+        // Calculate cost basis if not provided (includes reinvested amounts)
+        let costBasis = sale.cost_basis;
+        if (costBasis === undefined) {
+            costBasis = await this.calculateInvestmentCostBasis(sale.investment_id);
+        }
+        
+        const realizedGainLoss = sale.sale_amount - costBasis;
+        const { data, error } = await supabase
+            .from('investment_sales')
+            .insert({
+                ...sale,
+                cost_basis: costBasis,
+                realized_gain_loss: realizedGainLoss,
+            })
+            .select('*, investment:investments(*), company:companies(*)')
+            .single<InvestmentSale>();
+        if (error) throw new Error(error.message);
+        
+        // Update investment status to 'sold'
+        await this.updateInvestment(sale.investment_id, { status: 'sold' });
+        
+        return data;
+    }
+
+    async updateInvestmentSale(id: number, sale: Partial<InvestmentSale>): Promise<InvestmentSale> {
+        // Recalculate realized_gain_loss if sale_amount or cost_basis changed
+        if (sale.sale_amount !== undefined || sale.cost_basis !== undefined) {
+            const existing = await this.getInvestmentSale(id);
+            const saleAmount = sale.sale_amount ?? existing.sale_amount;
+            const costBasis = sale.cost_basis ?? existing.cost_basis;
+            sale.realized_gain_loss = saleAmount - costBasis;
+        }
+        
+        const { data, error } = await supabase
+            .from('investment_sales')
+            .update(sale)
+            .eq('id', id)
+            .select('*, investment:investments(*), company:companies(*)')
+            .single<InvestmentSale>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async getInvestmentSale(id: number): Promise<InvestmentSale> {
+        const { data, error } = await supabase
+            .from('investment_sales')
+            .select('*, investment:investments(*), company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<InvestmentSale>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Investment sale not found');
+        return data;
+    }
+
+    async deleteInvestmentSale(id: number): Promise<void> {
+        const { error } = await supabase.from('investment_sales').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Investment Transactions -------------------------------------------------
+    async getInvestmentTransactions(params?: { 
+        page?: number; 
+        limit?: number; 
+        investment_id?: number; 
+        company_id?: number;
+        transaction_type?: string;
+    }): Promise<PaginatedResponse<InvestmentTransaction>> {
+        return this.paginatedSelect<InvestmentTransaction>('investment_transactions', {
+            columns: '*, investment:investments(*), company:companies(*), linked_income:investment_income!linked_income_id(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'transaction_date', ascending: false },
+            modify: (query) => {
+                if (params?.investment_id) query = query.eq('investment_id', params.investment_id);
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.transaction_type) query = query.eq('transaction_type', params.transaction_type);
+                return query;
+            },
+        });
+    }
+
+    async getInvestmentTransaction(id: number): Promise<InvestmentTransaction> {
+        const { data, error } = await supabase
+            .from('investment_transactions')
+            .select('*, investment:investments(*), company:companies(*), linked_income:investment_income!linked_income_id(*)')
+            .eq('id', id)
+            .maybeSingle<InvestmentTransaction>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Investment transaction not found');
+        return data;
+    }
+
+    async createInvestmentTransaction(transaction: {
+        investment_id: number;
+        company_id: number;
+        transaction_type: 'contribution' | 'interest' | 'withdrawal' | 'dividend_reinvested' | 'price_update';
+        amount: number;
+        transaction_date: string;
+        balance_after: number;
+        linked_income_id?: number | null;
+        notes?: string;
+    }): Promise<InvestmentTransaction> {
+        const { data, error } = await supabase
+            .from('investment_transactions')
+            .insert(transaction)
+            .select('*, investment:investments(*), company:companies(*), linked_income:investment_income!linked_income_id(*)')
+            .single<InvestmentTransaction>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateInvestmentTransaction(id: number, transaction: Partial<InvestmentTransaction>): Promise<InvestmentTransaction> {
+        const { data, error } = await supabase
+            .from('investment_transactions')
+            .update(transaction)
+            .eq('id', id)
+            .select('*, investment:investments(*), company:companies(*), linked_income:investment_income!linked_income_id(*)')
+            .single<InvestmentTransaction>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteInvestmentTransaction(id: number): Promise<void> {
+        const { error } = await supabase.from('investment_transactions').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Helper method to calculate balance from transactions
+    async calculateInvestmentBalance(investment_id: number): Promise<number> {
+        const { data, error } = await supabase
+            .from('investment_transactions')
+            .select('amount')
+            .eq('investment_id', investment_id)
+            .order('transaction_date', { ascending: true });
+        
+        if (error) throw new Error(error.message);
+        
+        // Sum all transaction amounts
+        return data?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+    }
+
+    // Helper method to calculate cost basis for an investment
+    // Cost basis includes: initial purchase + contributions + reinvested interest + reinvested dividends
+    // Cost basis excludes: withdrawals
+    async calculateInvestmentCostBasis(investment_id: number): Promise<number> {
+        const { data, error } = await supabase
+            .from('investment_transactions')
+            .select('transaction_type, amount')
+            .eq('investment_id', investment_id);
+        
+        if (error) throw new Error(error.message);
+        
+        if (!data || data.length === 0) {
+            // If no transactions, use purchase_amount from investment
+            const investment = await this.getInvestment(investment_id);
+            return Number(investment.purchase_amount);
+        }
+        
+        // Sum contributions (includes initial purchase)
+        const contributions = data
+            .filter(t => t.transaction_type === 'contribution')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        // Sum reinvested interest
+        const reinvestedInterest = data
+            .filter(t => t.transaction_type === 'interest')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        // Sum reinvested dividends
+        const reinvestedDividends = data
+            .filter(t => t.transaction_type === 'dividend_reinvested')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        // Subtract withdrawals
+        const withdrawals = Math.abs(data
+            .filter(t => t.transaction_type === 'withdrawal')
+            .reduce((sum, t) => sum + Number(t.amount), 0));
+        
+        // Cost basis = contributions + reinvested interest + reinvested dividends - withdrawals
+        return contributions + reinvestedInterest + reinvestedDividends - withdrawals;
+    }
+
+    // Get investment detail with calculated stats
+    async getInvestmentDetail(id: number): Promise<{
+        investment: Investment;
+        transactions: InvestmentTransaction[];
+        totalInvested: number;
+        currentBalance: number;
+        totalInterest: number;
+        totalDividends: number;
+        totalContributions: number;
+        totalWithdrawals: number;
+    }> {
+        const investment = await this.getInvestment(id);
+        const transactionsResult = await this.getInvestmentTransactions({ 
+            investment_id: id, 
+            limit: 10000 
+        });
+        const transactions = transactionsResult.data;
+
+        // Fetch investment income to calculate total dividends
+        const incomeResult = await this.getInvestmentIncome({
+            investment_id: id,
+            limit: 10000
+        });
+        const investmentIncome = incomeResult.data;
+
+        // Calculate stats
+        const totalContributions = transactions
+            .filter(t => t.transaction_type === 'contribution')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        const totalWithdrawals = Math.abs(transactions
+            .filter(t => t.transaction_type === 'withdrawal')
+            .reduce((sum, t) => sum + Number(t.amount), 0));
+        
+        // If no transactions exist, use purchase_amount as the initial investment
+        const totalInvested = transactions.length > 0 
+            ? totalContributions - totalWithdrawals
+            : Number(investment.purchase_amount);
+        
+        const totalInterest = transactions
+            .filter(t => t.transaction_type === 'interest')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        // Calculate total dividends from investment_income (includes both reinvested and non-reinvested)
+        const totalDividends = investmentIncome
+            .filter(inc => inc.income_type === 'dividend')
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+        
+        // Current balance: prioritize transaction-based calculation for savings accounts
+        // For savings accounts, always use transactions when available
+        // For stocks, allow manual override but prefer transactions
+        let currentBalance = 0;
+        if (transactions.length > 0) {
+            // Get the most recent balance from transactions (sorted by date desc, then by id desc for same dates)
+            const sortedTransactions = [...transactions].sort((a, b) => {
+                const dateA = new Date(a.transaction_date).getTime();
+                const dateB = new Date(b.transaction_date).getTime();
+                if (dateA !== dateB) return dateB - dateA; // Most recent first
+                return b.id - a.id; // If same date, higher ID first (more recent)
+            });
+            currentBalance = Number(sortedTransactions[0].balance_after);
+        } else if (investment.current_balance !== null) {
+            // No transactions, but manual override is set
+            currentBalance = Number(investment.current_balance);
+        } else {
+            // No transactions yet - use purchase_amount as starting balance
+            // For stocks, also check current_value if set
+            if (investment.investment_type === 'stock' && investment.current_value !== null) {
+                currentBalance = Number(investment.current_value);
+            } else {
+                currentBalance = Number(investment.purchase_amount);
+            }
+        }
+
+        return {
+            investment,
+            transactions,
+            totalInvested,
+            currentBalance,
+            totalInterest,
+            totalDividends,
+            totalContributions,
+            totalWithdrawals,
+        };
     }
 
     // Reports -------------------------------------------------------------

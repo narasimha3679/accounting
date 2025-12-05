@@ -5,6 +5,7 @@ import api, { type Company } from '../lib/api';
 import { Save, Building2, Percent } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import HelpIcon from '../components/ui/HelpIcon';
 
 const Settings: React.FC = () => {
     const { user } = useAuth();
@@ -70,7 +71,7 @@ const Settings: React.FC = () => {
             setSuccess('Settings saved successfully!');
         } catch (error) {
             console.error('Error saving settings:', error);
-            setError('Failed to save settings');
+            setError('Couldn\'t save. Please check your information and try again.');
         } finally {
             setIsSaving(false);
         }
@@ -209,6 +210,7 @@ const Settings: React.FC = () => {
                         <div>
                             <label htmlFor="fiscal_year_end" className="block text-sm font-medium text-white mb-2">
                                 Fiscal Year End
+                                <span className="text-xs text-slate-muted ml-2">(The last day of your company's financial year)</span>
                             </label>
                             <input
                                 type="date"
@@ -233,7 +235,13 @@ const Settings: React.FC = () => {
                         {/* HST Registration Toggle */}
                         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                             <div>
-                                <h3 className="text-sm font-medium text-white">HST Registration</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-sm font-medium text-white">HST Registration</h3>
+                                    <HelpIcon
+                                        content="Are you registered for HST/GST? If yes, you can claim Input Tax Credits (ITCs) for HST paid on business expenses, which reduces the HST you owe to the government."
+                                        size="sm"
+                                    />
+                                </div>
                                 <p className="text-sm text-slate-muted">
                                     Enable if your business is HST/GST registered and can claim Input Tax Credits
                                 </p>

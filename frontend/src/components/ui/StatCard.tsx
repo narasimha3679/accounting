@@ -2,6 +2,7 @@ import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Card from './Card';
+import HelpIcon from './HelpIcon';
 import { cn } from '../../lib/utils';
 
 interface StatCardProps {
@@ -12,6 +13,7 @@ interface StatCardProps {
   gradient?: 'green' | 'blue' | 'purple' | 'orange' | 'emerald' | 'indigo' | 'red' | 'cyan' | 'amber' | 'golden' | 'none';
   className?: string;
   accent?: 'emerald' | 'golden' | 'default';
+  helpText?: string;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -22,6 +24,7 @@ const StatCard: React.FC<StatCardProps> = ({
   gradient = 'blue',
   className = '',
   accent = 'default',
+  helpText,
 }) => {
   // Map gradients to Cashual colors with meaningful context
   // Emerald: Money in, positive, completed
@@ -59,7 +62,16 @@ const StatCard: React.FC<StatCardProps> = ({
     >
       <Card className={cn("flex flex-col justify-between", className)}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+            {helpText && (
+              <HelpIcon
+                content={helpText}
+                size="sm"
+                className="text-muted-foreground"
+              />
+            )}
+          </div>
           <div className={cn("p-2 rounded-lg border", iconBg)}>
             <Icon className={cn("h-4 w-4", accentColor)} />
           </div>

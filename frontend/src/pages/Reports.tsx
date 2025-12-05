@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type HSTPayment, type DepreciationEntry, type Salary } from '../lib/api';
-import { Calendar, TrendingUp, DollarSign, Receipt, FileText, FileSpreadsheet } from 'lucide-react';
+import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary, type InvestmentIncome, type InvestmentSale } from '../lib/api';
+import { Calendar, TrendingUp, DollarSign, Receipt, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import HelpIcon from '../components/ui/HelpIcon';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -173,6 +174,34 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
+    // Fetch investment income for the selected year
+    const { data: investmentIncome } = useQuery({
+        queryKey: ['investment_income_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getInvestmentIncome({
+                company_id: user?.company_id,
+                fiscal_year: selectedYear,
+                limit: 1000
+            });
+            return result.data;
+        },
+        enabled: !!user?.company_id,
+    });
+
+    // Fetch investment sales for the selected year
+    const { data: investmentSales } = useQuery({
+        queryKey: ['investment_sales_report', user?.company_id, selectedYear],
+        queryFn: async () => {
+            const result = await api.getInvestmentSales({
+                company_id: user?.company_id,
+                fiscal_year: selectedYear,
+                limit: 1000
+            });
+            return result.data;
+        },
+        enabled: !!user?.company_id,
+    });
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
             style: 'currency',
@@ -184,9 +213,13 @@ const Reports: React.FC = () => {
         return new Date(dateString).toLocaleDateString('en-CA');
     };
 
+    const formatPercentage = (rate: number) => {
+        return `${(rate * 100).toFixed(2)}%`;
+    };
+
     // Calculate report data
     const reportData = React.useMemo(() => {
-        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries) return null;
+        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries || !investmentIncome || !investmentSales) return null;
 
         const paidInvoices = invoices.filter(inv => inv.status === 'paid');
 
@@ -201,8 +234,104 @@ const Reports: React.FC = () => {
         const otherIncomeEntries = incomeEntries.filter(entry => entry.income_type === 'other');
         const otherIncome = otherIncomeEntries.reduce((sum, entry) => sum + entry.amount, 0);
 
-        // Total gross income includes invoices, client income, and other income
-        const grossIncome = invoiceRevenue + clientIncome + otherIncome;
+        // Calculate expenses, salaries, and depreciation first (needed for active business income calculation)
+        const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        // Calculate deductible expenses using deduction percentage
+        const totalDeductibleExpenses = expenses.reduce((sum, exp) => {
+            const deductionPercentage = exp.deduction_percentage ?? 1.0;
+            return sum + (exp.amount * deductionPercentage);
+        }, 0);
+        const totalSalaries = salaries.reduce((sum, sal) => sum + sal.amount, 0);
+
+        // Calculate capital assets and depreciation for the year
+        const totalDepreciationForYear = capitalAssets.reduce((sum, asset: any) => {
+            const yearDepreciation = asset.yearDepreciationEntries?.reduce((depSum: number, entry: DepreciationEntry) => depSum + Number(entry.depreciation_amount), 0) || 0;
+            return sum + yearDepreciation;
+        }, 0);
+
+        const totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
+
+        // ===== SEPARATE ACTIVE BUSINESS INCOME FROM INVESTMENT INCOME =====
+
+        // Active Business Income (excludes investment income)
+        const grossRevenue = invoiceRevenue + clientIncome;
+        const activeBusinessIncome = Math.max(0, grossRevenue + otherIncome - totalDeductibleExpenses - totalSalaries - totalDepreciationForYear);
+
+        // Active Business Tax (small business rate)
+        const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
+        const activeBusinessTax = activeBusinessIncome * smallBusinessTaxRate;
+
+        // ===== INVESTMENT INCOME CALCULATIONS =====
+
+        // Interest income - 100% taxable
+        const investmentInterestBase = investmentIncome
+            .filter(inc => inc.income_type === 'interest')
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+        // Dividend income - eligible dividends get gross-up treatment (38% for Canadian eligible dividends)
+        const eligibleDividendGrossUp = 1.38;
+        const eligibleDividendsBase = investmentIncome
+            .filter(inc => inc.income_type === 'dividend' && inc.is_eligible_dividend)
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+        const nonEligibleDividendsBase = investmentIncome
+            .filter(inc => inc.income_type === 'dividend' && !inc.is_eligible_dividend)
+            .reduce((sum, inc) => sum + Number(inc.amount), 0);
+
+        // Gross-up eligible dividends
+        const eligibleDividendsGrossedUp = eligibleDividendsBase * eligibleDividendGrossUp;
+        const investmentDividendsTaxable = eligibleDividendsGrossedUp + nonEligibleDividendsBase;
+
+        // Capital gains - 50% inclusion rate
+        const realizedCapitalGains = investmentSales
+            .filter(sale => Number(sale.realized_gain_loss) > 0)
+            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+
+        // Capital losses - 50% deductible
+        const realizedCapitalLosses = investmentSales
+            .filter(sale => Number(sale.realized_gain_loss) < 0)
+            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
+
+        // Total investment income for display (before tax)
+        const totalInvestmentIncome = investmentInterestBase + eligibleDividendsBase + nonEligibleDividendsBase + realizedCapitalGains + realizedCapitalLosses;
+
+        // Investment income tax rates (configurable, with defaults for Ontario 2024)
+        const investmentInterestTaxRate = user?.company?.investment_interest_tax_rate ?? 0.5017;
+        const investmentEligibleDividendTaxRate = user?.company?.investment_eligible_dividend_tax_rate ?? 0.3934;
+        const investmentNonEligibleDividendTaxRate = user?.company?.investment_noneligible_dividend_tax_rate ?? 0.4774;
+        const investmentCapitalGainTaxRate = user?.company?.investment_capital_gain_tax_rate ?? 0.2509;
+
+        // Calculate investment income tax separately
+        const investmentInterestTax = investmentInterestBase * investmentInterestTaxRate;
+        const investmentEligibleDividendTax = eligibleDividendsGrossedUp * investmentEligibleDividendTaxRate;
+        const investmentNonEligibleDividendTax = nonEligibleDividendsBase * investmentNonEligibleDividendTaxRate;
+        const investmentCapitalGainTax = Math.max(0, realizedCapitalGains * investmentCapitalGainTaxRate);
+
+        const totalInvestmentIncomeTax = investmentInterestTax + investmentEligibleDividendTax + investmentNonEligibleDividendTax + investmentCapitalGainTax;
+
+        // ===== RDTOH (Refundable Dividend Tax on Hand) CALCULATIONS =====
+
+        // RDTOH addition: 30.67% of investment income tax is added to RDTOH
+        const rdtohRate = 0.3067; // 30.67%
+        const rdtohAddition = totalInvestmentIncomeTax * rdtohRate;
+
+        // RDTOH refund: $1 refund per $2.61 of dividends paid
+        const rdtohRefundRate = 1 / 2.61; // $1 refund per $2.61 dividend
+        const rdtohRefund = totalDividends * rdtohRefundRate;
+
+        // RDTOH balance (previous balance + additions - refunds)
+        const previousRDTOHBalance = user?.company?.rdtoh_balance ?? 0;
+        const rdtohBalance = Math.max(0, previousRDTOHBalance + rdtohAddition - rdtohRefund);
+        const rdtohRefundable = Math.min(rdtohRefund, previousRDTOHBalance + rdtohAddition);
+
+        // Total gross income for display (includes both active business and investment income)
+        const grossIncome = grossRevenue + otherIncome + totalInvestmentIncome;
+
+        // Total corporate tax (active business + investment income)
+        const totalCorporateTax = activeBusinessTax + totalInvestmentIncomeTax;
+
+        // Net income after tax (accounting for RDTOH refund)
+        const netIncomeBeforeTax = activeBusinessIncome + totalInvestmentIncome;
+        const netIncomeAfterTax = netIncomeBeforeTax - totalCorporateTax + rdtohRefundable;
 
         // Calculate HST collected from invoices
         const hstFromInvoices = paidInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
@@ -212,14 +341,6 @@ const Reports: React.FC = () => {
 
         // Total HST collected includes both invoices and client income entries
         const hstCollected = hstFromInvoices + hstFromClientIncome;
-
-        const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        // Calculate deductible expenses using deduction percentage
-        const totalDeductibleExpenses = expenses.reduce((sum, exp) => {
-            const deductionPercentage = exp.deduction_percentage ?? 1.0;
-            return sum + (exp.amount * deductionPercentage);
-        }, 0);
-        const totalSalaries = salaries.reduce((sum, sal) => sum + sal.amount, 0);
 
         // Calculate HST paid from expenses (Input Tax Credits)
         const isHSTRegistered = user?.company?.hst_registered || false;
@@ -232,41 +353,57 @@ const Reports: React.FC = () => {
         // Calculate HST remittance (what's owed after accounting for ITCs and payments made)
         const hstRemittance = hstCollected - hstInputTaxCredits - hstAlreadyPaid;
 
-        const totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
-
         // Calculate total owner payments
         const totalOwnerPayments = ownerPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
-        // Calculate capital assets and depreciation for the year
-        const totalDepreciationForYear = capitalAssets.reduce((sum, asset: any) => {
-            const yearDepreciation = asset.yearDepreciationEntries?.reduce((depSum: number, entry: DepreciationEntry) => depSum + Number(entry.depreciation_amount), 0) || 0;
-            return sum + yearDepreciation;
-        }, 0);
-
         const totalCapitalAssetCost = capitalAssets.reduce((sum, asset) => sum + Number(asset.total_cost), 0);
         const totalAccumulatedDepreciation = capitalAssets.reduce((sum, asset) => sum + Number(asset.accumulated_depreciation), 0);
-
-        // Net income before tax should include depreciation and salaries as expenses
-        // Use deductible expenses instead of total expenses
-        const netIncomeBeforeTax = grossIncome - totalDeductibleExpenses - totalSalaries - totalDepreciationForYear;
-        const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125; // Use company rate, fallback to 12.5%
-        const smallBusinessTax = Math.max(0, netIncomeBeforeTax * smallBusinessTaxRate);
-        const netIncomeAfterTax = netIncomeBeforeTax - smallBusinessTax;
 
         // Retained earnings = Net Income After Tax - Dividends - Owner Payments
         const retainedEarnings = netIncomeAfterTax - totalDividends - totalOwnerPayments;
 
         return {
             grossIncome,
+            grossRevenue,
             invoiceRevenue,
             clientIncome,
             otherIncome,
+            // Active Business Income
+            activeBusinessIncome,
+            activeBusinessTax,
+            smallBusinessTaxRate,
+            // Investment Income
+            investmentInterest: investmentInterestBase,
+            investmentDividends: eligibleDividendsBase + nonEligibleDividendsBase,
+            eligibleDividendsBase,
+            nonEligibleDividendsBase,
+            eligibleDividendsGrossedUp,
+            investmentDividendsTaxable,
+            realizedCapitalGains,
+            realizedCapitalLosses,
+            totalInvestmentIncome,
+            investmentInterestTax,
+            investmentEligibleDividendTax,
+            investmentNonEligibleDividendTax,
+            investmentCapitalGainTax,
+            totalInvestmentIncomeTax,
+            investmentInterestTaxRate,
+            investmentEligibleDividendTaxRate,
+            investmentNonEligibleDividendTaxRate,
+            investmentCapitalGainTaxRate,
+            // RDTOH
+            rdtohAddition,
+            rdtohRefund,
+            rdtohBalance,
+            rdtohRefundable,
+            previousRDTOHBalance,
+            // Combined
+            totalCorporateTax,
             totalExpenses,
             totalDeductibleExpenses,
             totalSalaries,
             totalDepreciationForYear,
             netIncomeBeforeTax,
-            smallBusinessTax,
             netIncomeAfterTax,
             hstCollected,
             hstFromInvoices,
@@ -290,25 +427,10 @@ const Reports: React.FC = () => {
             capitalAssets,
             totalCapitalAssetCost,
             totalAccumulatedDepreciation,
+            investmentIncome,
+            investmentSales,
         };
-    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, user?.company?.small_business_rate, user?.company?.hst_registered]);
-
-    const generateReport = () => {
-        if (!reportData) return;
-
-        const reportContent = generateComprehensiveReport(reportData);
-
-        // Create and download the report
-        const blob = new Blob([reportContent], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Comprehensive_Tax_Report_${selectedYear}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    };
+    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, investmentIncome, investmentSales, user?.company]);
 
     const generatePDFFromData = (data: NonNullable<typeof reportData>) => {
         const pdf = new jsPDF({
@@ -337,7 +459,7 @@ const Reports: React.FC = () => {
             pdf.setFontSize(fontSize);
             pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
             pdf.setTextColor(color[0], color[1], color[2]);
-            
+
             const lines = pdf.splitTextToSize(text, pageWidth - 2 * margin);
             lines.forEach((line: string) => {
                 checkPageBreak(fontSize * 0.5);
@@ -368,12 +490,29 @@ const Reports: React.FC = () => {
             startY: yPosition,
             head: [['Item', 'Amount']],
             body: [
-                ['Gross Income', formatCurrency(data.grossIncome)],
+                ['Gross Revenue', formatCurrency(data.grossRevenue)],
+                ['Other Income', formatCurrency(data.otherIncome)],
                 ['Total Expenses', formatCurrency(data.totalExpenses)],
                 ...(data.totalSalaries > 0 ? [['Total Salaries', formatCurrency(data.totalSalaries)]] : []),
                 ...(data.totalDepreciationForYear > 0 ? [['Depreciation (CCA)', formatCurrency(data.totalDepreciationForYear)]] : []),
-                ['Net Income (Pre-tax)', formatCurrency(data.netIncomeBeforeTax)],
-                [`Small Business Tax (${((user?.company?.small_business_rate || 0.125) * 100).toFixed(2)}%)`, formatCurrency(data.smallBusinessTax)],
+                ['---', '---'],
+                ['Active Business Income', formatCurrency(data.activeBusinessIncome)],
+                [`Active Business Tax (${formatPercentage(data.smallBusinessTaxRate)})`, formatCurrency(data.activeBusinessTax)],
+                ...(data.totalInvestmentIncome > 0 ? [
+                    ['---', '---'],
+                    ['Investment Interest', formatCurrency(data.investmentInterest)],
+                    ...(data.investmentInterest > 0 ? [[`Investment Interest Tax (${formatPercentage(data.investmentInterestTaxRate)})`, formatCurrency(data.investmentInterestTax)]] : []),
+                    ...(data.investmentDividends > 0 ? [['Investment Dividends', formatCurrency(data.investmentDividends)]] : []),
+                    ...(data.investmentDividends > 0 ? [[`Investment Dividend Tax`, formatCurrency(data.investmentEligibleDividendTax + data.investmentNonEligibleDividendTax)]] : []),
+                    ...(data.realizedCapitalGains !== 0 ? [['Realized Capital Gains (50%)', formatCurrency(data.realizedCapitalGains)]] : []),
+                    ...(data.realizedCapitalGains > 0 ? [[`Capital Gains Tax (${formatPercentage(data.investmentCapitalGainTaxRate)})`, formatCurrency(data.investmentCapitalGainTax)]] : []),
+                    ['Total Investment Income Tax', formatCurrency(data.totalInvestmentIncomeTax)],
+                    ...(data.rdtohAddition > 0 ? [['RDTOH Addition (30.67%)', formatCurrency(data.rdtohAddition)]] : []),
+                    ...(data.rdtohRefund > 0 ? [['RDTOH Refund', formatCurrency(data.rdtohRefundable)]] : []),
+                    ...(data.rdtohBalance > 0 ? [['RDTOH Balance', formatCurrency(data.rdtohBalance)]] : []),
+                ] : []),
+                ['---', '---'],
+                ['Total Corporate Tax', formatCurrency(data.totalCorporateTax)],
                 ['Net Income (Post-tax)', formatCurrency(data.netIncomeAfterTax)],
             ],
             theme: 'striped',
@@ -393,7 +532,7 @@ const Reports: React.FC = () => {
                 ['HST Collected', formatCurrency(data.hstCollected)],
                 ...(data.isHSTRegistered ? [['HST Input Tax Credits', formatCurrency(data.hstInputTaxCredits)]] : []),
                 ...(data.hstAlreadyPaid > 0 ? [['HST Already Paid to CRA', formatCurrency(data.hstAlreadyPaid)]] : []),
-                ['HST Remittance', formatCurrency(data.hstRemittance)],
+                ['HST to Pay', formatCurrency(data.hstRemittance)],
             ],
             theme: 'striped',
             headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
@@ -437,7 +576,7 @@ const Reports: React.FC = () => {
             const categoryRows = Object.values(categoryTotals)
                 .sort((a, b) => b.total - a.total)
                 .map(cat => [cat.name, cat.count.toString(), formatCurrency(cat.total)]);
-            
+
             autoTable(pdf, {
                 startY: yPosition,
                 head: [['Category', 'Count', 'Total Amount']],
@@ -481,6 +620,80 @@ const Reports: React.FC = () => {
                 margin: { left: margin, right: margin },
             });
             yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        }
+
+        // Investment Income and Sales
+        if ((data.investmentIncome && data.investmentIncome.length > 0) || (data.investmentSales && data.investmentSales.length > 0)) {
+            checkPageBreak(30);
+            addText('INVESTMENT INCOME & SALES', 14, true);
+
+            // Investment Income Summary
+            const investmentSummaryRows = [
+                ...(data.investmentInterest > 0 ? [['Interest Income', formatCurrency(data.investmentInterest)]] : []),
+                ...(data.investmentDividends > 0 ? [['Dividend Income', formatCurrency(data.investmentDividends)]] : []),
+                ...(data.realizedCapitalGains !== 0 ? [['Realized Capital Gains (50% taxable)', formatCurrency(data.realizedCapitalGains)]] : []),
+                ['Total Investment Income', formatCurrency(data.totalInvestmentIncome || 0)],
+            ];
+
+            autoTable(pdf, {
+                startY: yPosition,
+                head: [['Item', 'Amount']],
+                body: investmentSummaryRows,
+                theme: 'striped',
+                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 9 },
+                margin: { left: margin, right: margin },
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+            // Investment Income Details
+            if (data.investmentIncome && data.investmentIncome.length > 0) {
+                checkPageBreak(30);
+                addText('Investment Income Details', 12, true);
+                const incomeRows = data.investmentIncome.map((inc: InvestmentIncome) => [
+                    inc.investment?.description || 'N/A',
+                    inc.income_type,
+                    formatDate(inc.income_date),
+                    formatCurrency(inc.amount),
+                    inc.income_type === 'dividend' ? (inc.is_eligible_dividend ? 'Eligible' : 'Non-eligible') : '-',
+                ]);
+
+                autoTable(pdf, {
+                    startY: yPosition,
+                    head: [['Investment', 'Type', 'Date', 'Amount', 'Eligible Dividend']],
+                    body: incomeRows,
+                    theme: 'striped',
+                    headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                    styles: { fontSize: 8 },
+                    margin: { left: margin, right: margin },
+                });
+                yPosition = (pdf as any).lastAutoTable.finalY + 10;
+            }
+
+            // Investment Sales Details
+            if (data.investmentSales && data.investmentSales.length > 0) {
+                checkPageBreak(30);
+                addText('Investment Sales', 12, true);
+                const saleRows = data.investmentSales.map((sale: InvestmentSale) => [
+                    sale.investment?.description || 'N/A',
+                    formatDate(sale.sale_date),
+                    formatCurrency(sale.cost_basis),
+                    formatCurrency(sale.sale_amount),
+                    formatCurrency(sale.realized_gain_loss),
+                    formatCurrency(sale.realized_gain_loss * 0.5),
+                ]);
+
+                autoTable(pdf, {
+                    startY: yPosition,
+                    head: [['Investment', 'Sale Date', 'Cost Basis', 'Sale Proceeds', 'Realized Gain/Loss', 'Taxable (50%)']],
+                    body: saleRows,
+                    theme: 'striped',
+                    headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
+                    styles: { fontSize: 8 },
+                    margin: { left: margin, right: margin },
+                });
+                yPosition = (pdf as any).lastAutoTable.finalY + 10;
+            }
         }
 
         // Monthly HST Breakdown
@@ -677,338 +890,6 @@ const Reports: React.FC = () => {
     };
 
 
-    const generateMonthlyBreakdown = (invoices: Invoice[], expenses: Expense[], clientIncomeEntries: IncomeEntry[]) => {
-        const months = Array.from({ length: 12 }, (_, i) => i + 1);
-        let breakdown = '';
-
-        months.forEach(month => {
-            const monthInvoices = invoices.filter(inv =>
-                new Date(inv.issue_date).getMonth() + 1 === month
-            );
-            const monthExpenses = expenses.filter(exp =>
-                new Date(exp.expense_date).getMonth() + 1 === month
-            );
-            const monthClientIncome = clientIncomeEntries.filter(entry =>
-                new Date(entry.income_date).getMonth() + 1 === month
-            );
-
-            const hstCollectedFromInvoices = monthInvoices.reduce((sum, inv) => sum + inv.hst_amount, 0);
-            const hstCollectedFromIncome = monthClientIncome.reduce((sum, entry) => sum + entry.hst_amount, 0);
-            const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
-            const hstPaid = monthExpenses.reduce((sum, exp) => sum + exp.hst_paid, 0);
-
-            const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
-            breakdown += `${monthName} ${selectedYear}:\n`;
-            breakdown += `  HST Collected: ${formatCurrency(hstCollected)} (Invoices: ${formatCurrency(hstCollectedFromInvoices)}, Income: ${formatCurrency(hstCollectedFromIncome)})\n`;
-            breakdown += `  HST Paid (ITC): ${formatCurrency(hstPaid)}\n`;
-            breakdown += `  Net HST: ${formatCurrency(hstCollected - hstPaid)}\n\n`;
-        });
-
-        return breakdown;
-    };
-
-    const generateComprehensiveReport = (data: any) => {
-        const companyName = user?.company?.name || 'Company';
-        const businessNumber = user?.company?.business_number || 'N/A';
-        const hstNumber = user?.company?.hst_number || 'N/A';
-
-        return `
-================================================================================
-COMPREHENSIVE TAX REPORT
-================================================================================
-
-COMPANY INFORMATION
-Company Name: ${companyName}
-Business Number: ${businessNumber}
-HST Number: ${hstNumber || 'Not Registered'}
-Fiscal Year: ${selectedYear}
-Report Generated: ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
-
-================================================================================
-1. COMPLETE PROFIT & LOSS STATEMENT
-================================================================================
-
-INCOME
-Invoice Revenue: ${formatCurrency(data.invoiceRevenue)}
-Client Income: ${formatCurrency(data.clientIncome)}
-Other Income: ${formatCurrency(data.otherIncome || 0)}
-────────────────────────────────────────────────────────────────────────────
-Gross Revenue: ${formatCurrency(data.grossIncome)}
-
-EXPENSES
-Total Business Expenses: ${formatCurrency(data.totalExpenses)}
-${data.totalSalaries > 0 ? `Total Salaries: ${formatCurrency(data.totalSalaries)}` : ''}
-${data.totalDepreciationForYear > 0 ? `Depreciation (CCA): ${formatCurrency(data.totalDepreciationForYear)}` : ''}
-────────────────────────────────────────────────────────────────────────────
-Total Expenses (including Salaries and Depreciation): ${formatCurrency(data.totalExpenses + (data.totalSalaries || 0) + (data.totalDepreciationForYear || 0))}
-
-EXPENSE BREAKDOWN BY CATEGORY
-${(() => {
-                const categoryTotals: { [key: string]: { name: string; total: number; count: number } } = {};
-                data.expenses.forEach((exp: Expense) => {
-                    const categoryName = exp.category?.name || 'Uncategorized';
-                    if (!categoryTotals[categoryName]) {
-                        categoryTotals[categoryName] = { name: categoryName, total: 0, count: 0 };
-                    }
-                    categoryTotals[categoryName].total += exp.amount;
-                    categoryTotals[categoryName].count += 1;
-                });
-                return Object.values(categoryTotals)
-                    .sort((a, b) => b.total - a.total)
-                    .map(cat => `  ${cat.name}: ${formatCurrency(cat.total)} (${cat.count} ${cat.count === 1 ? 'expense' : 'expenses'})`)
-                    .join('\n') || '  No expenses by category';
-            })()}
-
-────────────────────────────────────────────────────────────────────────────
-NET INCOME BEFORE TAX: ${formatCurrency(data.netIncomeBeforeTax)}
-
-TAXES
-Small Business Tax (${((user?.company?.small_business_rate || 0.125) * 100).toFixed(2)}%): ${formatCurrency(data.smallBusinessTax)}
-
-────────────────────────────────────────────────────────────────────────────
-NET INCOME AFTER TAX: ${formatCurrency(data.netIncomeAfterTax)}
-
-DIVIDENDS PAID
-Total Dividends: ${formatCurrency(data.totalDividends)}
-
-OWNER PAYMENTS
-Total Owner Payments: ${formatCurrency(data.totalOwnerPayments || 0)}
-
-────────────────────────────────────────────────────────────────────────────
-RETAINED EARNINGS: ${formatCurrency(data.retainedEarnings)}
-
-================================================================================
-2. DETAILED HST SUMMARY WITH MONTHLY BREAKDOWN
-================================================================================
-
-HST COLLECTED
-Total HST Collected: ${formatCurrency(data.hstCollected)}
-  From Invoices: ${formatCurrency(data.hstFromInvoices)}
-  From Client Income: ${formatCurrency(data.hstFromClientIncome)}
-
-HST INPUT TAX CREDITS
-${data.isHSTRegistered
-                ? `Total HST Input Tax Credits: ${formatCurrency(data.hstInputTaxCredits)}`
-                : 'Company is not HST registered - no Input Tax Credits available'}
-
-HST ALREADY PAID TO CRA
-Total HST Already Paid: ${formatCurrency(data.hstAlreadyPaid || 0)}
-
-────────────────────────────────────────────────────────────────────────────
-HST REMITTANCE
-Amount Owed to CRA: ${formatCurrency(data.hstRemittance)}
-
-MONTHLY BREAKDOWN
-${generateMonthlyBreakdown(data.paidInvoices, data.expenses, data.clientIncomeEntries || [])}
-
-================================================================================
-3. CAPITAL ASSETS AND DEPRECIATION (CCA)
-================================================================================
-
-SUMMARY
-Total Capital Asset Cost: ${formatCurrency(data.totalCapitalAssetCost || 0)}
-Total Accumulated Depreciation: ${formatCurrency(data.totalAccumulatedDepreciation || 0)}
-Depreciation for ${selectedYear}: ${formatCurrency(data.totalDepreciationForYear || 0)}
-
-DETAILED CAPITAL ASSETS
-${data.capitalAssets && data.capitalAssets.length > 0
-                ? data.capitalAssets.map((asset: any) => {
-                    const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
-                    const depreciationEntries = asset.yearDepreciationEntries || [];
-                    return `
-Asset: ${asset.description}
-  Category: ${asset.category?.name || 'Uncategorized'}
-  Purchase Date: ${formatDate(asset.purchase_date)}
-  Purchase Amount: ${formatCurrency(asset.purchase_amount)}
-  HST Paid: ${formatCurrency(asset.hst_paid)}
-  Total Cost: ${formatCurrency(asset.total_cost)}
-  CCA Class: ${asset.cca_class}
-  CCA Rate: ${(Number(asset.cca_rate) * 100).toFixed(2)}%
-  Depreciable Amount: ${formatCurrency(asset.depreciable_amount)}
-  Depreciation for ${selectedYear}: ${formatCurrency(yearDepreciation)}
-  ${depreciationEntries.length > 0 ? depreciationEntries.map((entry: DepreciationEntry) =>
-                        `    - ${formatDate(entry.entry_date)}: ${formatCurrency(entry.depreciation_amount)}${entry.is_half_year_rule ? ' (Half-Year Rule Applied)' : ''}`
-                    ).join('\n') : `    No depreciation entries for ${selectedYear}`}
-  Accumulated Depreciation: ${formatCurrency(asset.accumulated_depreciation)}
-  Book Value: ${formatCurrency(asset.book_value)}
-  Paid By: ${asset.paid_by}
-  ${asset.disposal_date ? `Disposal Date: ${formatDate(asset.disposal_date)} | Disposal Amount: ${formatCurrency(asset.disposal_amount || 0)}` : ''}
-`;
-                }).join('\n')
-                : 'No capital assets recorded for this year'}
-
-CAPITAL ASSETS BY CCA CLASS
-${(() => {
-                const classTotals: { [key: string]: { cost: number; depreciation: number; count: number } } = {};
-                data.capitalAssets.forEach((asset: any) => {
-                    const yearDepreciation = asset.yearDepreciationEntries?.reduce((sum: number, entry: DepreciationEntry) => sum + Number(entry.depreciation_amount), 0) || 0;
-                    if (!classTotals[asset.cca_class]) {
-                        classTotals[asset.cca_class] = { cost: 0, depreciation: 0, count: 0 };
-                    }
-                    classTotals[asset.cca_class].cost += Number(asset.total_cost);
-                    classTotals[asset.cca_class].depreciation += yearDepreciation;
-                    classTotals[asset.cca_class].count += 1;
-                });
-                return Object.entries(classTotals)
-                    .map(([ccaClass, totals]) =>
-                        `  CCA Class ${ccaClass}: ${formatCurrency(totals.cost)} cost, ${formatCurrency(totals.depreciation)} depreciation (${totals.count} ${totals.count === 1 ? 'asset' : 'assets'})`
-                    )
-                    .join('\n') || '  No capital assets by CCA class';
-            })()}
-
-================================================================================
-4. SALARY PAYMENTS
-================================================================================
-
-SALARIES PAID
-${data.salaries && data.salaries.length > 0
-                ? data.salaries.map((sal: Salary) =>
-                    `${formatDate(sal.payment_date)} - ${sal.employee_name} - ${formatCurrency(sal.amount)} - Period: ${formatDate(sal.period_start)} to ${formatDate(sal.period_end)} - Status: ${sal.status}${sal.notes ? ` - Notes: ${sal.notes}` : ''}`
-                ).join('\n')
-                : 'No salaries recorded'}
-
-────────────────────────────────────────────────────────────────────────────
-TOTAL SALARIES PAID: ${formatCurrency(data.totalSalaries || 0)}
-
-================================================================================
-5. DIVIDEND DISTRIBUTIONS
-================================================================================
-
-DIVIDENDS DECLARED
-${data.dividends && data.dividends.length > 0
-                ? data.dividends.map((div: Dividend) =>
-                    `${formatDate(div.declaration_date)} - ${formatCurrency(div.amount)} - Status: ${div.status}${div.payment_date ? ` - Paid: ${formatDate(div.payment_date)}` : ''}${div.notes ? ` - Notes: ${div.notes}` : ''}`
-                ).join('\n')
-                : 'No dividends declared'}
-
-────────────────────────────────────────────────────────────────────────────
-TOTAL DIVIDENDS PAID: ${formatCurrency(data.totalDividends)}
-
-================================================================================
-6. RETAINED EARNINGS CALCULATION
-================================================================================
-
-NET INCOME AFTER TAX: ${formatCurrency(data.netIncomeAfterTax)}
-
-LESS:
-  Dividends Paid: ${formatCurrency(data.totalDividends)}
-  Owner Payments: ${formatCurrency(data.totalOwnerPayments || 0)}
-  ────────────────────────────────────────────────────────────────────────────
-  Total Distributions: ${formatCurrency(data.totalDividends + (data.totalOwnerPayments || 0))}
-
-────────────────────────────────────────────────────────────────────────────
-RETAINED EARNINGS: ${formatCurrency(data.retainedEarnings)}
-
-AVAILABLE FOR DISTRIBUTION: ${formatCurrency(data.retainedEarnings)}
-
-================================================================================
-7. ALL SUPPORTING TRANSACTION DETAILS
-================================================================================
-
-DETAILED INCOME BREAKDOWN
-
-INVOICES:
-${data.paidInvoices && data.paidInvoices.length > 0
-                ? data.paidInvoices
-                    .sort((a: Invoice, b: Invoice) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime())
-                    .map((inv: Invoice) =>
-                        `${inv.invoice_number} - ${inv.client?.name || 'Unknown'} - ${formatDate(inv.issue_date)} - Subtotal: ${formatCurrency(inv.subtotal)} - HST: ${formatCurrency(inv.hst_amount)} - Total: ${formatCurrency(inv.total)}${inv.paid_date ? ` - Paid: ${formatDate(inv.paid_date)}` : ''}`
-                    ).join('\n')
-                : 'No paid invoices'}
-
-INVOICE SUMMARY BY CLIENT
-${(() => {
-                const clientTotals: { [key: string]: { name: string; total: number; count: number; hst: number } } = {};
-                data.paidInvoices.forEach((inv: Invoice) => {
-                    const clientName = inv.client?.name || 'Unknown';
-                    if (!clientTotals[clientName]) {
-                        clientTotals[clientName] = { name: clientName, total: 0, count: 0, hst: 0 };
-                    }
-                    clientTotals[clientName].total += inv.subtotal;
-                    clientTotals[clientName].hst += inv.hst_amount;
-                    clientTotals[clientName].count += 1;
-                });
-                return Object.values(clientTotals)
-                    .sort((a, b) => b.total - a.total)
-                    .map(client =>
-                        `  ${client.name}: ${formatCurrency(client.total)} (${client.count} ${client.count === 1 ? 'invoice' : 'invoices'}) - HST: ${formatCurrency(client.hst)}`
-                    )
-                    .join('\n') || '  No invoices by client';
-            })()}
-
-CLIENT INCOME ENTRIES:
-${data.clientIncomeEntries && data.clientIncomeEntries.length > 0
-                ? data.clientIncomeEntries.map((entry: IncomeEntry) =>
-                    `${formatDate(entry.income_date)} - ${entry.description} - Amount: ${formatCurrency(entry.amount)} - HST: ${formatCurrency(entry.hst_amount)} - Total: ${formatCurrency(entry.total)}`
-                ).join('\n')
-                : 'No client income entries'}
-
-OTHER INCOME ENTRIES:
-${data.otherIncomeEntries && data.otherIncomeEntries.length > 0
-                ? data.otherIncomeEntries.map((entry: IncomeEntry) =>
-                    `${formatDate(entry.income_date)} - ${entry.description} - Amount: ${formatCurrency(entry.amount)}`
-                ).join('\n')
-                : 'No other income entries'}
-
-DETAILED EXPENSE BREAKDOWN
-${data.expenses && data.expenses.length > 0
-                ? data.expenses
-                    .sort((a: Expense, b: Expense) => new Date(a.expense_date).getTime() - new Date(b.expense_date).getTime())
-                    .map((exp: Expense) =>
-                        `${formatDate(exp.expense_date)} - ${exp.description} - Category: ${exp.category?.name || 'Uncategorized'} - Amount: ${formatCurrency(exp.amount)} - HST Paid: ${formatCurrency(exp.hst_paid)} - Paid By: ${exp.paid_by}${exp.receipt_attached ? ' - Receipt Attached' : ''}`
-                    ).join('\n')
-                : 'No expenses recorded'}
-
-EXPENSE SUMMARY BY PAYMENT METHOD
-${(() => {
-                const paidByTotals: { [key: string]: { total: number; count: number; hst: number } } = {};
-                data.expenses.forEach((exp: Expense) => {
-                    if (!paidByTotals[exp.paid_by]) {
-                        paidByTotals[exp.paid_by] = { total: 0, count: 0, hst: 0 };
-                    }
-                    paidByTotals[exp.paid_by].total += exp.amount;
-                    paidByTotals[exp.paid_by].hst += exp.hst_paid;
-                    paidByTotals[exp.paid_by].count += 1;
-                });
-                return Object.entries(paidByTotals)
-                    .map(([paidBy, totals]) =>
-                        `  ${paidBy === 'corp' ? 'Corporation' : 'Owner'}: ${formatCurrency(totals.total)} (${totals.count} ${totals.count === 1 ? 'expense' : 'expenses'}) - HST: ${formatCurrency(totals.hst)}`
-                    )
-                    .join('\n') || '  No expenses by payment method';
-            })()}
-
-SALARY PAYMENTS
-${data.salaries && data.salaries.length > 0
-                ? data.salaries.map((sal: Salary) =>
-                    `${formatDate(sal.payment_date)} - ${sal.employee_name} - Amount: ${formatCurrency(sal.amount)} - Period: ${formatDate(sal.period_start)} to ${formatDate(sal.period_end)} - Status: ${sal.status}${sal.notes ? ` - Notes: ${sal.notes}` : ''}`
-                ).join('\n')
-                : 'No salaries recorded'}
-
-OWNER PAYMENTS
-${data.ownerPayments && data.ownerPayments.length > 0
-                ? data.ownerPayments.map((payment: OwnerPayment) =>
-                    `${formatDate(payment.payment_date)} - ${payment.description} - Amount: ${formatCurrency(payment.amount)} - Type: ${payment.payment_type}${payment.reference ? ` - Reference: ${payment.reference}` : ''}${payment.notes ? ` - Notes: ${payment.notes}` : ''}`
-                ).join('\n')
-                : 'No owner payments recorded'}
-
-HST PAYMENTS TO CRA
-${data.hstPayments && data.hstPayments.length > 0
-                ? data.hstPayments.map((payment: HSTPayment) =>
-                    `${formatDate(payment.payment_date)} - Amount: ${formatCurrency(payment.amount)} - Period: ${formatDate(payment.period_start)} to ${formatDate(payment.period_end)}${payment.reference ? ` - Reference: ${payment.reference}` : ''}${payment.notes ? ` - Notes: ${payment.notes}` : ''}`
-                ).join('\n')
-                : 'No HST payments recorded'}
-
-================================================================================
-END OF COMPREHENSIVE TAX REPORT
-================================================================================
-
-This report includes all financial data needed for tax submission to your accountant.
-Perfect for providing to your tax accountant - includes everything they need to complete your tax return.
-
-Generated on: ${new Date().toLocaleString('en-CA')}
-`;
-    };
-
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
@@ -1039,13 +920,6 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                     <p className="text-slate-muted mt-2">Generate a comprehensive tax report with all financial data needed for tax submission</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                    <Button
-                        onClick={generateReport}
-                        variant="outline"
-                        icon={FileText}
-                    >
-                        Download TXT
-                    </Button>
                     <Button
                         onClick={generatePDFReport}
                         disabled={isGeneratingPDF}
@@ -1080,7 +954,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
 
             {/* Report Summary */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Profit & Loss Summary */}
+                {/* Income and Expenses */}
                 <Card className="p-6">
                     <div className="flex items-center mb-4">
                         <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400 mr-2" />
@@ -1095,21 +969,79 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                             <span className="text-sm text-slate-muted">Total Expenses:</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
                         </div>
+                        {reportData.totalSalaries > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-slate-muted">Total Salaries:</span>
+                                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalSalaries)}</span>
+                            </div>
+                        )}
                         {reportData.totalDepreciationForYear > 0 && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-slate-muted">Depreciation (CCA):</span>
+                                <span className="text-sm text-slate-muted">Depreciation:</span>
                                 <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalDepreciationForYear)}</span>
                             </div>
                         )}
                         <div className="flex justify-between border-t border-white/10 pt-2">
-                            <span className="text-sm font-medium text-white">Net Income (Pre-tax):</span>
-                            <span className={`font-bold ${reportData.netIncomeBeforeTax >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatCurrency(reportData.netIncomeBeforeTax)}
-                            </span>
+                            <span className="text-sm font-medium text-white">Active Business Income:</span>
+                            <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(reportData.activeBusinessIncome)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-sm text-slate-muted">Small Business Tax:</span>
-                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.smallBusinessTax)}</span>
+                            <span className="text-sm text-slate-muted">Active Business Tax ({formatPercentage(reportData.smallBusinessTaxRate)}):</span>
+                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.activeBusinessTax)}</span>
+                        </div>
+                        {(reportData.investmentInterest > 0 || reportData.investmentDividends > 0 || reportData.realizedCapitalGains !== 0) && (
+                            <>
+                                <div className="flex justify-between border-t border-white/10 pt-2">
+                                    <span className="text-sm font-medium text-white">Investment Income:</span>
+                                    <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(reportData.totalInvestmentIncome)}</span>
+                                </div>
+                                {reportData.investmentInterest > 0 && (
+                                    <div className="flex justify-between ml-4">
+                                        <span className="text-sm text-slate-muted">Interest ({formatPercentage(reportData.investmentInterestTaxRate)}):</span>
+                                        <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.investmentInterest)}</span>
+                                    </div>
+                                )}
+                                {reportData.investmentDividends > 0 && (
+                                    <div className="flex justify-between ml-4">
+                                        <span className="text-sm text-slate-muted">Dividends:</span>
+                                        <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.investmentDividends)}</span>
+                                    </div>
+                                )}
+                                {reportData.realizedCapitalGains !== 0 && (
+                                    <div className="flex justify-between ml-4">
+                                        <span className="text-sm text-slate-muted">Capital Gains (50%, {formatPercentage(reportData.investmentCapitalGainTaxRate)}):</span>
+                                        <span className={`font-medium ${reportData.realizedCapitalGains >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {formatCurrency(reportData.realizedCapitalGains)}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-slate-muted">Investment Income Tax:</span>
+                                    <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalInvestmentIncomeTax)}</span>
+                                </div>
+                            </>
+                        )}
+                        {(reportData.rdtohAddition > 0 || reportData.rdtohRefund > 0 || reportData.rdtohBalance > 0) && (
+                            <>
+                                <div className="flex justify-between border-t border-white/10 pt-2">
+                                    <span className="text-sm font-medium text-white">RDTOH Addition:</span>
+                                    <span className="font-bold text-green-600 dark:text-green-400">+{formatCurrency(reportData.rdtohAddition)}</span>
+                                </div>
+                                {reportData.rdtohRefund > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-slate-muted">RDTOH Refund:</span>
+                                        <span className="font-medium text-green-600 dark:text-green-400">-{formatCurrency(reportData.rdtohRefundable)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-slate-muted">RDTOH Balance:</span>
+                                    <span className="font-medium text-purple-600 dark:text-purple-400">{formatCurrency(reportData.rdtohBalance)}</span>
+                                </div>
+                            </>
+                        )}
+                        <div className="flex justify-between border-t border-white/10 pt-2">
+                            <span className="text-sm font-medium text-white">Total Corporate Tax:</span>
+                            <span className="font-bold text-red-600 dark:text-red-400">{formatCurrency(reportData.totalCorporateTax)}</span>
                         </div>
                         <div className="flex justify-between border-t border-white/10 pt-2">
                             <span className="text-sm font-bold text-white">Net Income (Post-tax):</span>
@@ -1144,7 +1076,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                             </div>
                         )}
                         <div className="flex justify-between border-t border-white/10 pt-2">
-                            <span className="text-sm font-bold text-white">HST Remittance:</span>
+                            <span className="text-sm font-bold text-white">HST to Pay:</span>
                             <span className={`font-bold text-lg ${reportData.hstRemittance >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                 {formatCurrency(reportData.hstRemittance)}
                             </span>
@@ -1157,6 +1089,10 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                     <div className="flex items-center mb-4">
                         <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-2" />
                         <h3 className="text-lg font-medium text-white">Retained Earnings</h3>
+                        <HelpIcon
+                            content="Money the business has kept after paying expenses, taxes, and dividends"
+                            size="sm"
+                        />
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between">
@@ -1229,7 +1165,13 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                 {/* Capital Assets and Depreciation */}
                 <Card className="overflow-hidden">
                     <div className="p-6 border-b border-white/10">
-                        <h2 className="text-xl font-semibold tracking-tight text-white">Capital Assets and Depreciation (CCA)</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">Capital Assets</h2>
+                            <HelpIcon
+                                content="CCA (Capital Cost Allowance) is the tax term for depreciation. It's the amount you can deduct each year for the wear and tear of business assets."
+                                size="sm"
+                            />
+                        </div>
                         <p className="text-sm text-slate-muted mt-1">Capital assets with depreciation details for {selectedYear}</p>
                     </div>
                     <div className="p-6 space-y-4">
@@ -1282,6 +1224,111 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                         )}
                     </div>
                 </Card>
+
+                {/* Investment Income */}
+                {(reportData.investmentIncome && reportData.investmentIncome.length > 0) || (reportData.investmentSales && reportData.investmentSales.length > 0) ? (
+                    <Card className="overflow-hidden">
+                        <div className="p-6 border-b border-white/10">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">Investment Income & Sales</h2>
+                            <p className="text-sm text-slate-muted mt-1">Investment income and realized gains/losses for {selectedYear}</p>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <div className="text-sm text-slate-muted">Interest Income</div>
+                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.investmentInterest || 0)}</div>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <div className="text-sm text-slate-muted">Dividend Income</div>
+                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.investmentDividends || 0)}</div>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <div className="text-sm text-slate-muted">Realized Capital Gains (50%)</div>
+                                    <div className={`text-2xl font-bold mt-1 ${(reportData.realizedCapitalGains || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {formatCurrency(reportData.realizedCapitalGains || 0)}
+                                    </div>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <div className="text-sm text-slate-muted">Total Investment Income</div>
+                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalInvestmentIncome || 0)}</div>
+                                </div>
+                            </div>
+
+                            {reportData.investmentIncome && reportData.investmentIncome.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-4">Investment Income Details</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
+                                                <tr>
+                                                    <th className="px-6 py-3">Investment</th>
+                                                    <th className="px-6 py-3">Type</th>
+                                                    <th className="px-6 py-3">Date</th>
+                                                    <th className="px-6 py-3 text-right">Amount</th>
+                                                    <th className="px-6 py-3">Eligible Dividend</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {reportData.investmentIncome.map((inc: InvestmentIncome) => (
+                                                    <tr key={inc.id} className="hover:bg-muted/50 transition-colors">
+                                                        <td className="px-6 py-4 font-medium text-white">{inc.investment?.description || 'N/A'}</td>
+                                                        <td className="px-6 py-4 text-slate-muted capitalize">{inc.income_type}</td>
+                                                        <td className="px-6 py-4 text-slate-muted">{formatDate(inc.income_date)}</td>
+                                                        <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(inc.amount)}</td>
+                                                        <td className="px-6 py-4">
+                                                            {inc.income_type === 'dividend' && (
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${inc.is_eligible_dividend
+                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                                                    }`}>
+                                                                    {inc.is_eligible_dividend ? 'Eligible' : 'Non-eligible'}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {reportData.investmentSales && reportData.investmentSales.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-4">Investment Sales</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
+                                                <tr>
+                                                    <th className="px-6 py-3">Investment</th>
+                                                    <th className="px-6 py-3">Sale Date</th>
+                                                    <th className="px-6 py-3 text-right">Cost Basis</th>
+                                                    <th className="px-6 py-3 text-right">Sale Proceeds</th>
+                                                    <th className="px-6 py-3 text-right">Realized Gain/Loss</th>
+                                                    <th className="px-6 py-3 text-right">Taxable (50%)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {reportData.investmentSales.map((sale: InvestmentSale) => (
+                                                    <tr key={sale.id} className="hover:bg-muted/50 transition-colors">
+                                                        <td className="px-6 py-4 font-medium text-white">{sale.investment?.description || 'N/A'}</td>
+                                                        <td className="px-6 py-4 text-slate-muted">{formatDate(sale.sale_date)}</td>
+                                                        <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(sale.cost_basis)}</td>
+                                                        <td className="px-6 py-4 text-right text-white">{formatCurrency(sale.sale_amount)}</td>
+                                                        <td className={`px-6 py-4 text-right font-medium ${sale.realized_gain_loss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                            {formatCurrency(sale.realized_gain_loss)}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right text-white">{formatCurrency(sale.realized_gain_loss * 0.5)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                ) : null}
 
                 {/* Monthly HST Breakdown */}
                 <Card className="overflow-hidden">
@@ -1424,6 +1471,51 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                     </div>
                 </Card>
 
+                {/* Salaries */}
+                <Card className="overflow-hidden">
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Salary Payments</h2>
+                        <p className="text-sm text-slate-muted mt-1">All salary payments for {selectedYear}</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
+                                <tr>
+                                    <th className="px-6 py-3">Employee</th>
+                                    <th className="px-6 py-3">Payment Date</th>
+                                    <th className="px-6 py-3">Period</th>
+                                    <th className="px-6 py-3 text-right">Amount</th>
+                                    <th className="px-6 py-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {reportData.salaries && reportData.salaries.length > 0 ? (
+                                    reportData.salaries.map((sal: Salary) => (
+                                        <tr key={sal.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-white">{sal.employee_name}</td>
+                                            <td className="px-6 py-4 text-slate-muted">{formatDate(sal.payment_date)}</td>
+                                            <td className="px-6 py-4 text-slate-muted">{formatDate(sal.period_start)} - {formatDate(sal.period_end)}</td>
+                                            <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(sal.amount)}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${sal.status === 'paid'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                                    }`}>
+                                                    {sal.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-muted">No salaries recorded</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
                 {/* Dividends and Owner Payments */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <Card className="overflow-hidden">
@@ -1516,6 +1608,7 @@ Generated on: ${new Date().toLocaleString('en-CA')}
                             <li>• Complete Profit & Loss Statement</li>
                             <li>• Detailed HST Summary with monthly breakdown</li>
                             <li>• Capital Assets and Depreciation (CCA)</li>
+                            <li>• Investment Income and Capital Gains</li>
                             <li>• Dividend distributions</li>
                             <li>• Retained earnings calculation</li>
                             <li>• All supporting transaction details</li>

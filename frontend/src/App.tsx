@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Login from './components/Login';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import Clients from './pages/Clients';
@@ -18,6 +20,8 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
+import Investments from './pages/Investments';
+import InvestmentDetail from './pages/InvestmentDetail';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -76,6 +80,8 @@ function App() {
           <Router>
             <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="/onboarding/company"
               element={
@@ -169,6 +175,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TaxCalculator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/investments"
+              element={
+                <ProtectedRoute>
+                  <Investments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/investments/:id"
+              element={
+                <ProtectedRoute>
+                  <InvestmentDetail />
                 </ProtectedRoute>
               }
             />

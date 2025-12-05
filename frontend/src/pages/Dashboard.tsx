@@ -199,11 +199,11 @@ const Dashboard: React.FC = () => {
             const ownerExpenses = expenses.filter(expense => expense.paid_by === 'owner');
             const ownerExpensesOwed = ownerExpenses
                 .reduce((sum, expense) => sum + expense.amount + expense.hst_paid, 0);
-            
+
             const ownerCapitalAssets = capitalAssets.filter(asset => asset.paid_by === 'owner');
             const ownerCapitalAssetsOwed = ownerCapitalAssets
                 .reduce((sum, asset) => sum + asset.total_cost, 0);
-            
+
             const ownerReimbursementOwed = ownerExpensesOwed + ownerCapitalAssetsOwed;
 
             // Calculate corporate expenses (for comparison)
@@ -429,7 +429,7 @@ const Dashboard: React.FC = () => {
                         <StatCard
                             title="Total Revenue"
                             value={formatCurrency(stats.totalRevenue)}
-                            subtitle="From invoices & income"
+                            subtitle="Money received from clients"
                             icon={DollarSign}
                             gradient="emerald"
                             accent="emerald"
@@ -439,7 +439,7 @@ const Dashboard: React.FC = () => {
                         <StatCard
                             title="Total Expenses"
                             value={formatCurrency(stats.totalExpenses)}
-                            subtitle="Business operations"
+                            subtitle="Money spent on business"
                             icon={Receipt}
                             gradient="red"
                             accent="default"
@@ -449,7 +449,7 @@ const Dashboard: React.FC = () => {
                         <StatCard
                             title="Net Income"
                             value={formatCurrency(stats.netIncome)}
-                            subtitle="After expenses"
+                            subtitle="Profit after all expenses"
                             icon={TrendingUp}
                             gradient={stats.netIncome >= 0 ? "emerald" : "red"}
                             accent={stats.netIncome >= 0 ? "emerald" : "default"}
@@ -457,9 +457,9 @@ const Dashboard: React.FC = () => {
                     </motion.div>
                     <motion.div variants={staggerItem}>
                         <StatCard
-                            title="Available Dividends"
+                            title="Dividends Available to Pay"
                             value={formatCurrency(stats.availableDividends)}
-                            subtitle="For distribution"
+                            subtitle="Available to pay to owners"
                             icon={Banknote}
                             gradient="amber"
                             accent="golden"
@@ -675,7 +675,7 @@ const Dashboard: React.FC = () => {
                         accent="emerald"
                     />
                     <StatCard
-                        title="Declared (Unpaid)"
+                        title="Announced (Not Paid Yet)"
                         value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'declared').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
                         icon={AlertCircle}
                         gradient="amber"
@@ -720,12 +720,13 @@ const Dashboard: React.FC = () => {
                     {user?.company?.hst_registered && stats.inputTaxCredits > 0 && (
                         <motion.div variants={staggerItem}>
                             <StatCard
-                                title="Input Tax Credits"
+                                title="HST Credits from Expenses"
                                 value={formatCurrency(stats.inputTaxCredits)}
                                 subtitle="HST on expenses"
                                 icon={Percent}
                                 gradient="cyan"
                                 accent="default"
+                                helpText="HST you paid on business expenses that you can claim back as a credit against HST you collected. This reduces the amount of HST you owe to the government."
                             />
                         </motion.div>
                     )}
@@ -768,12 +769,13 @@ const Dashboard: React.FC = () => {
                         </motion.div>
                         <motion.div variants={staggerItem}>
                             <StatCard
-                                title="Depreciation"
+                                title="Total Depreciation Taken"
                                 value={formatCurrency(stats.totalAccumulatedDepreciation)}
                                 subtitle="Accumulated"
                                 icon={Calculator}
                                 gradient="amber"
                                 accent="default"
+                                helpText="The total amount of depreciation claimed on all capital assets over time"
                             />
                         </motion.div>
                         <motion.div variants={staggerItem}>
@@ -784,6 +786,7 @@ const Dashboard: React.FC = () => {
                                 icon={TrendingUp}
                                 gradient="amber"
                                 accent="golden"
+                                helpText="The current value of an asset after subtracting depreciation"
                             />
                         </motion.div>
                     </motion.div>

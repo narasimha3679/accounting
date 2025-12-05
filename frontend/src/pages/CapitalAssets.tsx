@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Calculator, Building2, Calendar, X } from 'lucide-r
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import HelpIcon from '../components/ui/HelpIcon';
 
 const CapitalAssets: React.FC = () => {
     const { user } = useAuth();
@@ -98,7 +99,13 @@ const CapitalAssets: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Capital Assets</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-3xl font-bold tracking-tight text-white">Capital Assets</h1>
+                        <HelpIcon
+                            content="Business equipment and property worth over $500 that depreciate over time"
+                            size="sm"
+                        />
+                    </div>
                     <p className="text-slate-muted mt-2">Manage depreciable business assets over $500</p>
                 </div>
                 <Button
@@ -208,7 +215,7 @@ const CapitalAssets: React.FC = () => {
                                 <th className="px-6 py-4">Category</th>
                                 <th className="px-6 py-4">Purchase Date</th>
                                 <th className="px-6 py-4">Total Cost</th>
-                                <th className="px-6 py-4">CCA Class</th>
+                                <th className="px-6 py-4">Depreciation Class</th>
                                 <th className="px-6 py-4">CCA Rate</th>
                                 <th className="px-6 py-4">Accumulated Depreciation</th>
                                 <th className="px-6 py-4">Book Value</th>
@@ -459,7 +466,13 @@ function CapitalAssetModal({ asset, categories, ccaClasses, onClose, onSave }: C
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-white mb-2">CCA Class *</label>
+                            <div className="flex items-center gap-2 mb-2">
+                                <label className="block text-sm font-medium text-white">Depreciation Class *</label>
+                                <HelpIcon
+                                    content="CCA (Capital Cost Allowance) is the tax term for depreciation. Each asset class has a specific depreciation rate set by the CRA."
+                                    size="sm"
+                                />
+                            </div>
                             <select
                                 value={formData.cca_class}
                                 onChange={(e) => setFormData({ ...formData, cca_class: e.target.value })}
