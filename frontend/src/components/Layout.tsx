@@ -39,7 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Investments', href: '/investments', icon: PieChart },
         { name: 'Dividends', href: '/dividends', icon: Banknote },
         { name: 'Salary', href: '/salary', icon: Briefcase },
-        { name: 'Payments to Owner', href: '/owner-payments', icon: CreditCard },
+        { name: 'Owner Reimbursement', href: '/owner-payments', icon: CreditCard },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },

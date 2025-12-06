@@ -468,7 +468,7 @@ const Dashboard: React.FC = () => {
                 </motion.div>
 
                 {/* Owner Balance Section */}
-                {(stats.ownerReimbursementOwed > 0 || stats.ownerPaymentsTotal > 0) && (
+                {Math.abs(stats.netOwnerBalance) > 0.01 && (
                     <motion.div
                         variants={staggerItem}
                         className="relative"
@@ -529,11 +529,6 @@ const Dashboard: React.FC = () => {
                                         {stats.netOwnerBalance < 0 && (
                                             <p className="text-muted-foreground text-base leading-relaxed">
                                                 The corporation has overpaid the owner by <span className="font-bold text-foreground tabular-nums">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
-                                            </p>
-                                        )}
-                                        {stats.netOwnerBalance === 0 && stats.ownerReimbursementOwed > 0 && (
-                                            <p className="text-muted-foreground text-base leading-relaxed">
-                                                Owner balance is settled. All reimbursements have been paid.
                                             </p>
                                         )}
                                     </div>

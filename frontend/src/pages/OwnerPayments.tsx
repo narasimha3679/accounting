@@ -66,7 +66,9 @@ function OwnerPaymentModal({
 
     const orderedOwnerExpenses = useMemo(() => {
         if (!ownerExpenses) return [];
-        return [...ownerExpenses].sort((a, b) => {
+        // Double-check: filter out any company-paid expenses as a safeguard
+        const filtered = ownerExpenses.filter(expense => expense.paid_by === 'owner');
+        return [...filtered].sort((a, b) => {
             const dateA = new Date(a.expense_date).getTime();
             const dateB = new Date(b.expense_date).getTime();
             return dateB - dateA;
@@ -75,7 +77,9 @@ function OwnerPaymentModal({
 
     const orderedOwnerCapitalAssets = useMemo(() => {
         if (!ownerCapitalAssets) return [];
-        return [...ownerCapitalAssets].sort((a, b) => {
+        // Double-check: filter out any company-paid assets as a safeguard
+        const filtered = ownerCapitalAssets.filter(asset => asset.paid_by === 'owner');
+        return [...filtered].sort((a, b) => {
             const dateA = new Date(a.purchase_date).getTime();
             const dateB = new Date(b.purchase_date).getTime();
             return dateB - dateA;
@@ -138,8 +142,9 @@ function OwnerPaymentModal({
             description: expense.description,
             amount: totalWithHst.toFixed(2),
             payment_type: 'reimbursement',
-            payment_date: expense.expense_date.split('T')[0],
-            notes: `Reimbursement for ${expense.description} (${formattedDate})`
+            // Don't auto-fill payment_date - it should be when owner got paid, not expense date
+            // payment_date will remain as is (empty for new, or existing value for edit)
+            notes: `Reimbursement for ${expense.description} (expense date: ${formattedDate})`
         }));
     };
 
@@ -168,8 +173,9 @@ function OwnerPaymentModal({
             description: asset.description,
             amount: asset.total_cost.toFixed(2),
             payment_type: 'reimbursement',
-            payment_date: asset.purchase_date.split('T')[0],
-            notes: `Reimbursement for capital asset: ${asset.description} (${formattedDate})`
+            // Don't auto-fill payment_date - it should be when owner got paid, not purchase date
+            // payment_date will remain as is (empty for new, or existing value for edit)
+            notes: `Reimbursement for capital asset: ${asset.description} (purchase date: ${formattedDate})`
         }));
     };
 
@@ -531,14 +537,76 @@ const OwnerPayments: React.FC = () => {
 
         try {
             setOwnerExpensesLoading(true);
-            const response = await api.getExpenses({
-                company_id: user.company_id,
-                limit: 1000
+            const [expensesResponse, paymentsResponse] = await Promise.all([
+                api.getExpenses({
+                    company_id: user.company_id,
+                    limit: 1000
+                }),
+                api.getOwnerPayments({
+                    company_id: user.company_id,
+                    limit: 1000
+                })
+            ]);
+
+            // Get all reimbursement payments
+            const reimbursementPayments = paymentsResponse.data.filter(
+                payment => payment.payment_type === 'reimbursement'
+            );
+
+            // Filter expenses: only show owner-paid expenses that haven't been reimbursed yet
+            const allExpenses = expensesResponse.data || [];
+
+            // First, get all owner-paid expenses
+            const ownerPaidExpensesList = allExpenses.filter(expense => expense.paid_by === 'owner');
+
+            // Create a map to track which payments have been matched to expenses
+            // This prevents one payment from matching multiple expenses
+            const matchedPaymentIds = new Set<number>();
+            const matchedExpenseIds = new Set<number>();
+
+            // For each payment, find the best matching expense (one-to-one matching)
+            reimbursementPayments.forEach(payment => {
+                const paymentDate = new Date(payment.payment_date);
+
+                // Find the best matching expense (by date proximity)
+                const matchingExpense = ownerPaidExpensesList
+                    .filter(expense => {
+                        // Skip if already matched
+                        if (matchedExpenseIds.has(expense.id) || matchedPaymentIds.has(payment.id)) {
+                            return false;
+                        }
+
+                        const expenseTotal = expense.amount + (expense.hst_paid ?? 0);
+                        const descriptionMatch = payment.description.trim().toLowerCase() === expense.description.trim().toLowerCase();
+                        const amountMatch = Math.abs(payment.amount - expenseTotal) < 0.01;
+                        const expenseDate = new Date(expense.expense_date);
+                        const dateMatch = paymentDate >= expenseDate; // Payment should be on or after expense date
+
+                        return descriptionMatch && amountMatch && dateMatch;
+                    })
+                    .sort((a, b) => {
+                        // Prefer expenses with dates closest to payment date
+                        const dateDiffA = Math.abs(paymentDate.getTime() - new Date(a.expense_date).getTime());
+                        const dateDiffB = Math.abs(paymentDate.getTime() - new Date(b.expense_date).getTime());
+                        return dateDiffA - dateDiffB;
+                    })[0]; // Get the closest match
+
+                if (matchingExpense) {
+                    matchedExpenseIds.add(matchingExpense.id);
+                    matchedPaymentIds.add(payment.id);
+                }
             });
 
-            const ownerPaidExpenses = response.data
-                .filter(expense => expense.paid_by === 'owner')
+            // Filter out matched expenses
+            const ownerPaidExpenses = ownerPaidExpensesList
+                .filter(expense => !matchedExpenseIds.has(expense.id))
                 .sort((a, b) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime());
+
+            // Debug: Log if we find any company-paid expenses in the filtered list
+            const companyPaidInFiltered = ownerPaidExpenses.filter(e => e.paid_by !== 'owner');
+            if (companyPaidInFiltered.length > 0) {
+                console.warn('Found company-paid expenses in filtered list:', companyPaidInFiltered);
+            }
 
             setOwnerExpenses(ownerPaidExpenses);
         } catch (error) {
@@ -557,13 +625,65 @@ const OwnerPayments: React.FC = () => {
 
         try {
             setOwnerCapitalAssetsLoading(true);
-            const response = await api.getCapitalAssets({
-                company_id: user.company_id,
-                limit: 1000
+            const [assetsResponse, paymentsResponse] = await Promise.all([
+                api.getCapitalAssets({
+                    company_id: user.company_id,
+                    limit: 1000
+                }),
+                api.getOwnerPayments({
+                    company_id: user.company_id,
+                    limit: 1000
+                })
+            ]);
+
+            // Get all reimbursement payments
+            const reimbursementPayments = paymentsResponse.data.filter(
+                payment => payment.payment_type === 'reimbursement'
+            );
+
+            // First, get all owner-paid capital assets
+            const ownerPaidAssetsList = assetsResponse.data.filter(asset => asset.paid_by === 'owner');
+
+            // Create a map to track which payments have been matched to assets
+            // This prevents one payment from matching multiple assets
+            const matchedPaymentIds = new Set<number>();
+            const matchedAssetIds = new Set<number>();
+
+            // For each payment, find the best matching asset (one-to-one matching)
+            reimbursementPayments.forEach(payment => {
+                const paymentDate = new Date(payment.payment_date);
+
+                // Find the best matching asset (by date proximity)
+                const matchingAsset = ownerPaidAssetsList
+                    .filter(asset => {
+                        // Skip if already matched
+                        if (matchedAssetIds.has(asset.id) || matchedPaymentIds.has(payment.id)) {
+                            return false;
+                        }
+
+                        const descriptionMatch = payment.description.trim().toLowerCase() === asset.description.trim().toLowerCase();
+                        const amountMatch = Math.abs(payment.amount - asset.total_cost) < 0.01;
+                        const assetDate = new Date(asset.purchase_date);
+                        const dateMatch = paymentDate >= assetDate; // Payment should be on or after purchase date
+
+                        return descriptionMatch && amountMatch && dateMatch;
+                    })
+                    .sort((a, b) => {
+                        // Prefer assets with dates closest to payment date
+                        const dateDiffA = Math.abs(paymentDate.getTime() - new Date(a.purchase_date).getTime());
+                        const dateDiffB = Math.abs(paymentDate.getTime() - new Date(b.purchase_date).getTime());
+                        return dateDiffA - dateDiffB;
+                    })[0]; // Get the closest match
+
+                if (matchingAsset) {
+                    matchedAssetIds.add(matchingAsset.id);
+                    matchedPaymentIds.add(payment.id);
+                }
             });
 
-            const ownerPaidAssets = response.data
-                .filter(asset => asset.paid_by === 'owner')
+            // Filter out matched assets
+            const ownerPaidAssets = ownerPaidAssetsList
+                .filter(asset => !matchedAssetIds.has(asset.id))
                 .sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime());
 
             setOwnerCapitalAssets(ownerPaidAssets);
@@ -586,13 +706,10 @@ const OwnerPayments: React.FC = () => {
         }
         setEditingPayment(undefined);
 
-        if (linkedExpenseId) {
-            setOwnerExpenses(prev => prev.filter(expense => expense.id !== linkedExpenseId));
-        }
-
-        if (linkedCapitalAssetId) {
-            setOwnerCapitalAssets(prev => prev.filter(asset => asset.id !== linkedCapitalAssetId));
-        }
+        // Reload expenses and capital assets to ensure the lists are up-to-date
+        // This will automatically filter out any items that have been reimbursed
+        loadOwnerExpenses();
+        loadOwnerCapitalAssets();
     };
 
     const handleDelete = async (id: number) => {
@@ -601,6 +718,10 @@ const OwnerPayments: React.FC = () => {
         try {
             await api.deleteOwnerPayment(id);
             setOwnerPayments(prev => prev.filter(payment => payment.id !== id));
+            // Reload expenses and capital assets in case the deleted payment was a reimbursement
+            // This will make previously reimbursed items available again
+            loadOwnerExpenses();
+            loadOwnerCapitalAssets();
         } catch (error) {
             console.error('Error deleting owner payment:', error);
             alert('Error deleting owner payment. Please try again.');
@@ -651,7 +772,7 @@ const OwnerPayments: React.FC = () => {
     if (!user?.company_id) {
         return (
             <div className="space-y-4">
-                <h1 className="text-3xl font-bold tracking-tight text-white">Owner Payments</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Owner Reimbursement</h1>
                 <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
                     <p className="text-sm text-yellow-800 dark:text-yellow-300">
                         To track owner payments, please first set up your company details in the{' '}
@@ -666,7 +787,7 @@ const OwnerPayments: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Owner Payments</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Owner Reimbursement</h1>
                     <p className="text-muted-foreground mt-2">Track payments made by the corporation to the owner</p>
                 </div>
                 <Button
