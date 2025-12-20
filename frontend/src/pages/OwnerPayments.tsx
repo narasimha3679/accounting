@@ -694,7 +694,7 @@ const OwnerPayments: React.FC = () => {
         }
     };
 
-    const handleSave = (savedPayment: OwnerPayment, linkedExpenseId?: number, linkedCapitalAssetId?: number) => {
+    const handleSave = (savedPayment: OwnerPayment, _linkedExpenseId?: number, _linkedCapitalAssetId?: number) => {
         if (editingPayment) {
             setOwnerPayments(prev =>
                 prev.map(payment =>

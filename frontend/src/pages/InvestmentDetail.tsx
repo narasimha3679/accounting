@@ -448,6 +448,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     onClose,
     onSave
 }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         amount: transaction?.amount || 0,
         transaction_date: transaction?.transaction_date ? transaction.transaction_date.split('T')[0] : new Date().toISOString().split('T')[0],

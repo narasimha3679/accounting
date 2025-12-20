@@ -379,7 +379,9 @@ const Expenses: React.FC = () => {
                                     <td className="px-6 py-4 font-medium text-white">
                                         <div className="flex items-center gap-2">
                                             {expense.distance_km != null && (
-                                                <Car className="h-4 w-4 text-blue-400" title="Mileage expense" />
+                                                <span title="Mileage expense">
+                                                    <Car className="h-4 w-4 text-blue-400" />
+                                                </span>
                                             )}
                                             <span>{expense.description}</span>
                                             {expense.distance_km != null && expense.start_location && expense.end_location && (

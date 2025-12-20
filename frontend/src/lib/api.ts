@@ -1,5 +1,5 @@
 import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
-import { getFiscalYear, getFiscalYearRange, isDateInFiscalYear } from './fiscalYear';
+import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 
 export interface User {
     id: number;

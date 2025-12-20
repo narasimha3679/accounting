@@ -5,7 +5,7 @@
  * and fiscal year end date.
  */
 
-import { getFiscalYear, getFiscalYearRange, type FiscalYearRange } from './fiscalYear';
+import { getFiscalYear, getFiscalYearRange } from './fiscalYear';
 
 export type HSTFilingFrequency = 'monthly' | 'quarterly' | 'annual';
 
@@ -36,7 +36,6 @@ export function getHSTPeriodForDate(
     
     const fyEnd = new Date(fiscalYearEnd);
     const fyEndMonth = fyEnd.getMonth();
-    const fyEndDay = fyEnd.getDate();
     
     let periodNumber: number;
     let periodStart: Date;
@@ -86,7 +85,6 @@ export function getHSTPeriodForDate(
             periodEnd = new Date(fiscalYearRange.end);
         }
         
-        const monthName = periodStart.toLocaleDateString('en-CA', { month: 'short' });
         periodLabel = `${fiscalYear}-${String(periodNumber).padStart(2, '0')}`;
     }
     
@@ -105,7 +103,7 @@ export function getHSTPeriodForDate(
 function getMonthsSinceFiscalYearStart(
     date: Date,
     fiscalYearStart: Date,
-    fiscalYearEndMonth: number
+    _fiscalYearEndMonth: number
 ): number {
     const dateYear = date.getFullYear();
     const dateMonth = date.getMonth();
@@ -206,8 +204,6 @@ export function getHSTPeriodRange(
     
     // Get fiscal year range
     const fiscalYearRange = getFiscalYearRange(fiscalYear, fiscalYearEnd);
-    const fyEnd = new Date(fiscalYearEnd);
-    const fyEndMonth = fyEnd.getMonth();
     
     let periodStart: Date;
     let periodEnd: Date;
