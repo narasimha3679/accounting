@@ -16,6 +16,7 @@ const CompanyOnboarding: React.FC = () => {
     const [businessNumber, setBusinessNumber] = useState('');
     const [hstNumber, setHstNumber] = useState('');
     const [hstRegistered, setHstRegistered] = useState(false);
+    const [hstFilingFrequency, setHstFilingFrequency] = useState<'monthly' | 'quarterly' | 'annual'>('annual');
     const [fiscalYearEnd, setFiscalYearEnd] = useState(() => {
         const today = new Date();
         return today.toISOString().split('T')[0];
@@ -59,6 +60,7 @@ const CompanyOnboarding: React.FC = () => {
                 business_number: businessNumber,
                 hst_number: hstNumber || null,
                 hst_registered: hstRegistered,
+                hst_filing_frequency: hstRegistered ? hstFilingFrequency : 'annual',
                 fiscal_year_end: fiscalYearEnd,
                 small_business_rate: smallBusinessRate,
                 hst_rate: hstRate,
@@ -239,6 +241,32 @@ const CompanyOnboarding: React.FC = () => {
                                     </label>
                                 </div>
                             </Card>
+
+                            {/* HST Filing Frequency */}
+                            {hstRegistered && (
+                                <div className="space-y-2">
+                                    <label htmlFor="hst_filing_frequency" className="block text-sm font-semibold text-foreground">
+                                        HST Filing Frequency <span className="text-destructive">*</span>
+                                    </label>
+                                    <select
+                                        id="hst_filing_frequency"
+                                        value={hstFilingFrequency}
+                                        onChange={(e) => setHstFilingFrequency(e.target.value as 'monthly' | 'quarterly' | 'annual')}
+                                        className="input"
+                                        required
+                                    >
+                                        <option value="monthly">Monthly</option>
+                                        <option value="quarterly">Quarterly</option>
+                                        <option value="annual">Annual</option>
+                                    </select>
+                                    <div className="flex items-start space-x-2 mt-2 p-3 rounded-lg bg-card/50 border border-border">
+                                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-muted-foreground">
+                                            How often do you file HST returns with CRA? This affects how HST periods are calculated in reports.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Tax Rates */}
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { cn } from '../lib/utils';
+import { getFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 
 const Investments: React.FC = () => {
     const { user } = useAuth();
@@ -84,13 +85,26 @@ const Investments: React.FC = () => {
         const activeInvestments = investments.filter(inv => inv.status === 'active');
         const totalInvested = activeInvestments.reduce((sum, inv) => sum + Number(inv.purchase_amount), 0);
 
-        const currentYear = new Date().getFullYear();
+        const fiscalYearEnd = user?.company?.fiscal_year_end;
+        const currentFiscalYear = fiscalYearEnd ? getCurrentFiscalYear(fiscalYearEnd) : new Date().getFullYear();
         const yearIncome = investmentIncome
-            .filter(inc => new Date(inc.income_date).getFullYear() === currentYear)
+            .filter(inc => {
+                if (fiscalYearEnd) {
+                    return getFiscalYear(new Date(inc.income_date), fiscalYearEnd) === currentFiscalYear;
+                } else {
+                    return new Date(inc.income_date).getFullYear() === currentFiscalYear;
+                }
+            })
             .reduce((sum, inc) => sum + Number(inc.amount), 0);
 
         const yearSales = investmentSales
-            .filter(sale => new Date(sale.sale_date).getFullYear() === currentYear)
+            .filter(sale => {
+                if (fiscalYearEnd) {
+                    return getFiscalYear(new Date(sale.sale_date), fiscalYearEnd) === currentFiscalYear;
+                } else {
+                    return new Date(sale.sale_date).getFullYear() === currentFiscalYear;
+                }
+            })
             .reduce((sum, sale) => sum + Number(sale.realized_gain_loss), 0);
 
         // Calculate unrealized gains for stocks

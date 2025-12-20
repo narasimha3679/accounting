@@ -8,6 +8,8 @@ import Card from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import BalanceChart from '../components/investments/BalanceChart';
 import { cn } from '../lib/utils';
+import { getFiscalYear } from '../lib/fiscalYear';
+import { useAuth } from '../contexts/AuthContext';
 
 const InvestmentDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -516,7 +518,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
             // Always create/update investment_income entry for interest and dividends
             if (transactionType === 'interest' || transactionType === 'dividend_reinvested') {
-                const fiscalYear = new Date(formData.transaction_date).getFullYear();
+                const fiscalYearEnd = user?.company?.fiscal_year_end;
+                const fiscalYear = fiscalYearEnd 
+                    ? getFiscalYear(new Date(formData.transaction_date), fiscalYearEnd)
+                    : new Date(formData.transaction_date).getFullYear();
                 const incomeType = transactionType === 'interest' ? 'interest' : 'dividend';
 
                 if (transaction && transaction.linked_income_id) {

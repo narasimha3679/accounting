@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
-import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info, Car } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
 import { cn } from '../lib/utils';
+import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
+import { CRA_MILEAGE_RATE } from '../lib/api';
 
 const Expenses: React.FC = () => {
     const { user } = useAuth();
     const _queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showMileageModal, setShowMileageModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
@@ -22,17 +25,28 @@ const Expenses: React.FC = () => {
     });
     const [selectedDate, setSelectedDate] = useState(new Date());
 
-    // Calculate date range based on time period
+    // Calculate date range based on time period and fiscal year
     const getDateRange = () => {
+        const fiscalYearEnd = user?.company?.fiscal_year_end;
         let startDate: Date;
         let endDate: Date;
 
         if (timePeriod === 'month') {
+            // For monthly view, use calendar month
             startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
             endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
         } else {
-            startDate = new Date(selectedDate.getFullYear(), 0, 1);
-            endDate = new Date(selectedDate.getFullYear(), 11, 31);
+            // For yearly view, use fiscal year
+            if (fiscalYearEnd) {
+                const fiscalYear = getFiscalYear(selectedDate, fiscalYearEnd);
+                const fiscalYearRange = getFiscalYearRange(fiscalYear, fiscalYearEnd);
+                startDate = fiscalYearRange.start;
+                endDate = fiscalYearRange.end;
+            } else {
+                // Fallback to calendar year if no fiscal year end is set
+                startDate = new Date(selectedDate.getFullYear(), 0, 1);
+                endDate = new Date(selectedDate.getFullYear(), 11, 31);
+            }
         }
 
         return {
@@ -106,6 +120,13 @@ const Expenses: React.FC = () => {
     const totalExpenses = filteredExpenses?.reduce((sum, expense) => sum + expense.amount, 0) || 0;
     const totalHSTPaid = filteredExpenses?.reduce((sum, expense) => sum + expense.hst_paid, 0) || 0;
 
+    // Calculate mileage statistics
+    const mileageExpenses = filteredExpenses?.filter(expense => expense.distance_km != null) || [];
+    const totalMileageKm = mileageExpenses.reduce((sum, expense) => sum + (expense.distance_km || 0), 0);
+    const totalMileageAmount = mileageExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const mileageTripCount = mileageExpenses.length;
+    const averageDistance = mileageTripCount > 0 ? totalMileageKm / mileageTripCount : 0;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -160,32 +181,79 @@ const Expenses: React.FC = () => {
 
                         <div className="flex items-center space-x-2">
                             <Calendar className="h-5 w-5 text-slate-muted" />
-                            <input
-                                type={timePeriod === 'month' ? 'month' : 'number'}
-                                value={timePeriod === 'month'
-                                    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
-                                    : selectedDate.getFullYear()
-                                }
-                                onChange={(e) => {
-                                    if (timePeriod === 'month') {
+                            {timePeriod === 'month' ? (
+                                <input
+                                    type="month"
+                                    value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`}
+                                    onChange={(e) => {
                                         const [year, month] = e.target.value.split('-');
                                         setSelectedDate(new Date(parseInt(year), parseInt(month) - 1, 1));
-                                    } else {
-                                        setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
-                                    }
-                                }}
-                                className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            />
+                                    }}
+                                    className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={user?.company?.fiscal_year_end ? getFiscalYear(selectedDate, user.company.fiscal_year_end) : selectedDate.getFullYear()}
+                                        onChange={(e) => {
+                                            const fiscalYear = parseInt(e.target.value);
+                                            if (user?.company?.fiscal_year_end) {
+                                                const range = getFiscalYearRange(fiscalYear, user.company.fiscal_year_end);
+                                                setSelectedDate(range.start);
+                                            } else {
+                                                setSelectedDate(new Date(fiscalYear, 0, 1));
+                                            }
+                                        }}
+                                        className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {user?.company?.fiscal_year_end ? (
+                                            Array.from({ length: 6 }, (_, i) => {
+                                                const currentFY = getCurrentFiscalYear(user.company!.fiscal_year_end);
+                                                const fy = currentFY - i;
+                                                return (
+                                                    <option key={fy} value={fy}>
+                                                        {formatFiscalYear(fy)}
+                                                    </option>
+                                                );
+                                            })
+                                        ) : (
+                                            Array.from({ length: 6 }, (_, i) => {
+                                                const year = new Date().getFullYear() - i;
+                                                return (
+                                                    <option key={year} value={year}>
+                                                        {year}
+                                                    </option>
+                                                );
+                                            })
+                                        )}
+                                    </select>
+                                    {user?.company?.fiscal_year_end && (
+                                        <span className="text-sm text-muted-foreground">
+                                            ({formatFiscalYear(getFiscalYear(selectedDate, user.company.fiscal_year_end))})
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <Button
-                        onClick={() => setShowCreateModal(true)}
-                        icon={Plus}
-                        className="w-full sm:w-auto"
-                    >
-                        Add Expense
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <Button
+                            onClick={() => setShowMileageModal(true)}
+                            icon={Car}
+                            variant="secondary"
+                            className="w-full sm:w-auto"
+                        >
+                            Log Mileage
+                        </Button>
+                        <Button
+                            onClick={() => setShowCreateModal(true)}
+                            icon={Plus}
+                            className="w-full sm:w-auto"
+                        >
+                            Add Expense
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -207,7 +275,7 @@ const Expenses: React.FC = () => {
             </Card>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:grid-cols-4">
                 <Card className="p-6">
                     <div className="flex items-center">
                         <div className="flex-shrink-0 p-3 rounded-full bg-red-100 dark:bg-red-900/20">
@@ -261,6 +329,29 @@ const Expenses: React.FC = () => {
                         </div>
                     </div>
                 </Card>
+
+                {mileageTripCount > 0 && (
+                    <Card className="p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                                <Car className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-slate-muted truncate">
+                                        Mileage ({mileageTripCount} trips)
+                                    </dt>
+                                    <dd className="text-2xl font-bold text-white">
+                                        {formatCurrency(totalMileageAmount)}
+                                    </dd>
+                                    <dd className="text-xs text-slate-muted mt-1">
+                                        {totalMileageKm.toFixed(1)} km (avg: {averageDistance.toFixed(1)} km/trip)
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </Card>
+                )}
             </div>
 
             {/* Expenses Table */}
@@ -285,7 +376,19 @@ const Expenses: React.FC = () => {
                             {filteredExpenses?.map((expense) => (
                                 <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
                                     <td className="px-6 py-4 text-slate-muted">{formatDate(expense.expense_date)}</td>
-                                    <td className="px-6 py-4 font-medium text-white">{expense.description}</td>
+                                    <td className="px-6 py-4 font-medium text-white">
+                                        <div className="flex items-center gap-2">
+                                            {expense.distance_km != null && (
+                                                <Car className="h-4 w-4 text-blue-400" title="Mileage expense" />
+                                            )}
+                                            <span>{expense.description}</span>
+                                            {expense.distance_km != null && expense.start_location && expense.end_location && (
+                                                <span className="text-xs text-slate-muted">
+                                                    ({expense.distance_km}km: {expense.start_location} → {expense.end_location})
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4 text-slate-muted">{expense.category?.name || 'Uncategorized'}</td>
                                     <td className="px-6 py-4 font-medium text-white">{formatCurrency(expense.amount)}</td>
                                     <td className="px-6 py-4 text-slate-muted">{formatCurrency(expense.hst_paid)}</td>
@@ -366,6 +469,17 @@ const Expenses: React.FC = () => {
                 </div>
             )}
 
+            {/* Mileage Modal */}
+            {showMileageModal && (
+                <MileageModal
+                    onClose={() => setShowMileageModal(false)}
+                    onSave={() => {
+                        _queryClient.invalidateQueries({ queryKey: ['expenses'] });
+                        setShowMileageModal(false);
+                    }}
+                />
+            )}
+
             {/* Create/Edit Expense Modal */}
             {(showCreateModal || editingExpense) && (
                 <ExpenseModal
@@ -385,6 +499,223 @@ const Expenses: React.FC = () => {
         </div>
     );
 };
+
+// Mileage Modal Component
+interface MileageModalProps {
+    onClose: () => void;
+    onSave: () => void;
+}
+
+function MileageModal({ onClose, onSave }: MileageModalProps) {
+    const { user } = useAuth();
+    const [formData, setFormData] = useState({
+        trip_date: new Date().toISOString().split('T')[0],
+        start_location: '',
+        end_location: '',
+        distance_km: 0,
+        purpose: '',
+        vehicle_description: '',
+    });
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-CA', {
+            style: 'currency',
+            currency: 'CAD',
+        }).format(amount);
+    };
+
+    const createMileageMutation = useMutation({
+        mutationFn: async (data: typeof formData) => {
+            if (!user?.company_id) throw new Error('Company ID is required');
+            return api.createMileageExpense({
+                company_id: user.company_id,
+                trip_date: data.trip_date,
+                start_location: data.start_location,
+                end_location: data.end_location,
+                distance_km: data.distance_km,
+                purpose: data.purpose || undefined,
+                vehicle_description: data.vehicle_description || undefined,
+            });
+        },
+        onSuccess: () => {
+            onSave();
+        },
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (formData.distance_km <= 0) {
+            alert('Please enter a valid distance greater than 0');
+            return;
+        }
+        if (!formData.start_location.trim() || !formData.end_location.trim()) {
+            alert('Please enter both starting location and destination');
+            return;
+        }
+        createMileageMutation.mutate(formData);
+    };
+
+    const calculatedAmount = formData.distance_km * CRA_MILEAGE_RATE;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-card p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-semibold text-white">Log Mileage</h3>
+                        <p className="text-sm text-slate-muted mt-1">Track business mileage using CRA standard rates</p>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+
+                {/* CRA Guidance */}
+                <Card className="p-4 mb-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm text-blue-800 dark:text-blue-300">
+                            <p className="font-medium mb-2">CRA Mileage Rules:</p>
+                            <ul className="list-disc list-inside space-y-1 text-xs">
+                                <li>Only business-related trips are deductible</li>
+                                <li>Commuting from home to regular workplace is NOT deductible</li>
+                                <li>Keep a log of all business trips for CRA compliance</li>
+                                <li>Current rate: ${CRA_MILEAGE_RATE.toFixed(2)}/km (2024 CRA standard)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </Card>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-sm font-medium text-white mb-2">Trip Date *</label>
+                            <input
+                                type="date"
+                                value={formData.trip_date}
+                                onChange={(e) => setFormData({ ...formData, trip_date: e.target.value })}
+                                className="input"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-white mb-2">Distance (km) *</label>
+                            <input
+                                type="number"
+                                value={formData.distance_km || ''}
+                                onChange={(e) => setFormData({ ...formData, distance_km: parseFloat(e.target.value) || 0 })}
+                                className="input"
+                                min="0.01"
+                                step="0.01"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-white mb-2">Starting Location *</label>
+                            <input
+                                type="text"
+                                value={formData.start_location}
+                                onChange={(e) => setFormData({ ...formData, start_location: e.target.value })}
+                                className="input"
+                                placeholder="e.g., Office, Home, Client Site"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-white mb-2">Destination *</label>
+                            <input
+                                type="text"
+                                value={formData.end_location}
+                                onChange={(e) => setFormData({ ...formData, end_location: e.target.value })}
+                                className="input"
+                                placeholder="e.g., Client Site, Meeting Location"
+                                required
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-white mb-2">Purpose (Optional)</label>
+                            <textarea
+                                value={formData.purpose}
+                                onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                                className="input min-h-[80px]"
+                                placeholder="e.g., Client meeting, Site visit, Business errand"
+                            />
+                            <p className="text-xs text-slate-muted mt-1">This will be used as the expense description if provided</p>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-white mb-2">Vehicle Description (Optional)</label>
+                            <input
+                                type="text"
+                                value={formData.vehicle_description}
+                                onChange={(e) => setFormData({ ...formData, vehicle_description: e.target.value })}
+                                className="input"
+                                placeholder="e.g., 2020 Honda Civic"
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <Card className="p-4 bg-muted/50">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-white">Rate per km</p>
+                                        <p className="text-xs text-slate-muted">CRA Standard Rate (2024)</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-lg font-bold text-white">${CRA_MILEAGE_RATE.toFixed(2)}/km</p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <Card className="p-4 bg-primary/10 border-primary/30">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-white">Calculated Amount</p>
+                                        <p className="text-xs text-slate-muted">
+                                            {formData.distance_km > 0 ? `${formData.distance_km} km × $${CRA_MILEAGE_RATE.toFixed(2)}/km` : 'Enter distance to calculate'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold text-primary">
+                                            {formData.distance_km > 0 ? formatCurrency(calculatedAmount) : '$0.00'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={createMileageMutation.isPending || formData.distance_km <= 0}
+                        >
+                            {createMileageMutation.isPending ? 'Saving...' : 'Save Mileage'}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
 
 // Expense Modal Component
 interface ExpenseModalProps {
@@ -665,6 +996,12 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
         expense_date: expense?.expense_date || new Date().toISOString().split('T')[0],
         receipt_attached: expense?.receipt_attached || false,
         paid_by: expense?.paid_by || 'corp',
+        // Mileage fields
+        distance_km: expense?.distance_km ?? null,
+        start_location: expense?.start_location ?? null,
+        end_location: expense?.end_location ?? null,
+        vehicle_description: expense?.vehicle_description ?? null,
+        mileage_rate_per_km: expense?.mileage_rate_per_km ?? null,
     });
     const [taxApplies, setTaxApplies] = useState(initialTaxApplies);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -720,10 +1057,19 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const expenseData = {
+        const expenseData: any = {
             ...formData,
             company_id: user?.company_id,
         };
+
+        // Include mileage fields if they exist
+        if (formData.distance_km != null) {
+            expenseData.distance_km = formData.distance_km;
+            expenseData.start_location = formData.start_location;
+            expenseData.end_location = formData.end_location;
+            expenseData.vehicle_description = formData.vehicle_description;
+            expenseData.mileage_rate_per_km = formData.mileage_rate_per_km;
+        }
 
         if (expense) {
             updateExpenseMutation.mutate(expenseData);
@@ -1064,6 +1410,92 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                 </label>
                             </div>
                         </div>
+
+                        {/* Mileage Fields Section - Only show if editing a mileage expense */}
+                        {expense && expense.distance_km != null && (
+                            <>
+                                <div className="sm:col-span-2 border-t border-white/10 pt-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Car className="h-5 w-5 text-blue-400" />
+                                        <h4 className="text-lg font-medium text-white">Mileage Details</h4>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">Distance (km)</label>
+                                    <input
+                                        type="number"
+                                        value={formData.distance_km ?? ''}
+                                        onChange={(e) => {
+                                            const distance = parseFloat(e.target.value) || 0;
+                                            const rate = formData.mileage_rate_per_km ?? CRA_MILEAGE_RATE;
+                                            const newAmount = distance * rate;
+                                            setFormData({ 
+                                                ...formData, 
+                                                distance_km: distance,
+                                                amount: newAmount
+                                            });
+                                        }}
+                                        className="input"
+                                        min="0.01"
+                                        step="0.01"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">Rate per km</label>
+                                    <input
+                                        type="number"
+                                        value={formData.mileage_rate_per_km ?? CRA_MILEAGE_RATE}
+                                        onChange={(e) => {
+                                            const rate = parseFloat(e.target.value) || CRA_MILEAGE_RATE;
+                                            const distance = formData.distance_km ?? 0;
+                                            const newAmount = distance * rate;
+                                            setFormData({ 
+                                                ...formData, 
+                                                mileage_rate_per_km: rate,
+                                                amount: newAmount
+                                            });
+                                        }}
+                                        className="input"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <p className="text-xs text-slate-muted mt-1">CRA Standard: ${CRA_MILEAGE_RATE.toFixed(2)}/km (2024)</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">Starting Location</label>
+                                    <input
+                                        type="text"
+                                        value={formData.start_location ?? ''}
+                                        onChange={(e) => setFormData({ ...formData, start_location: e.target.value })}
+                                        className="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-white mb-2">Destination</label>
+                                    <input
+                                        type="text"
+                                        value={formData.end_location ?? ''}
+                                        onChange={(e) => setFormData({ ...formData, end_location: e.target.value })}
+                                        className="input"
+                                    />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-sm font-medium text-white mb-2">Vehicle Description</label>
+                                    <input
+                                        type="text"
+                                        value={formData.vehicle_description ?? ''}
+                                        onChange={(e) => setFormData({ ...formData, vehicle_description: e.target.value })}
+                                        className="input"
+                                        placeholder="e.g., 2020 Honda Civic"
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div className="sm:col-span-2">
                             <label className="block text-sm font-medium text-white mb-2">Who Paid *</label>

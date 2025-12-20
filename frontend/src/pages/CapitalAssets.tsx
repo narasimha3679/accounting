@@ -612,7 +612,10 @@ interface DepreciationScheduleModalProps {
 
 function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModalProps) {
     const queryClient = useQueryClient();
-    const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear());
+    const { user } = useAuth();
+    const fiscalYearEnd = user?.company?.fiscal_year_end;
+    const currentFiscalYear = fiscalYearEnd ? getCurrentFiscalYear(fiscalYearEnd) : new Date().getFullYear();
+    const [fiscalYear, setFiscalYear] = useState(currentFiscalYear);
     const [depreciationCalculation, setDepreciationCalculation] = useState<any>(null);
     const [isCalculating, setIsCalculating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -679,33 +682,61 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
         }
     };
 
-    // Generate depreciation schedule for next 10 years
+    // Generate depreciation schedule for next 10 fiscal years
     const generateSchedule = () => {
         const schedule = [];
-        const currentYear = new Date().getFullYear();
         let remainingBookValue = asset.book_value;
+        
+        if (fiscalYearEnd) {
+            // Use fiscal years
+            const purchaseFiscalYear = getFiscalYear(new Date(asset.purchase_date), fiscalYearEnd);
+            for (let i = 0; i < 10; i++) {
+                const year = currentFiscalYear + i;
+                const isHalfYear = year === purchaseFiscalYear;
+                const depreciationRate = isHalfYear ? asset.cca_rate * 0.5 : asset.cca_rate;
+                const depreciationAmount = Math.min(remainingBookValue * depreciationRate, remainingBookValue);
 
-        for (let year = currentYear; year < currentYear + 10; year++) {
-            const isHalfYear = year === new Date(asset.purchase_date).getFullYear();
-            const depreciationRate = isHalfYear ? asset.cca_rate * 0.5 : asset.cca_rate;
-            const depreciationAmount = Math.min(remainingBookValue * depreciationRate, remainingBookValue);
+                remainingBookValue -= depreciationAmount;
 
-            remainingBookValue -= depreciationAmount;
+                schedule.push({
+                    year,
+                    depreciationAmount,
+                    remainingBookValue,
+                    isHalfYear
+                });
 
-            schedule.push({
-                year,
-                depreciationAmount,
-                remainingBookValue,
-                isHalfYear
-            });
+                if (remainingBookValue <= 0) break;
+            }
+        } else {
+            // Fallback to calendar years
+            const currentYear = new Date().getFullYear();
+            for (let year = currentYear; year < currentYear + 10; year++) {
+                const isHalfYear = year === new Date(asset.purchase_date).getFullYear();
+                const depreciationRate = isHalfYear ? asset.cca_rate * 0.5 : asset.cca_rate;
+                const depreciationAmount = Math.min(remainingBookValue * depreciationRate, remainingBookValue);
 
-            if (remainingBookValue <= 0) break;
+                remainingBookValue -= depreciationAmount;
+
+                schedule.push({
+                    year,
+                    depreciationAmount,
+                    remainingBookValue,
+                    isHalfYear
+                });
+
+                if (remainingBookValue <= 0) break;
+            }
         }
 
         return schedule;
     };
 
     const schedule = generateSchedule();
+    
+    // Update schedule when fiscal year changes
+    React.useEffect(() => {
+        // Schedule is recalculated on render, no action needed
+    }, [fiscalYear, fiscalYearEnd]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-y-auto">
@@ -748,14 +779,26 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-white mb-2">Fiscal Year</label>
-                                <input
-                                    type="number"
-                                    value={fiscalYear}
-                                    onChange={(e) => setFiscalYear(parseInt(e.target.value))}
-                                    className="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    min="2020"
-                                    max="2030"
-                                />
+                                {fiscalYearEnd ? (
+                                    <select
+                                        value={fiscalYear}
+                                        onChange={(e) => setFiscalYear(parseInt(e.target.value))}
+                                        className="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    >
+                                        {getFiscalYearOptions(fiscalYearEnd, 5, 5).map(fy => (
+                                            <option key={fy} value={fy}>{formatFiscalYear(fy)}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="number"
+                                        value={fiscalYear}
+                                        onChange={(e) => setFiscalYear(parseInt(e.target.value))}
+                                        className="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                        min="2020"
+                                        max="2030"
+                                    />
+                                )}
                             </div>
                             <Button
                                 onClick={calculateDepreciation}
@@ -826,7 +869,9 @@ function DepreciationScheduleModal({ asset, onClose }: DepreciationScheduleModal
                             <tbody className="divide-y divide-border">
                                 {schedule.map((entry) => (
                                     <tr key={entry.year} className="hover:bg-muted/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-white">{entry.year}</td>
+                                        <td className="px-6 py-4 font-medium text-white">
+                                            {fiscalYearEnd ? formatFiscalYear(entry.year) : entry.year}
+                                        </td>
                                         <td className="px-6 py-4 text-slate-muted">
                                             {entry.isHalfYear ? (asset.cca_rate * 50).toFixed(1) : (asset.cca_rate * 100).toFixed(1)}%
                                         </td>

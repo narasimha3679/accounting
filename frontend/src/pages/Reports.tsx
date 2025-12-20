@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary, type InvestmentIncome, type InvestmentSale } from '../lib/api';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileSpreadsheet } from 'lucide-react';
@@ -8,20 +8,40 @@ import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getFiscalYearRange, formatFiscalYear, getCurrentFiscalYear, isDateInFiscalYear, getFiscalYearOptions } from '../lib/fiscalYear';
+import { getHSTPeriodsForFiscalYear, formatHSTPeriod, type HSTPeriod } from '../lib/hstPeriods';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const fiscalYearEnd = user?.company?.fiscal_year_end;
+    const currentFiscalYear = useMemo(() => {
+        return fiscalYearEnd ? getCurrentFiscalYear(fiscalYearEnd) : new Date().getFullYear();
+    }, [fiscalYearEnd]);
+    const [selectedFiscalYear, setSelectedFiscalYear] = useState(currentFiscalYear);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-    // Fetch tax return data for the selected year
+    // Get fiscal year range for filtering
+    const fiscalYearRange = useMemo(() => {
+        if (fiscalYearEnd) {
+            return getFiscalYearRange(selectedFiscalYear, fiscalYearEnd);
+        } else {
+            // Fallback to calendar year
+            return {
+                start: new Date(selectedFiscalYear, 0, 1),
+                end: new Date(selectedFiscalYear, 11, 31),
+                fiscalYear: selectedFiscalYear,
+            };
+        }
+    }, [selectedFiscalYear, fiscalYearEnd]);
+
+    // Fetch tax return data for the selected fiscal year
     const { data: _taxReturn } = useQuery({
-        queryKey: ['tax_return', user?.company_id, selectedYear],
+        queryKey: ['tax_return', user?.company_id, selectedFiscalYear],
         queryFn: async () => {
             try {
                 const result = await api.getTaxReturns({
                     company_id: user?.company_id,
-                    fiscal_year: selectedYear,
+                    fiscal_year: selectedFiscalYear,
                     limit: 1
                 });
                 return result.data[0] || null;
@@ -32,155 +52,153 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch invoices for the selected year
+    // Get date range strings for API filtering
+    const startDateStr = fiscalYearRange.start.toISOString().split('T')[0];
+    const endDateStr = fiscalYearRange.end.toISOString().split('T')[0];
+
+    // Fetch invoices for the selected fiscal year
+    // Note: getInvoices doesn't support date filtering, so we filter client-side
     const { data: invoices } = useQuery({
-        queryKey: ['invoices_report', user?.company_id, selectedYear],
+        queryKey: ['invoices_report', user?.company_id, selectedFiscalYear],
         queryFn: async () => {
             const result = await api.getInvoices({
                 company_id: user?.company_id,
                 limit: 1000
             });
-            // Filter by year on the client side
+            // Filter by fiscal year on the client side (API doesn't support date filtering)
             return result.data.filter(invoice => {
-                const year = new Date(invoice.issue_date).getFullYear();
-                return year === selectedYear;
+                if (fiscalYearEnd) {
+                    return isDateInFiscalYear(new Date(invoice.issue_date), selectedFiscalYear, fiscalYearEnd);
+                } else {
+                    return new Date(invoice.issue_date).getFullYear() === selectedFiscalYear;
+                }
             });
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch expenses for the selected year
+    // Fetch expenses for the selected fiscal year - use date range filtering in API
     const { data: expenses } = useQuery({
-        queryKey: ['expenses_report', user?.company_id, selectedYear],
+        queryKey: ['expenses_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getExpenses({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(expense => {
-                const year = new Date(expense.expense_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch dividends for the selected year
+    // Fetch dividends for the selected fiscal year - use date range filtering in API
     const { data: dividends } = useQuery({
-        queryKey: ['dividends_report', user?.company_id, selectedYear],
+        queryKey: ['dividends_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getDividends({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(dividend => {
-                const year = new Date(dividend.declaration_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch income entries for the selected year
+    // Fetch income entries for the selected fiscal year - use date range filtering in API
     const { data: incomeEntries } = useQuery({
-        queryKey: ['income_entries_report', user?.company_id, selectedYear],
+        queryKey: ['income_entries_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getIncomeEntries({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(entry => {
-                const year = new Date(entry.income_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch owner payments for the selected year
+    // Fetch owner payments for the selected fiscal year - use date range filtering in API
     const { data: ownerPayments } = useQuery({
-        queryKey: ['owner_payments_report', user?.company_id, selectedYear],
+        queryKey: ['owner_payments_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getOwnerPayments({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(payment => {
-                const year = new Date(payment.payment_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch HST payments for the selected year
+    // Fetch HST payments for the selected fiscal year - use date range filtering in API
     const { data: hstPayments } = useQuery({
-        queryKey: ['hst_payments_report', user?.company_id, selectedYear],
+        queryKey: ['hst_payments_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getHSTPayments({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(payment => {
-                const year = new Date(payment.payment_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch capital assets for the selected year
+    // Fetch capital assets for the selected fiscal year
     const { data: capitalAssets } = useQuery({
-        queryKey: ['capital_assets_report', user?.company_id, selectedYear],
+        queryKey: ['capital_assets_report', user?.company_id, selectedFiscalYear],
         queryFn: async () => {
             const result = await api.getCapitalAssets({
                 company_id: user?.company_id,
                 limit: 1000
             });
-            // Filter by purchase date within the selected year and include depreciation entries for the year
+            // Filter by purchase date within the selected fiscal year and include depreciation entries for the fiscal year
             return result.data.map(asset => {
-                const purchaseYear = new Date(asset.purchase_date).getFullYear();
-                const yearDepreciationEntries = asset.depreciation_entries?.filter(entry => entry.fiscal_year === selectedYear) || [];
+                const purchaseInFiscalYear = fiscalYearEnd
+                    ? isDateInFiscalYear(new Date(asset.purchase_date), selectedFiscalYear, fiscalYearEnd)
+                    : new Date(asset.purchase_date).getFullYear() === selectedFiscalYear;
+                const yearDepreciationEntries = asset.depreciation_entries?.filter(entry => entry.fiscal_year === selectedFiscalYear) || [];
                 return {
                     ...asset,
                     depreciation_entries: asset.depreciation_entries || [],
                     yearDepreciationEntries,
-                    isInYear: purchaseYear === selectedYear || yearDepreciationEntries.length > 0
+                    isInYear: purchaseInFiscalYear || yearDepreciationEntries.length > 0
                 };
             }).filter(asset => asset.isInYear);
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch salaries for the selected year
+    // Fetch salaries for the selected fiscal year - use date range filtering in API
     const { data: salaries } = useQuery({
-        queryKey: ['salaries_report', user?.company_id, selectedYear],
+        queryKey: ['salaries_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
             const result = await api.getSalaries({
                 company_id: user?.company_id,
+                start_date: startDateStr,
+                end_date: endDateStr,
                 limit: 1000
             });
-            // Filter by year on the client side
-            return result.data.filter(salary => {
-                const year = new Date(salary.payment_date).getFullYear();
-                return year === selectedYear;
-            });
+            return result.data;
         },
         enabled: !!user?.company_id,
     });
 
-    // Fetch investment income for the selected year
+    // Fetch investment income for the selected fiscal year
     const { data: investmentIncome } = useQuery({
-        queryKey: ['investment_income_report', user?.company_id, selectedYear],
+        queryKey: ['investment_income_report', user?.company_id, selectedFiscalYear],
         queryFn: async () => {
             const result = await api.getInvestmentIncome({
                 company_id: user?.company_id,
-                fiscal_year: selectedYear,
+                fiscal_year: selectedFiscalYear,
                 limit: 1000
             });
             return result.data;
@@ -188,19 +206,31 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch investment sales for the selected year
+    // Fetch investment sales for the selected fiscal year
     const { data: investmentSales } = useQuery({
-        queryKey: ['investment_sales_report', user?.company_id, selectedYear],
+        queryKey: ['investment_sales_report', user?.company_id, selectedFiscalYear],
         queryFn: async () => {
             const result = await api.getInvestmentSales({
                 company_id: user?.company_id,
-                fiscal_year: selectedYear,
+                fiscal_year: selectedFiscalYear,
                 limit: 1000
             });
             return result.data;
         },
         enabled: !!user?.company_id,
     });
+
+    // Get HST periods for the selected fiscal year
+    const hstPeriods = useMemo(() => {
+        if (!fiscalYearEnd || !user?.company?.hst_filing_frequency) {
+            return [];
+        }
+        return getHSTPeriodsForFiscalYear(
+            selectedFiscalYear,
+            user.company.hst_filing_frequency,
+            fiscalYearEnd
+        );
+    }, [selectedFiscalYear, fiscalYearEnd, user?.company?.hst_filing_frequency]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -480,7 +510,7 @@ const Reports: React.FC = () => {
         addText(`Company: ${user?.company?.name || 'N/A'}`, 12, true);
         addText(`Business Number: ${user?.company?.business_number || 'N/A'}`, 10);
         addText(`HST Number: ${user?.company?.hst_number || 'Not Registered'}`, 10);
-        addText(`Fiscal Year: ${selectedYear}`, 10);
+        addText(`Fiscal Year: ${formatFiscalYear(selectedFiscalYear)}`, 10);
         addText(`Report Generated: ${new Date().toLocaleDateString('en-CA')}`, 10);
         yPosition += 5;
 
@@ -595,7 +625,7 @@ const Reports: React.FC = () => {
             addText('CAPITAL ASSETS AND DEPRECIATION (CCA)', 14, true);
             addText(`Total Capital Asset Cost: ${formatCurrency(data.totalCapitalAssetCost || 0)}`, 10);
             addText(`Total Accumulated Depreciation: ${formatCurrency(data.totalAccumulatedDepreciation || 0)}`, 10);
-            addText(`Depreciation for ${selectedYear}: ${formatCurrency(data.totalDepreciationForYear || 0)}`, 10);
+            addText(`Depreciation for ${formatFiscalYear(selectedFiscalYear)}: ${formatCurrency(data.totalDepreciationForYear || 0)}`, 10);
             yPosition += 5;
 
             const assetRows = data.capitalAssets.map((asset: any) => {
@@ -612,7 +642,7 @@ const Reports: React.FC = () => {
 
             autoTable(pdf, {
                 startY: yPosition,
-                head: [['Asset', 'Purchase Date', 'Total Cost', 'CCA Class', `Depreciation (${selectedYear})`, 'Book Value']],
+                head: [['Asset', 'Purchase Date', 'Total Cost', 'CCA Class', `Depreciation (${formatFiscalYear(selectedFiscalYear)})`, 'Book Value']],
                 body: assetRows,
                 theme: 'striped',
                 headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
@@ -696,20 +726,31 @@ const Reports: React.FC = () => {
             }
         }
 
-        // Monthly HST Breakdown
+        // Monthly HST Breakdown (using fiscal year months)
         checkPageBreak(30);
         addText('MONTHLY HST BREAKDOWN', 14, true);
         const monthlyRows: string[][] = [];
-        Array.from({ length: 12 }, (_, i) => i + 1).forEach(month => {
-            const monthInvoices = data.paidInvoices.filter((inv: Invoice) =>
-                new Date(inv.issue_date).getMonth() + 1 === month
-            );
-            const monthExpenses = data.expenses.filter((exp: Expense) =>
-                new Date(exp.expense_date).getMonth() + 1 === month
-            );
-            const monthClientIncome = (data.clientIncomeEntries || []).filter((entry: IncomeEntry) =>
-                new Date(entry.income_date).getMonth() + 1 === month
-            );
+        const fyStart = fiscalYearRange.start;
+        const fyEnd = fiscalYearRange.end;
+
+        // Generate months within fiscal year
+        let currentMonth = new Date(fyStart);
+        while (currentMonth <= fyEnd) {
+            const month = currentMonth.getMonth() + 1;
+            const year = currentMonth.getFullYear();
+
+            const monthInvoices = data.paidInvoices.filter((inv: Invoice) => {
+                const invDate = new Date(inv.issue_date);
+                return invDate.getMonth() + 1 === month && invDate.getFullYear() === year;
+            });
+            const monthExpenses = data.expenses.filter((exp: Expense) => {
+                const expDate = new Date(exp.expense_date);
+                return expDate.getMonth() + 1 === month && expDate.getFullYear() === year;
+            });
+            const monthClientIncome = (data.clientIncomeEntries || []).filter((entry: IncomeEntry) => {
+                const entryDate = new Date(entry.income_date);
+                return entryDate.getMonth() + 1 === month && entryDate.getFullYear() === year;
+            });
 
             const hstCollectedFromInvoices = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
             const hstCollectedFromIncome = monthClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
@@ -717,7 +758,7 @@ const Reports: React.FC = () => {
             const hstPaid = monthExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
             const netHST = hstCollected - hstPaid;
 
-            const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
+            const monthName = currentMonth.toLocaleString('en-CA', { month: 'long', year: 'numeric' });
             monthlyRows.push([
                 monthName,
                 formatCurrency(hstCollectedFromInvoices),
@@ -726,7 +767,10 @@ const Reports: React.FC = () => {
                 formatCurrency(hstPaid),
                 formatCurrency(netHST),
             ]);
-        });
+
+            // Move to next month
+            currentMonth.setMonth(currentMonth.getMonth() + 1);
+        }
 
         autoTable(pdf, {
             startY: yPosition,
@@ -880,7 +924,7 @@ const Reports: React.FC = () => {
         setIsGeneratingPDF(true);
         try {
             const pdf = generatePDFFromData(reportData);
-            pdf.save(`Comprehensive_Tax_Report_${selectedYear}.pdf`);
+            pdf.save(`Comprehensive_Tax_Report_${formatFiscalYear(selectedFiscalYear)}.pdf`);
         } catch (error) {
             console.error('Failed to generate PDF report:', error);
             alert('Failed to generate PDF report. Please try again.');
@@ -940,13 +984,19 @@ const Reports: React.FC = () => {
                         <Calendar className="h-5 w-5 text-slate-muted" />
                         <label className="text-sm font-medium text-white">Fiscal Year:</label>
                         <select
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                            value={selectedFiscalYear}
+                            onChange={(e) => setSelectedFiscalYear(parseInt(e.target.value))}
                             className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                                <option key={year} value={year}>{year}</option>
-                            ))}
+                            {fiscalYearEnd ? (
+                                getFiscalYearOptions(fiscalYearEnd, 5, 1).map(fy => (
+                                    <option key={fy} value={fy}>{formatFiscalYear(fy)}</option>
+                                ))
+                            ) : (
+                                Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <option key={year} value={year}>{year}</option>
+                                ))
+                            )}
                         </select>
                     </div>
                 </div>
@@ -1172,7 +1222,7 @@ const Reports: React.FC = () => {
                                 size="sm"
                             />
                         </div>
-                        <p className="text-sm text-slate-muted mt-1">Capital assets with depreciation details for {selectedYear}</p>
+                        <p className="text-sm text-slate-muted mt-1">Capital assets with depreciation details for {formatFiscalYear(selectedFiscalYear)}</p>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1185,7 +1235,7 @@ const Reports: React.FC = () => {
                                 <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalAccumulatedDepreciation || 0)}</div>
                             </div>
                             <div className="bg-muted/50 p-4 rounded-lg">
-                                <div className="text-sm text-slate-muted">Depreciation for {selectedYear}</div>
+                                <div className="text-sm text-slate-muted">Depreciation for {formatFiscalYear(selectedFiscalYear)}</div>
                                 <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalDepreciationForYear || 0)}</div>
                             </div>
                         </div>
@@ -1198,7 +1248,7 @@ const Reports: React.FC = () => {
                                             <th className="px-6 py-3">Purchase Date</th>
                                             <th className="px-6 py-3">Total Cost</th>
                                             <th className="px-6 py-3">CCA Class</th>
-                                            <th className="px-6 py-3 text-right">Depreciation ({selectedYear})</th>
+                                            <th className="px-6 py-3 text-right">Depreciation ({formatFiscalYear(selectedFiscalYear)})</th>
                                             <th className="px-6 py-3 text-right">Book Value</th>
                                         </tr>
                                     </thead>
@@ -1230,7 +1280,7 @@ const Reports: React.FC = () => {
                     <Card className="overflow-hidden">
                         <div className="p-6 border-b border-white/10">
                             <h2 className="text-xl font-semibold tracking-tight text-white">Investment Income & Sales</h2>
-                            <p className="text-sm text-slate-muted mt-1">Investment income and realized gains/losses for {selectedYear}</p>
+                            <p className="text-sm text-slate-muted mt-1">Investment income and realized gains/losses for {formatFiscalYear(selectedFiscalYear)}</p>
                         </div>
                         <div className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1330,11 +1380,74 @@ const Reports: React.FC = () => {
                     </Card>
                 ) : null}
 
+                {/* HST Period Breakdown (if HST registered and filing frequency is set) */}
+                {user?.company?.hst_registered && user?.company?.hst_filing_frequency && hstPeriods.length > 0 && (
+                    <Card className="overflow-hidden">
+                        <div className="p-6 border-b border-white/10">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">HST Filing Period Breakdown</h2>
+                            <p className="text-sm text-slate-muted mt-1">
+                                HST collected and paid by {user.company.hst_filing_frequency} filing period for {formatFiscalYear(selectedFiscalYear)}
+                            </p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
+                                    <tr>
+                                        <th className="px-6 py-3">Period</th>
+                                        <th className="px-6 py-3">Period Dates</th>
+                                        <th className="px-6 py-3 text-right">HST Collected</th>
+                                        <th className="px-6 py-3 text-right">HST Paid (ITC)</th>
+                                        <th className="px-6 py-3 text-right">Net HST</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {hstPeriods.map((period: HSTPeriod) => {
+                                        const periodInvoices = reportData.paidInvoices.filter((inv: Invoice) => {
+                                            const invDate = new Date(inv.issue_date);
+                                            return invDate >= period.start && invDate <= period.end;
+                                        });
+                                        const periodExpenses = reportData.expenses.filter((exp: Expense) => {
+                                            const expDate = new Date(exp.expense_date);
+                                            return expDate >= period.start && expDate <= period.end;
+                                        });
+                                        const periodClientIncome = (reportData.clientIncomeEntries || []).filter((entry: IncomeEntry) => {
+                                            const entryDate = new Date(entry.income_date);
+                                            return entryDate >= period.start && entryDate <= period.end;
+                                        });
+
+                                        const hstCollectedFromInvoices = periodInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
+                                        const hstCollectedFromIncome = periodClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
+                                        const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
+                                        const hstPaid = periodExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
+                                        const netHST = hstCollected - hstPaid;
+
+                                        return (
+                                            <tr key={period.period} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-white">
+                                                    {formatHSTPeriod(period, user.company!.hst_filing_frequency!)}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-muted">
+                                                    {formatDate(period.start.toISOString().split('T')[0])} - {formatDate(period.end.toISOString().split('T')[0])}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(hstCollected)}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstPaid)}</td>
+                                                <td className={`px-6 py-4 text-right font-bold ${netHST >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                    {formatCurrency(netHST)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                )}
+
                 {/* Monthly HST Breakdown */}
                 <Card className="overflow-hidden">
                     <div className="p-6 border-b border-white/10">
                         <h2 className="text-xl font-semibold tracking-tight text-white">Monthly HST Breakdown</h2>
-                        <p className="text-sm text-slate-muted mt-1">HST collected and paid by month for {selectedYear}</p>
+                        <p className="text-sm text-slate-muted mt-1">HST collected and paid by month for {formatFiscalYear(selectedFiscalYear)}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
@@ -1349,37 +1462,54 @@ const Reports: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
-                                    const monthInvoices = reportData.paidInvoices.filter((inv: Invoice) =>
-                                        new Date(inv.issue_date).getMonth() + 1 === month
-                                    );
-                                    const monthExpenses = reportData.expenses.filter((exp: Expense) =>
-                                        new Date(exp.expense_date).getMonth() + 1 === month
-                                    );
-                                    const monthClientIncome = (reportData.clientIncomeEntries || []).filter((entry: IncomeEntry) =>
-                                        new Date(entry.income_date).getMonth() + 1 === month
-                                    );
+                                {(() => {
+                                    const months: Array<{ month: number; year: number; name: string }> = [];
+                                    let currentMonth = new Date(fiscalYearRange.start);
+                                    while (currentMonth <= fiscalYearRange.end) {
+                                        months.push({
+                                            month: currentMonth.getMonth() + 1,
+                                            year: currentMonth.getFullYear(),
+                                            name: currentMonth.toLocaleString('en-CA', { month: 'long', year: 'numeric' }),
+                                        });
+                                        const nextMonth = new Date(currentMonth);
+                                        nextMonth.setMonth(nextMonth.getMonth() + 1);
+                                        currentMonth = nextMonth;
+                                    }
 
-                                    const hstCollectedFromInvoices = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
-                                    const hstCollectedFromIncome = monthClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
-                                    const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
-                                    const hstPaid = monthExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
-                                    const netHST = hstCollected - hstPaid;
+                                    return months.map(({ month, year, name }) => {
+                                        const monthInvoices = reportData.paidInvoices.filter((inv: Invoice) => {
+                                            const invDate = new Date(inv.issue_date);
+                                            return invDate.getMonth() + 1 === month && invDate.getFullYear() === year;
+                                        });
+                                        const monthExpenses = reportData.expenses.filter((exp: Expense) => {
+                                            const expDate = new Date(exp.expense_date);
+                                            return expDate.getMonth() + 1 === month && expDate.getFullYear() === year;
+                                        });
+                                        const monthClientIncome = (reportData.clientIncomeEntries || []).filter((entry: IncomeEntry) => {
+                                            const entryDate = new Date(entry.income_date);
+                                            return entryDate.getMonth() + 1 === month && entryDate.getFullYear() === year;
+                                        });
 
-                                    const monthName = new Date(selectedYear, month - 1).toLocaleString('en-CA', { month: 'long' });
-                                    return (
-                                        <tr key={month} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-white">{monthName}</td>
-                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromInvoices)}</td>
-                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromIncome)}</td>
-                                            <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(hstCollected)}</td>
-                                            <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstPaid)}</td>
-                                            <td className={`px-6 py-4 text-right font-bold ${netHST >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                {formatCurrency(netHST)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                        const hstCollectedFromInvoices = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.hst_amount, 0);
+                                        const hstCollectedFromIncome = monthClientIncome.reduce((sum: number, entry: IncomeEntry) => sum + entry.hst_amount, 0);
+                                        const hstCollected = hstCollectedFromInvoices + hstCollectedFromIncome;
+                                        const hstPaid = monthExpenses.reduce((sum: number, exp: Expense) => sum + exp.hst_paid, 0);
+                                        const netHST = hstCollected - hstPaid;
+
+                                        return (
+                                            <tr key={`${year}-${month}`} className="hover:bg-muted/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-white">{name}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromInvoices)}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstCollectedFromIncome)}</td>
+                                                <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(hstCollected)}</td>
+                                                <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(hstPaid)}</td>
+                                                <td className={`px-6 py-4 text-right font-bold ${netHST >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                    {formatCurrency(netHST)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    });
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -1475,7 +1605,7 @@ const Reports: React.FC = () => {
                 <Card className="overflow-hidden">
                     <div className="p-6 border-b border-white/10">
                         <h2 className="text-xl font-semibold tracking-tight text-white">Salary Payments</h2>
-                        <p className="text-sm text-slate-muted mt-1">All salary payments for {selectedYear}</p>
+                        <p className="text-sm text-slate-muted mt-1">All salary payments for {formatFiscalYear(selectedFiscalYear)}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">

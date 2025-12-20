@@ -1,4 +1,5 @@
 import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
+import { getFiscalYear, getFiscalYearRange, isDateInFiscalYear } from './fiscalYear';
 
 export interface User {
     id: number;
@@ -18,6 +19,8 @@ export interface Company {
     hst_number?: string | null;
     hst_registered: boolean;
     fiscal_year_end: string;
+    hst_filing_frequency?: 'monthly' | 'quarterly' | 'annual' | null;
+    hst_filing_period_start?: string | null;
     small_business_rate: number;
     hst_rate: number;
     rdtoh_balance?: number;
@@ -113,6 +116,12 @@ export interface Expense {
     files?: ExpenseFile[];
     created_at: string;
     updated_at: string;
+    // Mileage-specific fields (optional, only populated for mileage expenses)
+    distance_km?: number | null;
+    start_location?: string | null;
+    end_location?: string | null;
+    vehicle_description?: string | null;
+    mileage_rate_per_km?: number | null;
 }
 
 export interface Dividend {
@@ -335,6 +344,9 @@ type QueryModifier = (query: any) => any;
 
 const DEFAULT_PAGE_SIZE = 50;
 
+// CRA Mileage Rate (update annually per CRA guidelines)
+export const CRA_MILEAGE_RATE = 0.70; // $0.70/km for 2024
+
 const toPaginatedResponse = <T>(data: T[], count: number | null, page: number, limit: number): PaginatedResponse<T> => ({
     data,
     total: count ?? data.length,
@@ -511,9 +523,25 @@ class SupabaseApi {
     }
 
     async updateCompany(id: number, company: Partial<Company>): Promise<Company> {
-        const { data, error } = await supabase.from('companies').update(company).eq('id', id).select('*').single<Company>();
-        if (error) throw new Error(error.message);
-        return data;
+        // Update the company - don't use select() as RLS WITH CHECK might block it
+        const { data: updateResult, error: updateError } = await supabase
+            .from('companies')
+            .update(company)
+            .eq('id', id)
+            .select('id'); // Just select id to verify update happened
+        
+        if (updateError) {
+            throw new Error(`Failed to update company: ${updateError.message}`);
+        }
+        
+        // Check if update actually affected any rows
+        if (!updateResult || updateResult.length === 0) {
+            throw new Error('Update did not affect any rows. You may not have permission to update this company, or the company does not exist.');
+        }
+        
+        // Fetch the updated company using getCompany which we know works with RLS
+        // This avoids RLS issues with select after update
+        return await this.getCompany(id);
     }
 
     async deleteCompany(id: number): Promise<void> {
@@ -619,13 +647,15 @@ class SupabaseApi {
         const hst_amount = company.hst_registered ? subtotal * company.hst_rate : 0;
         const total = subtotal + hst_amount;
 
-        // Generate invoice number: INV-YYYY-NNNN format
-        const year = new Date(issue_date).getFullYear();
+        // Generate invoice number: INV-FY-NNNN format (using fiscal year)
+        const fiscalYear = company.fiscal_year_end 
+            ? getFiscalYear(new Date(issue_date), company.fiscal_year_end)
+            : new Date(issue_date).getFullYear();
         const { data: existingInvoices, error: countError } = await supabase
             .from('invoices')
             .select('invoice_number')
             .eq('company_id', company_id)
-            .like('invoice_number', `INV-${year}-%`)
+            .like('invoice_number', `INV-${fiscalYear}-%`)
             .order('invoice_number', { ascending: false })
             .limit(1);
 
@@ -636,10 +666,10 @@ class SupabaseApi {
             // Extract the number from the last invoice and increment
             const lastNumber = existingInvoices[0].invoice_number.match(/\d+$/);
             const nextNumber = lastNumber ? parseInt(lastNumber[0], 10) + 1 : 1;
-            invoiceNumber = `INV-${year}-${String(nextNumber).padStart(4, '0')}`;
+            invoiceNumber = `INV-${fiscalYear}-${String(nextNumber).padStart(4, '0')}`;
         } else {
-            // First invoice for this year
-            invoiceNumber = `INV-${year}-0001`;
+            // First invoice for this fiscal year
+            invoiceNumber = `INV-${fiscalYear}-0001`;
         }
 
         const { data: invoice, error } = await supabase
@@ -846,6 +876,56 @@ class SupabaseApi {
         // Finally, delete the expense record
         const { error } = await supabase.from('expenses').delete().eq('id', id);
         if (error) throw new Error(error.message);
+    }
+
+    // Mileage expense helper method
+    async createMileageExpense(data: {
+        company_id: number;
+        trip_date: string;
+        start_location: string;
+        end_location: string;
+        distance_km: number;
+        purpose?: string;
+        vehicle_description?: string;
+        mileage_rate_per_km?: number;
+        paid_by?: 'corp' | 'owner';
+    }): Promise<Expense> {
+        const rate = data.mileage_rate_per_km ?? CRA_MILEAGE_RATE;
+        const amount = parseFloat((data.distance_km * rate).toFixed(2));
+        
+        // Generate description
+        const description = data.purpose 
+            ? data.purpose 
+            : `Mileage: ${data.start_location} to ${data.end_location} - ${data.distance_km}km`;
+
+        // Find Vehicle & Automobile category (id: 13)
+        const { data: vehicleCategory, error: categoryError } = await supabase
+            .from('expense_categories')
+            .select('id')
+            .eq('name', 'Vehicle & Automobile')
+            .maybeSingle();
+
+        if (categoryError) throw new Error(categoryError.message);
+        if (!vehicleCategory) throw new Error('Vehicle & Automobile category not found');
+
+        // Create expense with mileage fields
+        return this.createExpense({
+            description,
+            category_id: vehicleCategory.id,
+            amount,
+            hst_paid: 0, // Mileage allowance is not subject to HST
+            deduction_percentage: 1.0, // Business mileage is fully deductible
+            expense_date: data.trip_date,
+            receipt_attached: false,
+            paid_by: data.paid_by ?? 'corp',
+            company_id: data.company_id,
+            // Mileage-specific fields
+            distance_km: data.distance_km,
+            start_location: data.start_location,
+            end_location: data.end_location,
+            vehicle_description: data.vehicle_description ?? null,
+            mileage_rate_per_km: rate,
+        });
     }
 
     // Expense files -------------------------------------------------------
@@ -1900,9 +1980,20 @@ class SupabaseApi {
         const expenses = await this.getExpenses({ company_id: request.company_id, limit: 1000 });
         const dividends = await this.getDividends({ company_id: request.company_id, limit: 1000 });
 
-        const paidInvoices = invoices.data.filter((inv) => inv.status === 'paid' && new Date(inv.issue_date).getFullYear() === request.fiscal_year);
-        const filteredExpenses = expenses.data.filter((exp) => new Date(exp.expense_date).getFullYear() === request.fiscal_year);
-        const filteredDividends = dividends.data.filter((div) => new Date(div.declaration_date).getFullYear() === request.fiscal_year);
+        // Filter by fiscal year using company's fiscal year end date
+        const fiscalYearEnd = company.fiscal_year_end;
+        const filterByFiscalYear = (date: string): boolean => {
+            if (fiscalYearEnd) {
+                return isDateInFiscalYear(new Date(date), request.fiscal_year, fiscalYearEnd);
+            } else {
+                // Fallback to calendar year if no fiscal year end is set
+                return new Date(date).getFullYear() === request.fiscal_year;
+            }
+        };
+
+        const paidInvoices = invoices.data.filter((inv) => inv.status === 'paid' && filterByFiscalYear(inv.issue_date));
+        const filteredExpenses = expenses.data.filter((exp) => filterByFiscalYear(exp.expense_date));
+        const filteredDividends = dividends.data.filter((div) => filterByFiscalYear(div.declaration_date));
 
         const grossIncome = paidInvoices.reduce((sum, inv) => sum + inv.subtotal, 0);
         const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);

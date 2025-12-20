@@ -2,19 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
-import { Save, Building2, Percent } from 'lucide-react';
+import { Save, Building2, Percent, Calendar } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
+import { getCurrentFiscalYear, formatFiscalYearPeriod } from '../lib/fiscalYear';
 
 const Settings: React.FC = () => {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [company, setCompany] = useState<Company | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -29,8 +31,11 @@ const Settings: React.FC = () => {
             return;
         }
 
-        loadCompanyData();
-    }, [user]);
+        // Don't reload if we're currently updating to avoid overwriting the update
+        if (!isUpdating) {
+            loadCompanyData();
+        }
+    }, [user, isUpdating]);
 
     const loadCompanyData = async () => {
         if (!user?.company_id) {
@@ -53,6 +58,7 @@ const Settings: React.FC = () => {
         if (!company) return;
 
         setIsSaving(true);
+        setIsUpdating(true);
         setError('');
         setSuccess('');
 
@@ -63,15 +69,28 @@ const Settings: React.FC = () => {
                 hst_number: company.hst_number,
                 hst_registered: company.hst_registered,
                 fiscal_year_end: company.fiscal_year_end,
+                hst_filing_frequency: company.hst_filing_frequency || 'annual',
+                hst_filing_period_start: company.hst_filing_period_start,
                 small_business_rate: company.small_business_rate,
                 hst_rate: company.hst_rate,
             });
 
+            // Use the updated company data directly - this ensures we have the correct value
             setCompany(updatedCompany);
             setSuccess('Settings saved successfully!');
-        } catch (error) {
+            
+            // Refresh user context to update company data throughout the app
+            // Do this after setting local state to avoid race conditions
+            refreshUser().catch(err => {
+                console.error('Error refreshing user:', err);
+            }).finally(() => {
+                setIsUpdating(false);
+            });
+        } catch (error: any) {
             console.error('Error saving settings:', error);
-            setError('Couldn\'t save. Please check your information and try again.');
+            const errorMessage = error?.message || 'Couldn\'t save. Please check your information and try again.';
+            setError(errorMessage);
+            setIsUpdating(false);
         } finally {
             setIsSaving(false);
         }
@@ -220,6 +239,17 @@ const Settings: React.FC = () => {
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 required
                             />
+                            {company.fiscal_year_end && (
+                                <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Current Fiscal Year:</span>
+                                        <span className="font-medium text-foreground">
+                                            {formatFiscalYearPeriod(getCurrentFiscalYear(company.fiscal_year_end), company.fiscal_year_end)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -256,6 +286,32 @@ const Settings: React.FC = () => {
                                 <div className="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-ring/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-input after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                             </label>
                         </div>
+
+                        {/* HST Filing Frequency */}
+                        {company.hst_registered && (
+                            <div>
+                                <label htmlFor="hst_filing_frequency" className="block text-sm font-medium text-white mb-2">
+                                    HST Filing Frequency
+                                    <HelpIcon
+                                        content="How often do you file HST returns? Monthly, quarterly, or annually. This affects how HST periods are calculated and displayed in reports."
+                                        size="sm"
+                                    />
+                                </label>
+                                <select
+                                    id="hst_filing_frequency"
+                                    value={company.hst_filing_frequency || 'annual'}
+                                    onChange={(e) => handleInputChange('hst_filing_frequency', e.target.value as 'monthly' | 'quarterly' | 'annual')}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                                <p className="mt-1 text-sm text-slate-muted">
+                                    Select how often you file HST returns with CRA
+                                </p>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>

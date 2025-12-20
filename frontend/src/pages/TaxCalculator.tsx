@@ -6,6 +6,7 @@ import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
 import { cn } from '../lib/utils';
+import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 
 const TaxCalculator: React.FC = () => {
     const { user } = useAuth();
@@ -25,25 +26,40 @@ const TaxCalculator: React.FC = () => {
         investments: false,
     });
 
-    // Calculate date range based on time period
+    // Calculate date range based on time period and fiscal year
     const { startDate, endDate, fiscalYear } = useMemo(() => {
+        const fiscalYearEnd = user?.company?.fiscal_year_end;
         let start: Date;
         let end: Date;
+        let calculatedFiscalYear: number;
 
         if (timePeriod === 'month') {
+            // For monthly view, use calendar month
             start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
             end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+            // Calculate fiscal year for the selected date
+            calculatedFiscalYear = fiscalYearEnd ? getFiscalYear(selectedDate, fiscalYearEnd) : selectedDate.getFullYear();
         } else {
-            start = new Date(selectedDate.getFullYear(), 0, 1);
-            end = new Date(selectedDate.getFullYear(), 11, 31);
+            // For yearly view, use fiscal year
+            if (fiscalYearEnd) {
+                calculatedFiscalYear = getFiscalYear(selectedDate, fiscalYearEnd);
+                const fiscalYearRange = getFiscalYearRange(calculatedFiscalYear, fiscalYearEnd);
+                start = fiscalYearRange.start;
+                end = fiscalYearRange.end;
+            } else {
+                // Fallback to calendar year if no fiscal year end is set
+                start = new Date(selectedDate.getFullYear(), 0, 1);
+                end = new Date(selectedDate.getFullYear(), 11, 31);
+                calculatedFiscalYear = selectedDate.getFullYear();
+            }
         }
 
         return {
             startDate: start.toISOString().split('T')[0],
             endDate: end.toISOString().split('T')[0],
-            fiscalYear: selectedDate.getFullYear(),
+            fiscalYear: calculatedFiscalYear,
         };
-    }, [timePeriod, selectedDate]);
+    }, [timePeriod, selectedDate, user?.company?.fiscal_year_end]);
 
     // Fetch invoices
     const { data: invoicesResponse } = useQuery({
@@ -803,22 +819,59 @@ const TaxCalculator: React.FC = () => {
 
                     <div className="flex items-center space-x-2">
                         <Calendar className="h-5 w-5 text-slate-muted" />
-                        <input
-                            type={timePeriod === 'month' ? 'month' : 'number'}
-                            value={timePeriod === 'month'
-                                ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
-                                : selectedDate.getFullYear()
-                            }
-                            onChange={(e) => {
-                                if (timePeriod === 'month') {
+                        {timePeriod === 'month' ? (
+                            <input
+                                type="month"
+                                value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`}
+                                onChange={(e) => {
                                     const [year, month] = e.target.value.split('-');
                                     setSelectedDate(new Date(parseInt(year), parseInt(month) - 1, 1));
-                                } else {
-                                    setSelectedDate(new Date(parseInt(e.target.value), 0, 1));
-                                }
-                            }}
-                            className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
+                                }}
+                                className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={user?.company?.fiscal_year_end ? fiscalYear : selectedDate.getFullYear()}
+                                    onChange={(e) => {
+                                        const fy = parseInt(e.target.value);
+                                        if (user?.company?.fiscal_year_end) {
+                                            const range = getFiscalYearRange(fy, user.company.fiscal_year_end);
+                                            setSelectedDate(range.start);
+                                        } else {
+                                            setSelectedDate(new Date(fy, 0, 1));
+                                        }
+                                    }}
+                                    className="flex h-10 w-auto rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    {user?.company?.fiscal_year_end ? (
+                                        Array.from({ length: 6 }, (_, i) => {
+                                            const currentFY = getCurrentFiscalYear(user.company!.fiscal_year_end);
+                                            const fy = currentFY - i;
+                                            return (
+                                                <option key={fy} value={fy}>
+                                                    {formatFiscalYear(fy)}
+                                                </option>
+                                            );
+                                        })
+                                    ) : (
+                                        Array.from({ length: 6 }, (_, i) => {
+                                            const year = new Date().getFullYear() - i;
+                                            return (
+                                                <option key={year} value={year}>
+                                                    {year}
+                                                </option>
+                                            );
+                                        })
+                                    )}
+                                </select>
+                                {user?.company?.fiscal_year_end && (
+                                    <span className="text-sm text-muted-foreground">
+                                        ({formatFiscalYear(fiscalYear)})
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
