@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
-import { Save, Building2, Percent, Calendar, Bell, BellOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Save, Building2, Percent, Calendar, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
@@ -14,6 +14,7 @@ import {
     unsubscribeFromPush,
     type PushSubscriptionStatus,
 } from '../lib/pushNotifications';
+import { isInstallable, isInstalled, showInstallPrompt } from '../lib/pwa';
 
 const Settings: React.FC = () => {
     const { user, refreshUser } = useAuth();
@@ -31,6 +32,11 @@ const Settings: React.FC = () => {
     const [isLoadingPush, setIsLoadingPush] = useState(false);
     const [pushError, setPushError] = useState('');
     const [pushSuccess, setPushSuccess] = useState('');
+    
+    // PWA install state
+    const [isPWAInstallable, setIsPWAInstallable] = useState(false);
+    const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+    const [isInstalling, setIsInstalling] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -52,6 +58,12 @@ const Settings: React.FC = () => {
         
         // Load push notification status
         loadPushStatus();
+        
+        // Check PWA install status
+        checkPWAStatus();
+        const interval = setInterval(checkPWAStatus, 2000); // Check every 2 seconds
+        
+        return () => clearInterval(interval);
     }, [user, isUpdating]);
 
     const loadCompanyData = async () => {
@@ -210,6 +222,27 @@ const Settings: React.FC = () => {
             setPushError(error?.message || 'Failed to send test notification');
         } finally {
             setIsLoadingPush(false);
+        }
+    };
+
+    const checkPWAStatus = () => {
+        setIsPWAInstallable(isInstallable());
+        setIsPWAInstalled(isInstalled());
+    };
+
+    const handleInstall = async () => {
+        setIsInstalling(true);
+        try {
+            const accepted = await showInstallPrompt();
+            if (accepted) {
+                setSuccess('App installed successfully!');
+            }
+        } catch (error: any) {
+            console.error('Error installing app:', error);
+            setError('Failed to install app. Please try again.');
+        } finally {
+            setIsInstalling(false);
+            checkPWAStatus();
         }
     };
 
@@ -599,6 +632,57 @@ const Settings: React.FC = () => {
                         </div>
                     </div>
                 </Card>
+
+                {/* PWA Install */}
+                {!isPWAInstalled && (
+                    <Card className="p-6">
+                        <div className="flex items-center mb-4">
+                            <Smartphone className="h-5 w-5 text-slate-muted mr-2" />
+                            <h2 className="text-lg font-medium text-white">Install App</h2>
+                            <HelpIcon
+                                content="Install this app on your device for quick access. The app works offline and can be launched from your home screen."
+                                size="sm"
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Status indicator */}
+                            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    {isPWAInstallable ? (
+                                        <>
+                                            <CheckCircle className="h-5 w-5 text-green-500" />
+                                            <span className="text-sm font-medium text-white">Ready to Install</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertCircle className="h-5 w-5 text-yellow-500" />
+                                            <span className="text-sm font-medium text-white">Install Not Available</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {isPWAInstallable && (
+                                <Button
+                                    type="button"
+                                    onClick={handleInstall}
+                                    disabled={isInstalling}
+                                    icon={Download}
+                                    className="w-full sm:w-auto"
+                                >
+                                    {isInstalling ? 'Installing...' : 'Install App'}
+                                </Button>
+                            )}
+
+                            {!isPWAInstallable && (
+                                <p className="text-sm text-slate-muted">
+                                    The install option will appear when your browser detects the app is installable. Make sure you&apos;re using a supported browser (Chrome, Edge, Safari) and the app meets installation requirements.
+                                </p>
+                            )}
+                        </div>
+                    </Card>
+                )}
 
                 {/* Save Button */}
                 <div className="flex justify-end">
