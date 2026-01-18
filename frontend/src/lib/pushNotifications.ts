@@ -168,13 +168,17 @@ export async function getSubscriptionStatus(): Promise<PushSubscriptionStatus> {
   }
 
   try {
-    const subscription = await getCurrentSubscription();
-    if (subscription) {
-      // Check if subscription is stored in database
-      const status = await api.getPushSubscriptionStatus();
-      if (status.subscribed && status.enabled) {
+    // Check database first - this is the source of truth
+    const status = await api.getPushSubscriptionStatus();
+    if (status.subscribed && status.enabled) {
+      // Verify browser subscription exists as well
+      const subscription = await getCurrentSubscription();
+      if (subscription) {
         return 'subscribed';
       }
+      // Database says subscribed but browser doesn't have it - might be syncing
+      // Still return subscribed since database is source of truth
+      return 'subscribed';
     }
     return 'not-subscribed';
   } catch (error) {

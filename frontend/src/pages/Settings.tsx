@@ -165,7 +165,20 @@ const Settings: React.FC = () => {
             }
 
             await subscribeToPush();
-            await loadPushStatus();
+            
+            // Wait a moment for the database to sync
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Check database status directly
+            const subscriptionStatus = await api.getPushSubscriptionStatus();
+            if (subscriptionStatus.subscribed) {
+                setPushStatus('subscribed');
+                setPushEnabled(subscriptionStatus.enabled);
+            } else {
+                // If database check fails, try the full status check
+                await loadPushStatus();
+            }
+            
             setPushSuccess('Successfully subscribed to push notifications!');
         } catch (error: any) {
             console.error('Error subscribing to push:', error);
