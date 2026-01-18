@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { registerSWUpdateHandler, reloadToUpdate } from '../lib/pwa';
 import { Button } from './ui/Button';
@@ -9,15 +9,36 @@ import { Button } from './ui/Button';
 export const UpdateAvailable: React.FC = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInstalled, setUpdateInstalled] = useState(false);
+  const hasShownUpdateAvailable = useRef(false);
 
   useEffect(() => {
     const cleanup = registerSWUpdateHandler(
-      () => setUpdateAvailable(true),
-      () => setUpdateInstalled(true)
+      () => {
+        hasShownUpdateAvailable.current = true;
+        setUpdateAvailable(true);
+      },
+      () => {
+        // Only show "Update installed" if we previously showed "Update available"
+        // This prevents showing it on first-time service worker installation
+        if (hasShownUpdateAvailable.current) {
+          setUpdateInstalled(true);
+        }
+      }
     );
 
     return cleanup;
   }, []);
+
+  // Auto-reload when update is installed (after a short delay)
+  useEffect(() => {
+    if (updateInstalled) {
+      const timer = setTimeout(() => {
+        reloadToUpdate();
+      }, 2000); // 2 second delay to show the message
+
+      return () => clearTimeout(timer);
+    }
+  }, [updateInstalled]);
 
   const handleUpdate = () => {
     reloadToUpdate();
