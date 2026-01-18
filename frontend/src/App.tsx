@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { UpdateAvailable } from './components/UpdateAvailable';
+import { InstallPrompt } from './components/InstallPrompt';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
@@ -259,6 +260,7 @@ function App() {
             </Routes>
             <OfflineIndicator />
             <UpdateAvailable />
+            <InstallPrompt />
           </Router>
         </AuthProvider>
       </QueryClientProvider>

@@ -8,14 +8,24 @@ export interface BeforeInstallPromptEvent extends Event {
 }
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
+let installPromptCallbacks: Array<() => void> = [];
 
 /**
  * Listen for the beforeinstallprompt event and store it
+ * @param onPromptAvailable - Optional callback when install prompt becomes available
  */
-export function setupInstallPrompt(): void {
+export function setupInstallPrompt(onPromptAvailable?: () => void): void {
+  if (onPromptAvailable) {
+    installPromptCallbacks.push(onPromptAvailable);
+  }
+
   window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent default to capture the event for our custom banner
     e.preventDefault();
     deferredPrompt = e as BeforeInstallPromptEvent;
+    
+    // Notify all registered callbacks
+    installPromptCallbacks.forEach(callback => callback());
   });
 }
 
@@ -44,6 +54,25 @@ export async function showInstallPrompt(): Promise<boolean> {
  */
 export function isInstallable(): boolean {
   return deferredPrompt !== null;
+}
+
+/**
+ * Register a callback to be notified when install prompt becomes available
+ * @param callback - Function to call when install prompt is available
+ * @returns Cleanup function to unregister the callback
+ */
+export function onInstallPromptAvailable(callback: () => void): () => void {
+  installPromptCallbacks.push(callback);
+  
+  // If prompt is already available, call immediately
+  if (deferredPrompt) {
+    callback();
+  }
+  
+  // Return cleanup function
+  return () => {
+    installPromptCallbacks = installPromptCallbacks.filter(cb => cb !== callback);
+  };
 }
 
 /**
