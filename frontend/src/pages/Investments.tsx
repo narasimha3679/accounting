@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Investment } from '../lib/api';
@@ -8,7 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { cn } from '../lib/utils';
 import { getFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
-import { getStockPrices, trackStock } from '../lib/stockApi';
+import { getStockPrices } from '../lib/stockApi';
 
 const Investments: React.FC = () => {
     const { user } = useAuth();
@@ -16,6 +16,7 @@ const Investments: React.FC = () => {
     const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
+    const [updatingPrices, setUpdatingPrices] = useState(false);
 
     // Fetch investments
     const { data: investments, isLoading } = useQuery({
@@ -76,6 +77,41 @@ const Investments: React.FC = () => {
                 console.error('Error deleting investment:', error);
                 alert('Failed to delete investment');
             }
+        }
+    };
+
+    const updateStockPrices = async () => {
+        if (!investments) return;
+        const stockInvestments = investments.filter(
+            (inv) => inv.investment_type === 'stock' && inv.symbol && inv.status === 'active'
+        );
+        if (stockInvestments.length === 0) return;
+
+        setUpdatingPrices(true);
+        try {
+            const normalizedSymbols = Array.from(new Set(
+                stockInvestments
+                    .map(inv => inv.symbol?.trim())
+                    .filter((symbol): symbol is string => Boolean(symbol))
+                    .map(symbol => symbol.toUpperCase())
+            ));
+            const prices = await getStockPrices(normalizedSymbols);
+
+            const updates = stockInvestments.map(async (investment) => {
+                const symbol = investment.symbol?.trim().toUpperCase();
+                if (!symbol) return;
+                const priceData = prices[symbol];
+                if (!priceData || Number.isNaN(priceData.price)) return;
+                await api.updateInvestment(investment.id, { current_value: priceData.price });
+            });
+
+            await Promise.all(updates);
+            queryClient.invalidateQueries({ queryKey: ['investments'] });
+        } catch (error) {
+            console.error('Error updating stock prices:', error);
+            alert('Failed to update stock prices');
+        } finally {
+            setUpdatingPrices(false);
         }
     };
 
