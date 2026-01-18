@@ -1,4 +1,4 @@
-import { supabase, SUPABASE_STORAGE_BUCKET, supabaseUrl } from './supabaseClient';
+import { supabase, SUPABASE_STORAGE_BUCKET, supabaseUrl, supabaseAnonKey } from './supabaseClient';
 import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 
 export interface User {
@@ -2417,6 +2417,7 @@ class SupabaseApi {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${session.access_token}`,
+                'apikey': supabaseAnonKey,
             },
             body: JSON.stringify({
                 type: 'test',
