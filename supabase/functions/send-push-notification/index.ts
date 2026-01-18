@@ -51,6 +51,20 @@ interface RequestPayload {
 }
 
 /**
+ * Get CORS headers for the request
+ * Uses the request origin instead of '*' to support credentials (Authorization header)
+ */
+function getCorsHeaders(req: Request): HeadersInit {
+  const origin = req.headers.get('origin');
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
+
+/**
  * Send push notification to a subscription
  */
 async function sendNotification(
@@ -197,15 +211,11 @@ async function sendTimesheetNotification(companyId: number, timesheetData: any):
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
+      headers: getCorsHeaders(req),
     });
   }
 
@@ -217,8 +227,8 @@ Deno.serve(async (req) => {
         {
           status: 500,
           headers: {
+            ...getCorsHeaders(req),
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
           },
         }
       );
@@ -240,8 +250,8 @@ Deno.serve(async (req) => {
             {
               status: 200,
               headers: {
+                ...getCorsHeaders(req),
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
               },
             }
           );
@@ -253,8 +263,8 @@ Deno.serve(async (req) => {
         {
           status: 200,
           headers: {
+            ...getCorsHeaders(req),
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
           },
         }
       );
@@ -270,8 +280,8 @@ Deno.serve(async (req) => {
           {
             status: 400,
             headers: {
+              ...getCorsHeaders(req),
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
             },
           }
         );
@@ -283,8 +293,8 @@ Deno.serve(async (req) => {
         {
           status: result.success ? 200 : 400,
           headers: {
+            ...getCorsHeaders(req),
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
           },
         }
       );
@@ -300,8 +310,8 @@ Deno.serve(async (req) => {
         {
           status: 200,
           headers: {
+            ...getCorsHeaders(req),
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
           },
         }
       );
@@ -322,8 +332,8 @@ Deno.serve(async (req) => {
         {
           status: 200,
           headers: {
+            ...getCorsHeaders(req),
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
           },
         }
       );
@@ -334,8 +344,8 @@ Deno.serve(async (req) => {
       {
         status: 400,
         headers: {
+          ...getCorsHeaders(req),
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
         },
       }
     );
@@ -346,8 +356,8 @@ Deno.serve(async (req) => {
       {
         status: 500,
         headers: {
+          ...getCorsHeaders(req),
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
         },
       }
     );
