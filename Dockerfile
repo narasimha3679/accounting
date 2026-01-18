@@ -1,18 +1,28 @@
 # Build stage
 FROM node:20-alpine AS builder
 
-# Set working directory
-WORKDIR /app
+# Build arguments for environment variables (required at build time for Vite)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_STORAGE_BUCKET=expense-files
 
-# Copy package files
-COPY package*.json ./
+# Convert ARGs to ENV so they're available during npm run build
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_STORAGE_BUCKET=$VITE_SUPABASE_STORAGE_BUCKET
+
+# Set working directory
+WORKDIR /app/frontend
+
+# Copy package files from frontend directory
+COPY frontend/package*.json ./
 
 # Install dependencies with clean install to avoid rollup issues
 RUN rm -rf node_modules package-lock.json && \
     npm install
 
-# Copy source code
-COPY . .
+# Copy frontend source code
+COPY frontend/ ./
 
 # Build the application
 RUN npm run build
@@ -20,11 +30,11 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom nginx config from frontend directory
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \

@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Investment } from '../lib/api';
-import { Plus, Edit, Trash2, DollarSign, X, TrendingUp, Building2, Coins } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, X, TrendingUp, Building2, Coins, RefreshCw } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { cn } from '../lib/utils';
 import { getFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
+import { getStockPrices, trackStock } from '../lib/stockApi';
 
 const Investments: React.FC = () => {
     const { user } = useAuth();
@@ -143,6 +144,17 @@ const Investments: React.FC = () => {
                     <p className="text-sm sm:text-base text-muted-foreground mt-1.5 sm:mt-2">Track corporate investments in stocks and GICs</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    {investments && investments.some(inv => inv.investment_type === 'stock' && inv.symbol && inv.status === 'active') && (
+                        <Button
+                            onClick={updateStockPrices}
+                            icon={RefreshCw}
+                            variant="outline"
+                            disabled={updatingPrices}
+                            className="w-full sm:w-auto min-h-[44px] sm:min-h-0"
+                        >
+                            {updatingPrices ? 'Updating...' : 'Refresh Prices'}
+                        </Button>
+                    )}
                     <Button
                         onClick={() => setShowCreateModal(true)}
                         icon={Plus}
