@@ -14,6 +14,7 @@ import {
     X,
     Briefcase
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const SalaryPage: React.FC = () => {
     const { user } = useAuth();
@@ -33,9 +34,23 @@ const SalaryPage: React.FC = () => {
         payment_date: '',
         period_start: '',
         period_end: '',
-        employee_name: '',
+        employee_id: '',
         status: 'pending' as 'pending' | 'paid',
         notes: '',
+    });
+
+    // Fetch employees for dropdown
+    const { data: employees } = useQuery({
+        queryKey: ['employees', user?.company_id],
+        queryFn: async () => {
+            const result = await api.getEmployees({
+                company_id: user?.company_id,
+                status: 'active',
+                limit: 1000
+            });
+            return result.data;
+        },
+        enabled: !!user?.company_id,
     });
 
     useEffect(() => {
@@ -71,7 +86,7 @@ const SalaryPage: React.FC = () => {
                 payment_date: formData.payment_date,
                 period_start: formData.period_start,
                 period_end: formData.period_end,
-                employee_name: formData.employee_name,
+                employee_id: parseInt(formData.employee_id),
                 status: formData.status,
                 notes: formData.notes || undefined,
                 company_id: user?.company_id!,
@@ -99,7 +114,7 @@ const SalaryPage: React.FC = () => {
             payment_date: salary.payment_date.split('T')[0],
             period_start: salary.period_start.split('T')[0],
             period_end: salary.period_end.split('T')[0],
-            employee_name: salary.employee_name,
+            employee_id: salary.employee_id.toString(),
             status: salary.status,
             notes: salary.notes || '',
         });
@@ -123,7 +138,7 @@ const SalaryPage: React.FC = () => {
             payment_date: '',
             period_start: '',
             period_end: '',
-            employee_name: '',
+            employee_id: '',
             status: 'pending',
             notes: '',
         });
@@ -174,11 +189,14 @@ const SalaryPage: React.FC = () => {
         }
     };
 
-    const filteredSalaries = salaries.filter((salary) =>
-        salary.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        salary.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        salary.amount.toString().includes(searchTerm)
-    );
+    const filteredSalaries = salaries.filter((salary) => {
+        const employeeName = salary.employee 
+            ? `${salary.employee.first_name} ${salary.employee.last_name}`.toLowerCase()
+            : '';
+        return employeeName.includes(searchTerm.toLowerCase()) ||
+            salary.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            salary.amount.toString().includes(searchTerm);
+    });
 
     const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
     const paidSalaries = salaries.filter(s => s.status === 'paid').reduce((sum, salary) => sum + salary.amount, 0);
@@ -314,7 +332,9 @@ const SalaryPage: React.FC = () => {
                             {filteredSalaries.map((salary) => (
                                 <tr key={salary.id} className="hover:bg-muted/50 transition-colors">
                                     <td className="px-6 py-4 font-medium text-foreground">
-                                        {salary.employee_name}
+                                        {salary.employee 
+                                            ? `${salary.employee.first_name} ${salary.employee.last_name}`
+                                            : 'Unknown Employee'}
                                     </td>
                                     <td className="px-6 py-4 font-medium text-foreground">
                                         {formatCurrency(salary.amount)}
@@ -469,16 +489,21 @@ const SalaryPage: React.FC = () => {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-2">
-                                    Employee Name *
+                                    Employee *
                                 </label>
-                                <input
-                                    type="text"
+                                <select
                                     required
-                                    value={formData.employee_name}
-                                    onChange={(e) => setFormData({ ...formData, employee_name: e.target.value })}
+                                    value={formData.employee_id}
+                                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
                                     className="input"
-                                    placeholder="Employee name"
-                                />
+                                >
+                                    <option value="">Select an employee</option>
+                                    {employees?.map((employee) => (
+                                        <option key={employee.id} value={employee.id}>
+                                            {employee.first_name} {employee.last_name} ({employee.employee_id})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>

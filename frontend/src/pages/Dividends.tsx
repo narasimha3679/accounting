@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Dividend } from '../lib/api';
+import api, { type Dividend, type DividendRecipient } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import DividendRecipientModal from '../components/dividends/DividendRecipientModal';
+import DividendRecipientList from '../components/dividends/DividendRecipientList';
+import { generateT5SlipPDF, generateT5SummaryPDF } from '../lib/t5Generator';
+import { generateDividendMinutesPDF } from '../lib/dividendMinutesGenerator';
+import { getFiscalYear } from '../lib/fiscalYear';
 import {
     Plus,
     Edit,
@@ -11,8 +16,164 @@ import {
     CheckCircle,
     Clock,
     Search,
-    X
+    X,
+    FileText,
+    Download,
+    // AlertCircle,
+    Users
 } from 'lucide-react';
+
+// Dividend Table Row Component
+const DividendTableRow: React.FC<{
+    dividend: Dividend;
+    formatCurrency: (amount: number) => string;
+    formatDate: (dateString: string) => string;
+    getStatusIcon: (status: string) => React.ReactNode;
+    getStatusColor: (status: string) => string;
+    getComplianceStatus: (dividend: Dividend) => Promise<{
+        status: 'compliant' | 'warning' | 'error';
+        message: string;
+        recipientCount: number;
+    }>;
+    handleEdit: (dividend: Dividend) => void;
+    handleDelete: (id: number) => void;
+    handleGenerateT5Slip: (dividend: Dividend, recipient: DividendRecipient) => Promise<void>;
+    handleGenerateMinutes: (dividend: Dividend) => Promise<void>;
+}> = ({
+    dividend,
+    formatCurrency,
+    formatDate,
+    getStatusIcon,
+    getStatusColor,
+    getComplianceStatus,
+    handleEdit,
+    handleDelete,
+    handleGenerateT5Slip,
+    handleGenerateMinutes,
+}) => {
+    const [compliance, setCompliance] = useState<{
+        status: 'compliant' | 'warning' | 'error';
+        message: string;
+        recipientCount: number;
+    } | null>(null);
+    const [loadingCompliance, setLoadingCompliance] = useState(true);
+
+    useEffect(() => {
+        getComplianceStatus(dividend).then(setCompliance).finally(() => setLoadingCompliance(false));
+    }, [dividend.id]);
+
+    const getComplianceColor = (status: string) => {
+        switch (status) {
+            case 'compliant':
+                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+            case 'warning':
+                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+            case 'error':
+                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+            default:
+                return 'bg-muted text-slate-muted';
+        }
+    };
+
+    return (
+        <tr className="hover:bg-muted/50 transition-colors">
+            <td className="px-6 py-4 font-medium text-white">
+                {formatCurrency(dividend.amount)}
+            </td>
+            <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    dividend.dividend_type === 'eligible'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300'
+                }`}>
+                    {dividend.dividend_type === 'eligible' ? 'Eligible' : 'Non-eligible'}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-slate-muted">
+                {dividend.fiscal_year}
+            </td>
+            <td className="px-6 py-4 text-slate-muted">
+                {formatDate(dividend.declaration_date)}
+            </td>
+            <td className="px-6 py-4 text-slate-muted">
+                {dividend.payment_date ? formatDate(dividend.payment_date) : '-'}
+            </td>
+            <td className="px-6 py-4">
+                {loadingCompliance ? (
+                    <span className="text-slate-muted text-xs">Loading...</span>
+                ) : compliance ? (
+                    <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-slate-muted" />
+                        <span className="text-sm text-white">{compliance.recipientCount}</span>
+                        {compliance.status !== 'compliant' && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getComplianceColor(compliance.status)}`}>
+                                {compliance.message}
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <span className="text-slate-muted text-xs">-</span>
+                )}
+            </td>
+            <td className="px-6 py-4">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(dividend.status)}`}>
+                    {getStatusIcon(dividend.status)}
+                    <span className="ml-1 capitalize">{dividend.status}</span>
+                </span>
+            </td>
+            <td className="px-6 py-4 text-right">
+                <div className="flex justify-end gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(dividend)}
+                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                        title="Edit"
+                    >
+                        <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                            const recipients = await api.getDividendRecipients(dividend.id);
+                            if (recipients.length === 0) {
+                                alert('No recipients found. Please add recipients first.');
+                                return;
+                            }
+                            // Generate T5 slips for all recipients
+                            for (const recipient of recipients) {
+                                await handleGenerateT5Slip(dividend, recipient);
+                            }
+                        }}
+                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                        title="Generate T5 Slips"
+                    >
+                        <FileText className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleGenerateMinutes(dividend)}
+                        className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                        title="Generate Minutes"
+                    >
+                        <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(dividend.id)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            </td>
+        </tr>
+    );
+};
 
 const Dividends: React.FC = () => {
     const { user } = useAuth();
@@ -25,6 +186,7 @@ const Dividends: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [selectedFiscalYear, setSelectedFiscalYear] = useState<number>(new Date().getFullYear());
 
     // Form state
     const [formData, setFormData] = useState({
@@ -33,7 +195,15 @@ const Dividends: React.FC = () => {
         payment_date: '',
         status: 'declared' as 'declared' | 'paid',
         notes: '',
+        dividend_type: 'non_eligible' as 'eligible' | 'non_eligible',
+        fiscal_year: new Date().getFullYear(),
     });
+
+    // Recipient management
+    const [recipients, setRecipients] = useState<DividendRecipient[]>([]);
+    const [showRecipientModal, setShowRecipientModal] = useState(false);
+    const [editingRecipient, setEditingRecipient] = useState<DividendRecipient | null>(null);
+    const [loadingRecipients, setLoadingRecipients] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -62,32 +232,72 @@ const Dividends: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validate recipient amounts
+        const totalAllocated = recipients.reduce((sum, r) => sum + r.amount, 0);
+        const dividendAmount = parseFloat(formData.amount);
+        
+        if (recipients.length > 0 && Math.abs(totalAllocated - dividendAmount) > 0.01) {
+            alert(`Recipient amounts (${totalAllocated.toFixed(2)}) must equal dividend amount (${dividendAmount.toFixed(2)})`);
+            return;
+        }
+
         try {
+            // Calculate fiscal year from declaration date if not set
+            let fiscalYear = formData.fiscal_year;
+            if (formData.declaration_date && user?.company?.fiscal_year_end) {
+                fiscalYear = getFiscalYear(formData.declaration_date, user.company.fiscal_year_end);
+            }
+
             const dividendData = {
-                amount: parseFloat(formData.amount),
+                amount: dividendAmount,
                 declaration_date: formData.declaration_date,
                 payment_date: formData.payment_date || undefined,
                 status: formData.status,
                 notes: formData.notes || undefined,
+                dividend_type: formData.dividend_type,
+                fiscal_year: fiscalYear,
                 company_id: user?.company_id!,
             };
 
+            let savedDividend: Dividend;
             if (editingDividend) {
-                await api.updateDividend(editingDividend.id, dividendData);
+                savedDividend = await api.updateDividend(editingDividend.id, dividendData);
             } else {
-                await api.createDividend(dividendData);
+                savedDividend = await api.createDividend(dividendData);
+            }
+
+            // Save recipients
+            if (recipients.length > 0) {
+                // Delete existing recipients if editing
+                if (editingDividend) {
+                    const existingRecipients = await api.getDividendRecipients(savedDividend.id);
+                    for (const recipient of existingRecipients) {
+                        await api.deleteDividendRecipient(recipient.id);
+                    }
+                }
+
+                // Create new recipients
+                for (const recipient of recipients) {
+                    await api.createDividendRecipient({
+                        ...recipient,
+                        dividend_id: savedDividend.id,
+                    });
+                }
             }
 
             setShowModal(false);
             setEditingDividend(null);
+            setRecipients([]);
             resetForm();
             loadDividends();
         } catch (error) {
             console.error('Error saving dividend:', error);
+            alert('Error saving dividend. Please try again.');
         }
     };
 
-    const handleEdit = (dividend: Dividend) => {
+    const handleEdit = async (dividend: Dividend) => {
         setEditingDividend(dividend);
         setFormData({
             amount: dividend.amount.toString(),
@@ -95,7 +305,22 @@ const Dividends: React.FC = () => {
             payment_date: dividend.payment_date ? dividend.payment_date.split('T')[0] : '',
             status: dividend.status,
             notes: dividend.notes || '',
+            dividend_type: dividend.dividend_type,
+            fiscal_year: dividend.fiscal_year,
         });
+        
+        // Load recipients for this dividend
+        setLoadingRecipients(true);
+        try {
+            const dividendRecipients = await api.getDividendRecipients(dividend.id);
+            setRecipients(dividendRecipients);
+        } catch (error) {
+            console.error('Error loading recipients:', error);
+            setRecipients([]);
+        } finally {
+            setLoadingRecipients(false);
+        }
+        
         setShowModal(true);
     };
 
@@ -117,7 +342,10 @@ const Dividends: React.FC = () => {
             payment_date: '',
             status: 'declared',
             notes: '',
+            dividend_type: 'non_eligible',
+            fiscal_year: new Date().getFullYear(),
         });
+        setRecipients([]);
     };
 
     const openModal = () => {
@@ -129,7 +357,183 @@ const Dividends: React.FC = () => {
     const closeModal = () => {
         setShowModal(false);
         setEditingDividend(null);
+        setRecipients([]);
         resetForm();
+    };
+
+    // Recipient management
+    const handleAddRecipient = () => {
+        setEditingRecipient(null);
+        setShowRecipientModal(true);
+    };
+
+    const handleEditRecipient = (recipient: DividendRecipient) => {
+        setEditingRecipient(recipient);
+        setShowRecipientModal(true);
+    };
+
+    const handleSaveRecipient = async (recipientData: Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'>) => {
+        if (editingRecipient) {
+            const updated = await api.updateDividendRecipient(editingRecipient.id, recipientData);
+            setRecipients(recipients.map(r => r.id === updated.id ? updated : r));
+        } else {
+            const newRecipient = await api.createDividendRecipient({
+                ...recipientData,
+                dividend_id: editingDividend?.id || 0, // Temporary, will be set on save
+            });
+            setRecipients([...recipients, newRecipient]);
+        }
+        setShowRecipientModal(false);
+        setEditingRecipient(null);
+    };
+
+    const handleDeleteRecipient = async (id: number) => {
+        try {
+            if (editingDividend) {
+                await api.deleteDividendRecipient(id);
+            }
+            setRecipients(recipients.filter(r => r.id !== id));
+        } catch (error) {
+            console.error('Error deleting recipient:', error);
+        }
+    };
+
+    // Document generation
+    const handleGenerateT5Slip = async (dividend: Dividend, recipient: DividendRecipient) => {
+        try {
+            const company = user?.company;
+            if (!company) {
+                alert('Company information not available');
+                return;
+            }
+            const blob = await generateT5SlipPDF(dividend, recipient, company);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `T5_${recipient.recipient_name.replace(/\s+/g, '_')}_${dividend.id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generating T5 slip:', error);
+            alert('Error generating T5 slip. Please try again.');
+        }
+    };
+
+    const handleGenerateT5Summary = async (fiscalYear: number) => {
+        try {
+            const company = user?.company;
+            if (!company) {
+                alert('Company information not available');
+                return;
+            }
+            
+            // Get all dividends for the fiscal year
+            const dividendsResponse = await api.getDividends({
+                company_id: company.id,
+                limit: 1000,
+            });
+            const fiscalYearDividends = dividendsResponse.data.filter(d => d.fiscal_year === fiscalYear);
+            
+            // Get all recipients for these dividends
+            const allRecipients: DividendRecipient[] = [];
+            for (const dividend of fiscalYearDividends) {
+                const recipients = await api.getDividendRecipients(dividend.id);
+                allRecipients.push(...recipients);
+            }
+
+            if (allRecipients.length === 0) {
+                alert('No recipients found for this fiscal year');
+                return;
+            }
+
+            const blob = await generateT5SummaryPDF(company, fiscalYear, fiscalYearDividends, allRecipients);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `T5_Summary_FY${fiscalYear}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generating T5 Summary:', error);
+            alert('Error generating T5 Summary. Please try again.');
+        }
+    };
+
+    const handleGenerateMinutes = async (dividend: Dividend) => {
+        try {
+            const company = user?.company;
+            if (!company) {
+                alert('Company information not available');
+                return;
+            }
+            
+            const recipients = await api.getDividendRecipients(dividend.id);
+            if (recipients.length === 0) {
+                alert('No recipients found for this dividend');
+                return;
+            }
+
+            const blob = generateDividendMinutesPDF(dividend, recipients, company);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Dividend_Minutes_${dividend.id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generating minutes:', error);
+            alert('Error generating minutes. Please try again.');
+        }
+    };
+
+    // Compliance status
+    const getComplianceStatus = async (dividend: Dividend): Promise<{
+        status: 'compliant' | 'warning' | 'error';
+        message: string;
+        recipientCount: number;
+    }> => {
+        const dividendRecipients = await api.getDividendRecipients(dividend.id);
+        const recipientCount = dividendRecipients.length;
+        
+        if (recipientCount === 0) {
+            return {
+                status: 'warning',
+                message: 'No recipients',
+                recipientCount: 0,
+            };
+        }
+
+        const totalAllocated = dividendRecipients.reduce((sum, r) => sum + r.amount, 0);
+        if (Math.abs(totalAllocated - dividend.amount) > 0.01) {
+            return {
+                status: 'error',
+                message: 'Amount mismatch',
+                recipientCount,
+            };
+        }
+
+        const missingSIN = dividendRecipients.some(
+            r => r.recipient_type === 'individual' && !r.recipient_sin
+        );
+        if (missingSIN) {
+            return {
+                status: 'warning',
+                message: 'Missing SIN',
+                recipientCount,
+            };
+        }
+
+        return {
+            status: 'compliant',
+            message: 'Compliant',
+            recipientCount,
+        };
     };
 
     const formatCurrency = (amount: number) => {
@@ -292,57 +696,30 @@ const Dividends: React.FC = () => {
                         <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-4">Amount</th>
+                                <th className="px-6 py-4">Type</th>
+                                <th className="px-6 py-4">Fiscal Year</th>
                                 <th className="px-6 py-4">Declaration Date</th>
                                 <th className="px-6 py-4">Payment Date</th>
+                                <th className="px-6 py-4">Recipients</th>
                                 <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4">Notes</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {filteredDividends.map((dividend) => (
-                                <tr key={dividend.id} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-white">
-                                        {formatCurrency(dividend.amount)}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-muted">
-                                        {formatDate(dividend.declaration_date)}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-muted">
-                                        {dividend.payment_date ? formatDate(dividend.payment_date) : '-'}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(dividend.status)}`}>
-                                            {getStatusIcon(dividend.status)}
-                                            <span className="ml-1 capitalize">{dividend.status}</span>
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-muted max-w-xs truncate">
-                                        {dividend.notes || '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleEdit(dividend)}
-                                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                                                title="Edit"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDelete(dividend.id)}
-                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <DividendTableRow
+                                    key={dividend.id}
+                                    dividend={dividend}
+                                    formatCurrency={formatCurrency}
+                                    formatDate={formatDate}
+                                    getStatusIcon={getStatusIcon}
+                                    getStatusColor={getStatusColor}
+                                    getComplianceStatus={getComplianceStatus}
+                                    handleEdit={handleEdit}
+                                    handleDelete={handleDelete}
+                                    handleGenerateT5Slip={handleGenerateT5Slip}
+                                    handleGenerateMinutes={handleGenerateMinutes}
+                                />
                             ))}
                         </tbody>
                     </table>
@@ -470,13 +847,51 @@ const Dividends: React.FC = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-white mb-2">
+                                    Dividend Type *
+                                </label>
+                                <select
+                                    required
+                                    value={formData.dividend_type}
+                                    onChange={(e) => setFormData({ ...formData, dividend_type: e.target.value as 'eligible' | 'non_eligible' })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="non_eligible">Non-eligible</option>
+                                    <option value="eligible">Eligible</option>
+                                </select>
+                                <p className="text-xs text-slate-muted mt-1">
+                                    Eligible dividends receive a 38% gross-up; non-eligible receive 15%
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-white mb-2">
                                     Declaration Date *
                                 </label>
                                 <input
                                     type="date"
                                     required
                                     value={formData.declaration_date}
-                                    onChange={(e) => setFormData({ ...formData, declaration_date: e.target.value })}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, declaration_date: e.target.value });
+                                        // Auto-calculate fiscal year
+                                        if (e.target.value && user?.company?.fiscal_year_end) {
+                                            const fiscalYear = getFiscalYear(e.target.value, user.company.fiscal_year_end);
+                                            setFormData(prev => ({ ...prev, fiscal_year: fiscalYear }));
+                                        }
+                                    }}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-white mb-2">
+                                    Fiscal Year *
+                                </label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={formData.fiscal_year}
+                                    onChange={(e) => setFormData({ ...formData, fiscal_year: parseInt(e.target.value) })}
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 />
                             </div>
@@ -521,6 +936,37 @@ const Dividends: React.FC = () => {
                                 />
                             </div>
 
+                            {/* Recipients Section */}
+                            <div className="pt-4 border-t border-white/10">
+                                <div className="flex items-center justify-between mb-4">
+                                    <label className="block text-sm font-medium text-white">
+                                        Recipients *
+                                    </label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleAddRecipient}
+                                        icon={Plus}
+                                    >
+                                        Add Recipient
+                                    </Button>
+                                </div>
+                                
+                                {loadingRecipients ? (
+                                    <div className="text-center py-4 text-slate-muted">
+                                        Loading recipients...
+                                    </div>
+                                ) : (
+                                    <DividendRecipientList
+                                        recipients={recipients}
+                                        dividendAmount={parseFloat(formData.amount) || 0}
+                                        onEdit={handleEditRecipient}
+                                        onDelete={handleDeleteRecipient}
+                                    />
+                                )}
+                            </div>
+
                             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-white/10">
                                 <Button
                                     type="button"
@@ -538,6 +984,53 @@ const Dividends: React.FC = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Recipient Modal */}
+            {showRecipientModal && (
+                <DividendRecipientModal
+                    recipient={editingRecipient}
+                    dividendAmount={parseFloat(formData.amount) || 0}
+                    existingRecipientsTotal={recipients
+                        .filter(r => !editingRecipient || r.id !== editingRecipient.id)
+                        .reduce((sum, r) => sum + r.amount, 0)}
+                    onClose={() => {
+                        setShowRecipientModal(false);
+                        setEditingRecipient(null);
+                    }}
+                    onSave={handleSaveRecipient}
+                />
+            )}
+
+            {/* T5 Summary Generation Button */}
+            {user?.company && (
+                <Card className="p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-semibold text-white">T5 Summary</h3>
+                            <p className="text-xs text-slate-muted mt-1">
+                                Generate T5 Summary for a fiscal year
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={selectedFiscalYear || new Date().getFullYear()}
+                                onChange={(e) => setSelectedFiscalYear(parseInt(e.target.value))}
+                                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                    <option key={year} value={year}>{year}</option>
+                                ))}
+                            </select>
+                            <Button
+                                onClick={() => handleGenerateT5Summary(selectedFiscalYear || new Date().getFullYear())}
+                                icon={FileText}
+                            >
+                                Generate T5 Summary
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
             )}
         </div>
     );

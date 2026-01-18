@@ -1,13 +1,15 @@
-import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
+import { supabase, SUPABASE_STORAGE_BUCKET, supabaseUrl } from './supabaseClient';
 import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 
 export interface User {
     id: number;
     email: string;
     name: string;
-    role: 'admin' | 'accountant' | 'viewer';
+    role: 'admin' | 'accountant' | 'viewer' | 'employee';
     company_id: number;
     company?: Company;
+    isEmployee?: boolean;
+    employee?: Employee;
     created_at: string;
     updated_at: string;
 }
@@ -45,6 +47,27 @@ export interface Client {
     company?: Company;
     created_at: string;
     updated_at: string;
+}
+
+export interface Employee {
+    id: number;
+    company_id: number;
+    auth_user_id?: string | null;
+    employee_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string | null;
+    position?: string | null;
+    hire_date?: string | null;
+    status: 'active' | 'inactive' | 'terminated';
+    address?: string | null;
+    sin?: string | null;
+    payrate?: number | null;
+    payrate_type?: 'hourly' | 'salary' | 'monthly' | 'biweekly' | null;
+    created_at: string;
+    updated_at: string;
+    company?: Company;
 }
 
 export interface InvoiceItem {
@@ -133,6 +156,22 @@ export interface Dividend {
     notes?: string | null;
     company_id: number;
     company?: Company;
+    dividend_type: 'eligible' | 'non_eligible';
+    fiscal_year: number;
+    is_capital_dividend?: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DividendRecipient {
+    id: number;
+    dividend_id: number;
+    recipient_name: string;
+    recipient_sin?: string | null;
+    recipient_type: 'individual' | 'corporation' | 'trust';
+    business_number?: string | null;
+    amount: number;
+    mailing_address?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -143,7 +182,8 @@ export interface Salary {
     payment_date: string;
     period_start: string;
     period_end: string;
-    employee_name: string;
+    employee_id: number;
+    employee?: Employee;
     status: 'pending' | 'paid';
     notes?: string | null;
     company_id: number;
@@ -603,6 +643,179 @@ class SupabaseApi {
         if (error) throw new Error(error.message);
     }
 
+    // Employees -----------------------------------------------------------
+    async getEmployees(params?: { page?: number; limit?: number; search?: string; company_id?: number; status?: string }): Promise<PaginatedResponse<Employee>> {
+        return this.paginatedSelect<Employee>('employees', {
+            columns: '*, company:companies(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'created_at', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.search) {
+                    query = query.or(`first_name.ilike.%${params.search}%,last_name.ilike.%${params.search}%,email.ilike.%${params.search}%,employee_id.ilike.%${params.search}%`);
+                }
+                return query;
+            },
+        });
+    }
+
+    async getEmployee(id: number): Promise<Employee> {
+        const { data, error } = await supabase
+            .from('employees')
+            .select('*, company:companies(*)')
+            .eq('id', id)
+            .maybeSingle<Employee>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Employee not found');
+        return data;
+    }
+
+    async createEmployee(employee: Omit<Employee, 'id' | 'created_at' | 'updated_at' | 'company' | 'auth_user_id' | 'employee_id'> & { employee_id?: string; initialPassword: string }): Promise<Employee> {
+        const { initialPassword, ...employeeData } = employee;
+        
+        // Call edge function to create employee with auth user
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-employee`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                ...employeeData,
+                initialPassword,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create employee');
+        }
+
+        const createdEmployee = await response.json();
+        return createdEmployee;
+    }
+
+    async updateEmployee(id: number, employee: Partial<Employee> & { newEmail?: string }): Promise<Employee> {
+        const { newEmail, ...employeeData } = employee;
+        const currentEmployee = await this.getEmployee(id);
+
+        // If email changed, update auth user email via edge function
+        if (newEmail && newEmail !== currentEmployee.email) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error('Not authenticated');
+            }
+
+            const response = await fetch(`${supabaseUrl}/functions/v1/update-employee-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    employee_id: id,
+                    newEmail,
+                }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update employee email');
+            }
+        }
+
+        // Update employee record
+        const { data, error } = await supabase
+            .from('employees')
+            .update(employeeData)
+            .eq('id', id)
+            .select('*, company:companies(*)')
+            .single<Employee>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteEmployee(id: number, deleteAuthUser: boolean = true): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/delete-employee`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                employee_id: id,
+                deleteAuthUser,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete employee');
+        }
+    }
+
+    async updateEmployeePassword(id: number, newPassword: string): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/update-employee-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                employee_id: id,
+                newPassword,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update employee password');
+        }
+    }
+
+    async resetEmployeePassword(id: number): Promise<string> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/reset-employee-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                employee_id: id,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to reset employee password');
+        }
+
+        const result = await response.json();
+        return result.password;
+    }
+
     // Invoices ------------------------------------------------------------
     async getInvoices(params?: { page?: number; limit?: number; search?: string; company_id?: number; client_id?: number; status?: string }): Promise<PaginatedResponse<Invoice>> {
         return this.paginatedSelect<Invoice>('invoices', {
@@ -1043,16 +1256,59 @@ class SupabaseApi {
         if (error) throw new Error(error.message);
     }
 
+    // Dividend Recipients ---------------------------------------------------
+    async getDividendRecipients(dividend_id: number): Promise<DividendRecipient[]> {
+        const { data, error } = await supabase
+            .from('dividend_recipients')
+            .select('*')
+            .eq('dividend_id', dividend_id)
+            .order('created_at', { ascending: true });
+        if (error) throw new Error(error.message);
+        return data || [];
+    }
+
+    async createDividendRecipient(recipient: Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'>): Promise<DividendRecipient> {
+        const { data, error } = await supabase
+            .from('dividend_recipients')
+            .insert(recipient)
+            .select()
+            .single<DividendRecipient>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateDividendRecipient(id: number, recipient: Partial<DividendRecipient>): Promise<DividendRecipient> {
+        const { data, error } = await supabase
+            .from('dividend_recipients')
+            .update(recipient)
+            .eq('id', id)
+            .select()
+            .single<DividendRecipient>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteDividendRecipient(id: number): Promise<void> {
+        const { error } = await supabase.from('dividend_recipients').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Dividend Document Generation ------------------------------------------
+    // Note: These methods are placeholders. Document generation is handled directly
+    // in the UI components using the generator functions from t5Generator.ts
+    // and dividendMinutesGenerator.ts
+
     // Salaries -----------------------------------------------------------
-    async getSalaries(params?: { page?: number; limit?: number; company_id?: number; status?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<Salary>> {
+    async getSalaries(params?: { page?: number; limit?: number; company_id?: number; status?: string; start_date?: string; end_date?: string; employee_id?: number }): Promise<PaginatedResponse<Salary>> {
         return this.paginatedSelect<Salary>('salaries', {
-            columns: '*, company:companies(*)',
+            columns: '*, company:companies(*), employee:employees(*)',
             page: params?.page,
             limit: params?.limit,
             order: { column: 'payment_date', ascending: false },
             modify: (query) => {
                 if (params?.company_id) query = query.eq('company_id', params.company_id);
                 if (params?.status) query = query.eq('status', params.status);
+                if (params?.employee_id) query = query.eq('employee_id', params.employee_id);
                 if (params?.start_date) query = query.gte('payment_date', params.start_date);
                 if (params?.end_date) query = query.lte('payment_date', params.end_date);
                 return query;
@@ -1063,7 +1319,7 @@ class SupabaseApi {
     async getSalary(id: number): Promise<Salary> {
         const { data, error } = await supabase
             .from('salaries')
-            .select('*, company:companies(*)')
+            .select('*, company:companies(*), employee:employees(*)')
             .eq('id', id)
             .maybeSingle<Salary>();
         if (error) throw new Error(error.message);
@@ -1071,22 +1327,26 @@ class SupabaseApi {
         return data;
     }
 
-    async createSalary(salary: Omit<Salary, 'id' | 'company' | 'created_at' | 'updated_at'>): Promise<Salary> {
+    async createSalary(salary: Omit<Salary, 'id' | 'company' | 'employee' | 'created_at' | 'updated_at'>): Promise<Salary> {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { employee, ...salaryData } = salary as any;
         const { data, error } = await supabase
             .from('salaries')
-            .insert(salary)
-            .select('*, company:companies(*)')
+            .insert(salaryData)
+            .select('*, company:companies(*), employee:employees(*)')
             .single<Salary>();
         if (error) throw new Error(error.message);
         return data;
     }
 
     async updateSalary(id: number, salary: Partial<Salary>): Promise<Salary> {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { employee, ...salaryData } = salary as any;
         const { data, error } = await supabase
             .from('salaries')
-            .update(salary)
+            .update(salaryData)
             .eq('id', id)
-            .select('*, company:companies(*)')
+            .select('*, company:companies(*), employee:employees(*)')
             .single<Salary>();
         if (error) throw new Error(error.message);
         return data;
@@ -2029,6 +2289,145 @@ class SupabaseApi {
         ].join('\\n');
 
         return new Blob([content], { type: 'text/plain' });
+    }
+
+    // Push Notification methods --------------------------------------------------------
+    
+    /**
+     * Subscribe to push notifications
+     */
+    async subscribeToPushNotifications(subscription: {
+        endpoint: string;
+        keys: {
+            p256dh: string;
+            auth: string;
+        };
+    }): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase
+            .from('push_subscriptions')
+            .upsert(
+                {
+                    user_id: authUser.id,
+                    endpoint: subscription.endpoint,
+                    p256dh: subscription.keys.p256dh,
+                    auth: subscription.keys.auth,
+                    enabled: true,
+                },
+                {
+                    onConflict: 'endpoint',
+                }
+            );
+
+        if (error) {
+            throw new Error(`Failed to subscribe: ${error.message}`);
+        }
+    }
+
+    /**
+     * Unsubscribe from push notifications
+     */
+    async unsubscribeFromPushNotifications(): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('user_id', authUser.id);
+
+        if (error) {
+            throw new Error(`Failed to unsubscribe: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get push subscription status
+     */
+    async getPushSubscriptionStatus(): Promise<{ subscribed: boolean; enabled: boolean }> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            return { subscribed: false, enabled: false };
+        }
+
+        const { data, error } = await supabase
+            .from('push_subscriptions')
+            .select('id, enabled')
+            .eq('user_id', authUser.id)
+            .eq('enabled', true)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Error getting push subscription status:', error);
+            return { subscribed: false, enabled: false };
+        }
+
+        return {
+            subscribed: !!data,
+            enabled: data?.enabled ?? false,
+        };
+    }
+
+    /**
+     * Toggle push notification enabled status
+     */
+    async togglePushNotifications(enabled: boolean): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { error } = await supabase
+            .from('push_subscriptions')
+            .update({ enabled })
+            .eq('user_id', authUser.id);
+
+        if (error) {
+            throw new Error(`Failed to toggle notifications: ${error.message}`);
+        }
+    }
+
+    /**
+     * Trigger a test notification (calls edge function)
+     */
+    async triggerTestNotification(): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                type: 'test',
+                userId: authUser.id,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to send test notification: ${error}`);
+        }
     }
 }
 

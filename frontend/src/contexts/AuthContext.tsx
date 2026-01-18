@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { User } from '../lib/api';
+import type { User, Employee } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
 
 interface AuthContextType {
@@ -58,6 +58,7 @@ const mapProfileToUser = (profile: ProfileRow | null): User | null => {
         role: profile.role,
         company_id: profile.company_id ?? 0,
         company: profile.company ?? undefined,
+        isEmployee: false,
         created_at: profile.created_at,
         updated_at: profile.updated_at,
     };
@@ -76,6 +77,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
+        // First check if user is an employee
+        const { data: employeeData, error: employeeError } = await supabase
+            .from('employees')
+            .select(`
+                id,
+                company_id,
+                auth_user_id,
+                employee_id,
+                first_name,
+                last_name,
+                email,
+                phone,
+                position,
+                hire_date,
+                status,
+                address,
+                created_at,
+                updated_at,
+                company:companies (
+                    id,
+                    name,
+                    business_number,
+                    hst_number,
+                    hst_registered,
+                    fiscal_year_end,
+                    small_business_rate,
+                    hst_rate,
+                    created_at,
+                    updated_at
+                )
+            `)
+            .eq('auth_user_id', sessionUser.id)
+            .maybeSingle<Employee>();
+
+        if (!employeeError && employeeData) {
+            // User is an employee
+            const employeeUser: User = {
+                id: employeeData.id,
+                email: employeeData.email,
+                name: `${employeeData.first_name} ${employeeData.last_name}`,
+                role: 'employee',
+                company_id: employeeData.company_id,
+                company: employeeData.company ?? undefined,
+                isEmployee: true,
+                employee: employeeData,
+                created_at: employeeData.created_at,
+                updated_at: employeeData.updated_at,
+            };
+            setUser(employeeUser);
+            return;
+        }
+
+        // Check if user is a company user (profile)
         const { data, error } = await supabase
             .from('profiles')
             .select(`
@@ -113,6 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'viewer',
                 company_id: 0,
                 company: undefined,
+                isEmployee: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             };
@@ -122,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const mapped = mapProfileToUser(data);
         if (mapped) {
-            setUser(mapped);
+            setUser({ ...mapped, isEmployee: false });
         } else {
             // No profile row yet – still allow using the bare auth user
             const fallback: User = {
@@ -132,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: 'viewer',
                 company_id: 0,
                 company: undefined,
+                isEmployee: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             };

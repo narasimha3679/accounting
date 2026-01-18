@@ -1421,7 +1421,7 @@ const TaxCalculator: React.FC = () => {
                                                 {taxData.filteredSalaries.map((salary) => (
                                                     <tr key={salary.id} className="hover:bg-muted/50 transition-colors">
                                                         <td className="px-4 py-3 text-slate-muted">{formatDate(salary.payment_date)}</td>
-                                                        <td className="px-4 py-3 text-white">{salary.employee_name}</td>
+                                                        <td className="px-4 py-3 text-white">{salary.employee ? `${salary.employee.first_name} ${salary.employee.last_name}` : 'Unknown Employee'}</td>
                                                         <td className="px-4 py-3 text-right text-white">{formatCurrency(salary.amount)}</td>
                                                     </tr>
                                                 ))}

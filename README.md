@@ -9,13 +9,15 @@ A comprehensive accounting tool built with a React 18 frontend and Supabase (Pos
 - **Tax Calculations**: Automatic calculation of small business tax and HST remittances
 - **Dividend Tracking**: Track dividend distributions and adjust company equity
 - **Financial Reports**: Generate P&L statements, HST reports, and retained earnings reports
-- **User Authentication**: Supabase Auth with role-scoped access (admin, accountant, viewer)
+- **Employee Management**: Manage employees, generate login credentials, and provide employee dashboards
+- **User Authentication**: Supabase Auth with role-scoped access (admin, accountant, viewer, employee)
 - **Modern UI**: Clean, responsive interface built with React, Tailwind CSS, and React Query
 
 ## Architecture
 
 - **Frontend**: React 18 + TypeScript (Vite, React Router, TanStack Query, Tailwind)
 - **Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Storage)
+- **Edge Functions**: Supabase Edge Functions for secure admin operations (employee management)
 - **Storage**: Supabase Storage bucket for receipt uploads
 - **CI/CD**: Docker image for the static frontend (optional)
 
@@ -96,8 +98,20 @@ The schema mirrors the original Go models and includes (non-exhaustive):
 - `dividends`, `income_entries`, `hst_payments`
 - `tax_returns`, `capital_assets`, `depreciation_entries`
 - `owner_payments`, `cca_classes`
+- `employees`: employee records with auth user linkage
 
 Each table enforces row-level access by `company_id` and user role, ensuring users only see the organizations they belong to.
+
+## Employee Management
+
+The system includes comprehensive employee management functionality. See [EMPLOYEE_MANAGEMENT.md](./EMPLOYEE_MANAGEMENT.md) for detailed documentation on:
+
+- Employee management features
+- Database schema and RLS policies
+- Supabase Edge Functions setup and deployment
+- API usage and examples
+- Security considerations
+- Setup and troubleshooting guide
 
 ## Available Scripts
 

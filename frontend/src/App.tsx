@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { UpdateAvailable } from './components/UpdateAvailable';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
@@ -22,11 +24,14 @@ import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
 import Investments from './pages/Investments';
 import InvestmentDetail from './pages/InvestmentDetail';
+import Employees from './pages/Employees';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 
 // Create a client
 const queryClient = new QueryClient();
 
 // Protected Route Component (requires authentication and a company)
+// For company users only - blocks employees
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -42,8 +47,41 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />;
   }
 
+  // Redirect employees to their dashboard
+  if (user?.isEmployee) {
+    return <Navigate to="/employee-dashboard" replace />;
+  }
+
   if (!user?.company_id) {
     return <Navigate to="/onboarding/company" replace />;
+  }
+
+  return <Layout>{children}</Layout>;
+};
+
+// Employee-only route
+const EmployeeRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect company users to dashboard
+  if (!user?.isEmployee) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!user?.company_id) {
+    return <Navigate to="/login" replace />;
   }
 
   return <Layout>{children}</Layout>;
@@ -95,6 +133,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee-dashboard"
+              element={
+                <EmployeeRoute>
+                  <EmployeeDashboard />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employees"
+              element={
+                <ProtectedRoute>
+                  <Employees />
                 </ProtectedRoute>
               }
             />
@@ -203,6 +257,8 @@ function App() {
               }
             />
             </Routes>
+            <OfflineIndicator />
+            <UpdateAvailable />
           </Router>
         </AuthProvider>
       </QueryClientProvider>

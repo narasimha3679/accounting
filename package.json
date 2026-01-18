@@ -19,5 +19,8 @@
         "react"
     ],
     "author": "Your Name",
-    "license": "MIT"
+    "license": "MIT",
+    "devDependencies": {
+        "supabase": "^2.72.8"
+    }
 }

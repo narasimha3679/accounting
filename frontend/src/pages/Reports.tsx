@@ -462,7 +462,31 @@ const Reports: React.FC = () => {
         };
     }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, investmentIncome, investmentSales, user?.company]);
 
-    const generatePDFFromData = (data: NonNullable<typeof reportData>) => {
+    // Calculate T5 compliance stats
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const t5ComplianceStats = useMemo(() => {
+        if (!dividends || dividends.length === 0) return { totalSlips: 0, missingSIN: 0, eligibleCount: 0, nonEligibleCount: 0 };
+        
+        let totalSlips = 0;
+        let missingSIN = 0;
+        let eligibleCount = 0;
+        let nonEligibleCount = 0;
+
+        dividends.forEach((div: Dividend) => {
+            if (div.dividend_type === 'eligible') {
+                eligibleCount++;
+            } else {
+                nonEligibleCount++;
+            }
+        });
+
+        // Note: We can't easily get recipient counts here without async calls
+        // This is a simplified version - full stats would require loading all recipients
+        
+        return { totalSlips, missingSIN, eligibleCount, nonEligibleCount };
+    }, [dividends]);
+
+    const generatePDFFromData = async (data: NonNullable<typeof reportData>) => {
         const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
@@ -853,12 +877,14 @@ const Reports: React.FC = () => {
             const dividendRows = data.dividends.map((div: Dividend) => [
                 formatDate(div.declaration_date),
                 formatCurrency(div.amount),
+                div.dividend_type === 'eligible' ? 'Eligible' : 'Non-eligible',
+                div.fiscal_year?.toString() || '-',
                 div.status,
             ]);
 
             autoTable(pdf, {
                 startY: yPosition,
-                head: [['Date', 'Amount', 'Status']],
+                head: [['Date', 'Amount', 'Type', 'Fiscal Year', 'Status']],
                 body: dividendRows,
                 theme: 'striped',
                 headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
@@ -866,6 +892,37 @@ const Reports: React.FC = () => {
                 margin: { left: margin, right: margin },
             });
             yPosition = (pdf as any).lastAutoTable.finalY + 10;
+
+            // Add T5 Compliance Section
+            checkPageBreak(20);
+            addText('T5 COMPLIANCE INFORMATION', 12, true);
+            yPosition += 8;
+            
+            let totalT5Slips = 0;
+            let missingSINCount = 0;
+            
+            for (const div of data.dividends) {
+                try {
+                    const recipients = await api.getDividendRecipients(div.id);
+                    totalT5Slips += recipients.length;
+                    missingSINCount += recipients.filter(r => r.recipient_type === 'individual' && !r.recipient_sin).length;
+                } catch (error) {
+                    console.error('Error loading recipients:', error);
+                }
+            }
+
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`Total T5 Slips Required: ${totalT5Slips}`, margin, yPosition);
+            yPosition += 5;
+            if (missingSINCount > 0) {
+                pdf.setTextColor(255, 0, 0);
+                pdf.text(`Warning: ${missingSINCount} recipient(s) missing SIN numbers`, margin, yPosition);
+                pdf.setTextColor(0, 0, 0);
+                yPosition += 5;
+            }
+            pdf.text(`T5 Summary must be filed by February 28 following the tax year.`, margin, yPosition);
+            yPosition += 10;
         }
 
         // Salaries
@@ -873,7 +930,7 @@ const Reports: React.FC = () => {
             checkPageBreak(30);
             addText('SALARY PAYMENTS', 14, true);
             const salaryRows = data.salaries.map((sal: Salary) => [
-                sal.employee_name,
+                sal.employee ? `${sal.employee.first_name} ${sal.employee.last_name}` : 'Unknown Employee',
                 formatDate(sal.payment_date),
                 formatDate(sal.period_start) + ' - ' + formatDate(sal.period_end),
                 formatCurrency(sal.amount),
@@ -923,7 +980,7 @@ const Reports: React.FC = () => {
 
         setIsGeneratingPDF(true);
         try {
-            const pdf = generatePDFFromData(reportData);
+            const pdf = await generatePDFFromData(reportData);
             pdf.save(`Comprehensive_Tax_Report_${formatFiscalYear(selectedFiscalYear)}.pdf`);
         } catch (error) {
             console.error('Failed to generate PDF report:', error);
@@ -1622,7 +1679,7 @@ const Reports: React.FC = () => {
                                 {reportData.salaries && reportData.salaries.length > 0 ? (
                                     reportData.salaries.map((sal: Salary) => (
                                         <tr key={sal.id} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-white">{sal.employee_name}</td>
+                                            <td className="px-6 py-4 font-medium text-white">{sal.employee ? `${sal.employee.first_name} ${sal.employee.last_name}` : 'Unknown Employee'}</td>
                                             <td className="px-6 py-4 text-slate-muted">{formatDate(sal.payment_date)}</td>
                                             <td className="px-6 py-4 text-slate-muted">{formatDate(sal.period_start)} - {formatDate(sal.period_end)}</td>
                                             <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(sal.amount)}</td>
@@ -1652,6 +1709,11 @@ const Reports: React.FC = () => {
                         <div className="p-6 border-b border-white/10">
                             <h2 className="text-xl font-semibold tracking-tight text-white">Dividend Distributions</h2>
                             <p className="text-sm text-slate-muted mt-1">All dividends declared and paid</p>
+                            {(t5ComplianceStats.eligibleCount > 0 || t5ComplianceStats.nonEligibleCount > 0) && (
+                                <div className="mt-2 text-xs text-slate-muted">
+                                    Eligible: {t5ComplianceStats.eligibleCount} | Non-eligible: {t5ComplianceStats.nonEligibleCount}
+                                </div>
+                            )}
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -1659,6 +1721,8 @@ const Reports: React.FC = () => {
                                     <tr>
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3">Amount</th>
+                                        <th className="px-6 py-3">Type</th>
+                                        <th className="px-6 py-3">Fiscal Year</th>
                                         <th className="px-6 py-3">Status</th>
                                     </tr>
                                 </thead>
@@ -1668,6 +1732,16 @@ const Reports: React.FC = () => {
                                             <tr key={div.id} className="hover:bg-muted/50 transition-colors">
                                                 <td className="px-6 py-4 text-slate-muted">{formatDate(div.declaration_date)}</td>
                                                 <td className="px-6 py-4 font-medium text-white">{formatCurrency(div.amount)}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                        div.dividend_type === 'eligible'
+                                                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                                            : 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300'
+                                                    }`}>
+                                                        {div.dividend_type === 'eligible' ? 'Eligible' : 'Non-eligible'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-muted">{div.fiscal_year || '-'}</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${div.status === 'paid'
                                                         ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
@@ -1680,7 +1754,7 @@ const Reports: React.FC = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={3} className="px-6 py-8 text-center text-slate-muted">No dividends declared</td>
+                                            <td colSpan={5} className="px-6 py-8 text-center text-slate-muted">No dividends declared</td>
                                         </tr>
                                     )}
                                 </tbody>

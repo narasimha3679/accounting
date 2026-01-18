@@ -16,7 +16,8 @@ import {
     X,
     CreditCard,
     Briefcase,
-    PieChart
+    PieChart,
+    UserCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -30,7 +31,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const navigation = [
+    // Company user navigation
+    const companyNavigation = [
         { name: 'Dashboard', href: '/', icon: Home },
         { name: 'Invoices', href: '/invoices', icon: FileText },
         { name: 'Income', href: '/income', icon: DollarSign },
@@ -41,10 +43,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Salary', href: '/salary', icon: Briefcase },
         { name: 'Owner Reimbursement', href: '/owner-payments', icon: CreditCard },
         { name: 'Clients', href: '/clients', icon: Users },
+        { name: 'Employees', href: '/employees', icon: UserCircle },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },
         { name: 'Settings', href: '/settings', icon: Settings },
     ];
+
+    // Employee navigation (limited)
+    const employeeNavigation = [
+        { name: 'Dashboard', href: '/employee-dashboard', icon: Home },
+    ];
+
+    const navigation = user?.isEmployee ? employeeNavigation : companyNavigation;
 
     const isActive = (href: string) => {
         return location.pathname === href;

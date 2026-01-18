@@ -1034,7 +1034,7 @@ const Dashboard: React.FC = () => {
                                     <div key={salary.id} className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-foreground">
-                                                {salary.employee_name}
+                                                {salary.employee ? `${salary.employee.first_name} ${salary.employee.last_name}` : 'Unknown Employee'}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
                                                 {formatDate(salary.period_start)} - {formatDate(salary.period_end)}
