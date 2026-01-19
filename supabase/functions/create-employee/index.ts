@@ -18,13 +18,40 @@ interface EmployeeData {
   initialPassword: string;
 }
 
+/**
+ * Get CORS headers for the request
+ * Uses the request origin instead of '*' to support credentials (Authorization header)
+ */
+function getCorsHeaders(req: Request): HeadersInit {
+  const origin = req.headers.get('origin');
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
+
 Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: getCorsHeaders(req),
+    });
+  }
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 401, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
@@ -52,7 +79,13 @@ Deno.serve(async (req: Request) => {
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 401, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
@@ -66,7 +99,13 @@ Deno.serve(async (req: Request) => {
     if (profileError || !profile || !["admin", "accountant"].includes(profile.role)) {
       return new Response(
         JSON.stringify({ error: "Forbidden: Must be admin or accountant" }),
-        { status: 403, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 403, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
@@ -76,7 +115,13 @@ Deno.serve(async (req: Request) => {
     if (employeeData.company_id !== profile.company_id) {
       return new Response(
         JSON.stringify({ error: "Forbidden: Company ID mismatch" }),
-        { status: 403, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 403, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
@@ -92,7 +137,13 @@ Deno.serve(async (req: Request) => {
       if (fetchError) {
         return new Response(
           JSON.stringify({ error: `Failed to fetch existing employees: ${fetchError.message}` }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
+          { 
+            status: 500, 
+            headers: {
+              ...getCorsHeaders(req),
+              "Content-Type": "application/json",
+            },
+          }
         );
       }
 
@@ -120,7 +171,13 @@ Deno.serve(async (req: Request) => {
     if (createUserError || !authUser.user) {
       return new Response(
         JSON.stringify({ error: `Failed to create auth user: ${createUserError?.message}` }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 400, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
@@ -151,18 +208,36 @@ Deno.serve(async (req: Request) => {
       await adminClient.auth.admin.deleteUser(authUser.user.id);
       return new Response(
         JSON.stringify({ error: `Failed to create employee: ${employeeError.message}` }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { 
+          status: 400, 
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
     return new Response(
       JSON.stringify(employee),
-      { status: 201, headers: { "Content-Type": "application/json" } }
+      { 
+        status: 201, 
+        headers: {
+          ...getCorsHeaders(req),
+          "Content-Type": "application/json",
+        },
+      }
     );
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { 
+        status: 500, 
+        headers: {
+          ...getCorsHeaders(req),
+          "Content-Type": "application/json",
+        },
+      }
     );
   }
 });

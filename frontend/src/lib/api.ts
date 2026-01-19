@@ -1551,7 +1551,7 @@ class SupabaseApi {
         return { total_cost, depreciable_amount, accumulated_depreciation, book_value };
     }
 
-    async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string }): Promise<PaginatedResponse<CapitalAsset>> {
+    async getCapitalAssets(params?: { page?: number; limit?: number; search?: string; company_id?: number; category_id?: number; cca_class?: string; start_date?: string; end_date?: string }): Promise<PaginatedResponse<CapitalAsset>> {
         return this.paginatedSelect<CapitalAsset>('capital_assets', {
             // Include depreciation entries so CCA flows through to reports and tax calculator
             columns: '*, category:expense_categories(*), depreciation_entries:depreciation_entries(*)',
@@ -1563,6 +1563,8 @@ class SupabaseApi {
                 if (params?.category_id) query = query.eq('category_id', params.category_id);
                 if (params?.cca_class) query = query.eq('cca_class', params.cca_class);
                 if (params?.search) query = query.ilike('description', `%${params.search}%`);
+                if (params?.start_date) query = query.gte('purchase_date', params.start_date);
+                if (params?.end_date) query = query.lte('purchase_date', params.end_date);
                 return query;
             },
         });

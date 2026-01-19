@@ -149,9 +149,11 @@ const Dashboard: React.FC = () => {
                     end_date: endDateStr,
                     limit: 1000
                 }),
-                // Fetch capital assets (no date filtering needed - all assets)
+                // Fetch capital assets with date filtering
                 api.getCapitalAssets({
                     company_id: companyId,
+                    start_date: startDateStr,
+                    end_date: endDateStr,
                     limit: 1000
                 }),
                 // Fetch owner payments with date filtering
