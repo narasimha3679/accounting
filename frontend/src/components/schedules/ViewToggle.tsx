@@ -1,9 +1,9 @@
 import React from 'react';
-import { Calendar, CalendarDays } from 'lucide-react';
+import { Calendar, CalendarDays, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
-export type CalendarView = 'month' | 'week';
+export type CalendarView = 'month' | 'week' | 'day';
 
 interface ViewToggleProps {
     view: CalendarView;
@@ -15,6 +15,7 @@ const ViewToggle: React.FC<ViewToggleProps> = ({ view, onChange, className }) =>
     const views: { value: CalendarView; label: string; icon: typeof Calendar }[] = [
         { value: 'month', label: 'Month', icon: Calendar },
         { value: 'week', label: 'Week', icon: CalendarDays },
+        { value: 'day', label: 'Day', icon: Clock },
     ];
 
     return (

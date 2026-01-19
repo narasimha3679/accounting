@@ -9,8 +9,9 @@ import Card from '../components/ui/Card';
 import CalendarHeader from '../components/schedules/CalendarHeader';
 import MonthCalendarView from '../components/schedules/MonthCalendarView';
 import WeekTimelineView from '../components/schedules/WeekTimelineView';
+import DayTimelineView from '../components/schedules/DayTimelineView';
 import type { CalendarView } from '../components/schedules/ViewToggle';
-import { calculateHours, formatDateKey, getWeekDates } from '../lib/scheduleUtils';
+import { calculateHours, formatDateKey, getWeekDates, getShiftsForDate } from '../lib/scheduleUtils';
 
 const Schedules: React.FC = () => {
     const { user } = useAuth();
@@ -39,8 +40,8 @@ const Schedules: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Calculate date range based on current view
-    const dateRange = useMemo(() => {
+    // Calculate visible date range (what the user sees in the calendar)
+    const visibleDateRange = useMemo(() => {
         if (view === 'month') {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -50,15 +51,35 @@ const Schedules: React.FC = () => {
                 start_date: formatDateKey(start),
                 end_date: formatDateKey(end),
             };
-        } else {
-            // Week view
+        } else if (view === 'week') {
             const weekDates = getWeekDates(currentDate);
             return {
                 start_date: formatDateKey(weekDates[0]),
                 end_date: formatDateKey(weekDates[6]),
             };
+        } else {
+            // Day view - just the current day
+            const dateKey = formatDateKey(currentDate);
+            return {
+                start_date: dateKey,
+                end_date: dateKey,
+            };
         }
     }, [view, currentDate]);
+
+    // Fetch date range (may include extra days for overnight shifts)
+    const dateRange = useMemo(() => {
+        if (view === 'day') {
+            // Include previous day for overnight shift segments
+            const prevDate = new Date(currentDate);
+            prevDate.setDate(currentDate.getDate() - 1);
+            return {
+                start_date: formatDateKey(prevDate),
+                end_date: visibleDateRange.end_date,
+            };
+        }
+        return visibleDateRange;
+    }, [view, currentDate, visibleDateRange]);
 
     // Fetch schedules
     const { data: schedulesData, isLoading } = useQuery({
@@ -88,9 +109,19 @@ const Schedules: React.FC = () => {
     });
 
     const handleDateClick = (date: Date) => {
-        setPrefilledDate(date);
-        setCurrentDate(date);
-        setShowCreateModal(true);
+        // Check if the day has any schedules
+        const daySchedules = getShiftsForDate(schedulesData || [], date);
+        
+        if (daySchedules.length === 0) {
+            // No schedules - open create modal
+            setPrefilledDate(date);
+            setCurrentDate(date);
+            setShowCreateModal(true);
+        } else {
+            // Has schedules - switch to day view
+            setCurrentDate(date);
+            setView('day');
+        }
     };
 
     const handleTimeSlotClick = (date: Date, hour: number, minute: number, employeeId?: number) => {
@@ -110,19 +141,50 @@ const Schedules: React.FC = () => {
         setCurrentDate(new Date());
     };
 
+    // Filter schedules to only those in the visible date range
+    const visibleSchedules = useMemo(() => {
+        return schedulesData?.filter(s => {
+            const scheduleDate = s.schedule_date.split('T')[0];
+            return scheduleDate >= visibleDateRange.start_date && scheduleDate <= visibleDateRange.end_date;
+        }) || [];
+    }, [schedulesData, visibleDateRange]);
+
     const totalHours = useMemo(() => {
-        return schedulesData?.reduce((sum, s) => {
+        return visibleSchedules.reduce((sum, s) => {
             return sum + calculateHours(s.start_time, s.end_time, s.break_duration_minutes);
-        }, 0) || 0;
-    }, [schedulesData]);
+        }, 0);
+    }, [visibleSchedules]);
 
     const scheduledCount = useMemo(() => {
-        return schedulesData?.filter(s => s.status === 'scheduled').length || 0;
-    }, [schedulesData]);
+        const now = new Date();
+        return visibleSchedules.filter(s => {
+            if (s.status !== 'scheduled') return false;
+            const scheduleDate = s.schedule_date.split('T')[0];
+            const shiftStart = new Date(`${scheduleDate}T${s.start_time}`);
+            return shiftStart >= now;
+        }).length;
+    }, [visibleSchedules]);
 
     const completedCount = useMemo(() => {
-        return schedulesData?.filter(s => s.status === 'completed').length || 0;
-    }, [schedulesData]);
+        const now = new Date();
+        return visibleSchedules.filter(s => {
+            // Cancelled shifts don't count as completed
+            if (s.status === 'cancelled') return false;
+            
+            // Calculate shift end time
+            const scheduleDate = s.schedule_date.split('T')[0];
+            const shiftStart = new Date(`${scheduleDate}T${s.start_time}`);
+            const shiftEnd = new Date(`${scheduleDate}T${s.end_time}`);
+            
+            // Handle overnight shifts (end time is before start time)
+            if (shiftEnd < shiftStart) {
+                shiftEnd.setDate(shiftEnd.getDate() + 1);
+            }
+            
+            // Count as completed if explicitly marked OR if shift has ended
+            return s.status === 'completed' || shiftEnd <= now;
+        }).length;
+    }, [visibleSchedules]);
 
     if (isLoading) {
         return (
@@ -240,6 +302,15 @@ const Schedules: React.FC = () => {
                             <WeekTimelineView
                                 currentDate={currentDate}
                                 schedules={schedulesData || []}
+                                onShiftClick={handleShiftClick}
+                                onTimeSlotClick={handleTimeSlotClick}
+                            />
+                        )}
+                        {view === 'day' && (
+                            <DayTimelineView
+                                currentDate={currentDate}
+                                schedules={schedulesData || []}
+                                employees={employees}
                                 onShiftClick={handleShiftClick}
                                 onTimeSlotClick={handleTimeSlotClick}
                             />

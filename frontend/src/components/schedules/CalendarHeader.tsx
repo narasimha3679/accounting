@@ -38,7 +38,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     const formatDateDisplay = () => {
         if (view === 'month') {
             return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        } else {
+        } else if (view === 'week') {
             // Week view
             const weekStart = new Date(currentDate);
             weekStart.setDate(currentDate.getDate() - currentDate.getDay());
@@ -48,6 +48,9 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             const startStr = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const endStr = weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             return `${startStr} - ${endStr}`;
+        } else {
+            // Day view
+            return currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
         }
     };
 
@@ -56,9 +59,12 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         
         if (view === 'month') {
             newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-        } else {
+        } else if (view === 'week') {
             // Week view
             newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+        } else {
+            // Day view
+            newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
         }
         
         onDateChange(newDate);
