@@ -18,7 +18,10 @@ import {
     Briefcase,
     PieChart,
     UserCircle,
-    Clock
+    Clock,
+    BarChart,
+    FileCheck,
+    User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -46,6 +49,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Employees', href: '/employees', icon: UserCircle },
         { name: 'Time Management', href: '/time-management', icon: Clock },
+        { name: 'Pay Runs', href: '/payroll/runs', icon: DollarSign },
+        { name: 'Payroll Reports', href: '/payroll/reports', icon: BarChart },
+        { name: 'Remittances', href: '/payroll/remittances', icon: Banknote },
+        { name: 'ROEs', href: '/payroll/roe', icon: FileCheck },
+        { name: 'T4 Generation', href: '/payroll/t4', icon: FileCheck },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },
         { name: 'Settings', href: '/settings', icon: Settings },
@@ -54,6 +62,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     // Employee navigation (limited)
     const employeeNavigation = [
         { name: 'Dashboard', href: '/employee-dashboard', icon: Home },
+        { name: 'Pay Stubs', href: '/employee/pay-stubs', icon: FileText },
+        { name: 'YTD Summary', href: '/employee/ytd', icon: BarChart },
+        { name: 'Tax Documents', href: '/employee/tax-documents', icon: FileCheck },
+        { name: 'My Info', href: '/employee/info', icon: User },
         { name: 'My Time', href: '/employee-time-management', icon: Clock },
     ];
 

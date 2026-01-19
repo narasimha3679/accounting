@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Employee } from '../lib/api';
 import { Plus, Edit, Trash2, X, Users, UserCheck, UserX, Search, Key } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import EmployeeBenefitsAssignment from '../components/employees/EmployeeBenefitsAssignment';
 
 const Employees: React.FC = () => {
     const { user } = useAuth();
@@ -351,6 +353,7 @@ interface EmployeeModalProps {
 
 function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         first_name: employee?.first_name || '',
         last_name: employee?.last_name || '',
@@ -407,7 +410,31 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
 
         if (employee) {
             const { initialPassword, ...updateData } = employeeData;
-            updateEmployeeMutation.mutate(updateData);
+            const statusChanged = employee.status !== updateData.status;
+            const newStatusIsTerminatedOrInactive =
+                (updateData.status === 'terminated' || updateData.status === 'inactive') &&
+                employee.status !== 'terminated' &&
+                employee.status !== 'inactive';
+
+            // Update employee status first
+            updateEmployeeMutation.mutate(updateData, {
+                onSuccess: () => {
+                    // If status changed to terminated or inactive, prompt for ROE
+                    if (statusChanged && newStatusIsTerminatedOrInactive) {
+                        const generateROE = window.confirm(
+                            `Generate ROE for ${employee.first_name} ${employee.last_name}?`
+                        );
+                        if (generateROE) {
+                            onSave();
+                            navigate(`/payroll/roe/new?employee=${employee.id}`);
+                        } else {
+                            onSave();
+                        }
+                    } else {
+                        onSave();
+                    }
+                },
+            });
         } else {
             if (!formData.initialPassword) {
                 alert('Please provide an initial password for the employee');
@@ -664,6 +691,16 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                         </Button>
                     </div>
                 </form>
+
+                {/* Benefits Section - Only show for existing employees */}
+                {employee && user?.company_id && (
+                    <div className="mt-6 pt-6 border-t border-border">
+                        <EmployeeBenefitsAssignment
+                            employeeId={employee.id}
+                            companyId={user.company_id}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

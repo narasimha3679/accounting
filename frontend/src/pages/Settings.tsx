@@ -15,6 +15,8 @@ import {
     type PushSubscriptionStatus,
 } from '../lib/pushNotifications';
 import { isInstallable, isInstalled, showInstallPrompt } from '../lib/pwa';
+import PayrollSettingsComponent from '../components/settings/PayrollSettings';
+import BenefitTypesManager from '../components/settings/BenefitTypesManager';
 
 const Settings: React.FC = () => {
     const { user, refreshUser } = useAuth();
@@ -762,6 +764,12 @@ const Settings: React.FC = () => {
                         </div>
                     </Card>
                 )}
+
+                {/* Payroll Settings */}
+                <PayrollSettingsComponent companyId={company.id} />
+
+                {/* Benefit Types */}
+                <BenefitTypesManager companyId={company.id} />
 
                 {/* Save Button */}
                 <div className="flex justify-end">

@@ -29,6 +29,18 @@ import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
 import EmployeeTimeManagement from './pages/EmployeeTimeManagement';
+import PayRuns from './pages/PayRuns';
+import PayRunDetail from './pages/PayRunDetail';
+import PayrollReports from './pages/PayrollReports';
+import PayrollRemittances from './pages/PayrollRemittances';
+import ROEList from './pages/ROEList';
+import ROEGeneration from './pages/ROEGeneration';
+import T4Generation from './pages/T4Generation';
+import EmployeePayStubsPage from './pages/EmployeePayStubsPage';
+import EmployeeYTDPage from './pages/EmployeeYTDPage';
+import EmployeeTaxDocumentsPage from './pages/EmployeeTaxDocumentsPage';
+import EmployeeInfoPage from './pages/EmployeeInfoPage';
+import EmployeeTD1Page from './pages/EmployeeTD1Page';
 
 // Create a client with optimized defaults
 const queryClient = new QueryClient({
@@ -165,6 +177,46 @@ function App() {
               }
             />
             <Route
+              path="/employee/pay-stubs"
+              element={
+                <EmployeeRoute>
+                  <EmployeePayStubsPage />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employee/ytd"
+              element={
+                <EmployeeRoute>
+                  <EmployeeYTDPage />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employee/tax-documents"
+              element={
+                <EmployeeRoute>
+                  <EmployeeTaxDocumentsPage />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employee/info"
+              element={
+                <EmployeeRoute>
+                  <EmployeeInfoPage />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employee/td1"
+              element={
+                <EmployeeRoute>
+                  <EmployeeTD1Page />
+                </EmployeeRoute>
+              }
+            />
+            <Route
               path="/employees"
               element={
                 <ProtectedRoute>
@@ -281,6 +333,70 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/runs"
+              element={
+                <ProtectedRoute>
+                  <PayRuns />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/runs/:id"
+              element={
+                <ProtectedRoute>
+                  <PayRunDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/reports"
+              element={
+                <ProtectedRoute>
+                  <PayrollReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/remittances"
+              element={
+                <ProtectedRoute>
+                  <PayrollRemittances />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/roe"
+              element={
+                <ProtectedRoute>
+                  <ROEList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/roe/new"
+              element={
+                <ProtectedRoute>
+                  <ROEGeneration />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/roe/:id"
+              element={
+                <ProtectedRoute>
+                  <ROEGeneration />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll/t4"
+              element={
+                <ProtectedRoute>
+                  <T4Generation />
                 </ProtectedRoute>
               }
             />

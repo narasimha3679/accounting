@@ -1,39 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Salary } from '../lib/api';
+import api from '../lib/api';
 import Card from '../components/ui/Card';
-import { DollarSign, CheckCircle, Clock, Building2, Calendar, FileText } from 'lucide-react';
+import StatCard from '../components/ui/StatCard';
+import Button from '../components/ui/Button';
+import { DollarSign, TrendingUp, Building2, Calendar, FileText, BarChart, FileCheck, User, Briefcase } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 const EmployeeDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [salaries, setSalaries] = useState<Salary[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const currentYear = new Date().getFullYear();
 
-    useEffect(() => {
-        if (user?.isEmployee && user.employee) {
-            loadSalaries();
-        }
-    }, [user]);
+    // Fetch YTD data
+    const { data: ytd, isLoading: ytdLoading } = useQuery({
+        queryKey: ['myYTD', user?.employee?.id, currentYear],
+        queryFn: () => api.getMyYTD(currentYear),
+        enabled: !!user?.employee?.id,
+    });
 
-    const loadSalaries = async () => {
-        if (!user?.employee) return;
-
-        try {
-            setIsLoading(true);
-            const response = await api.getSalaries({
-                company_id: user.company_id,
-                employee_id: user.employee.id,
-                limit: 1000
-            });
-            setSalaries(response.data);
-        } catch (error) {
-            console.error('Error loading salaries:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Fetch recent pay stubs
+    const { data: recentPayStubs, isLoading: payStubsLoading } = useQuery({
+        queryKey: ['myPayStubs', user?.employee?.id, 'recent'],
+        queryFn: () => api.getMyPayStubs({ limit: 5 }),
+        enabled: !!user?.employee?.id,
+    });
 
     // Fetch upcoming schedules
     const { data: schedulesData } = useQuery({
@@ -75,23 +66,16 @@ const EmployeeDashboard: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return new Date(dateString).toLocaleDateString('en-CA', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'paid':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-            default:
-                return 'bg-muted text-slate-muted';
-        }
-    };
-
-    const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
-    const paidSalaries = salaries.filter(s => s.status === 'paid').reduce((sum, salary) => sum + salary.amount, 0);
-    const pendingSalaries = salaries.filter(s => s.status === 'pending').reduce((sum, salary) => sum + salary.amount, 0);
+    const isLoading = ytdLoading || payStubsLoading;
+    const ytdNet = ytd ? ytd.gross_earnings - ytd.federal_tax_withheld - ytd.provincial_tax_withheld - ytd.cpp_contributions - ytd.cpp2_contributions - ytd.ei_premiums : 0;
+    const lastPay = recentPayStubs && recentPayStubs.length > 0 ? recentPayStubs[0] : null;
 
     if (!user?.isEmployee || !user.employee) {
         return (
@@ -116,7 +100,9 @@ const EmployeeDashboard: React.FC = () => {
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">
                     Welcome, {user.employee.first_name}!
                 </h1>
-                <p className="text-muted-foreground mt-2">View your salary information</p>
+                <p className="text-muted-foreground mt-2">
+                    {user.company?.name || 'View your payroll information'}
+                </p>
             </div>
 
             {/* Company Info */}
@@ -174,114 +160,165 @@ const EmployeeDashboard: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <Card className="p-6">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
-                            <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
-                                    Total Salaries
-                                </dt>
-                                <dd className="text-2xl font-bold text-foreground">
-                                    {formatCurrency(totalSalaries)}
-                                </dd>
-                            </dl>
-                        </div>
+            {/* Payroll Summary Cards */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                    title="YTD Gross"
+                    value={ytd ? formatCurrency(ytd.gross_earnings) : formatCurrency(0)}
+                    icon={DollarSign}
+                />
+                <StatCard
+                    title="YTD Net"
+                    value={formatCurrency(ytdNet)}
+                    icon={TrendingUp}
+                />
+                <StatCard
+                    title="Vacation Balance"
+                    value={ytd ? formatCurrency(ytd.vacation_balance) : formatCurrency(0)}
+                    icon={Briefcase}
+                />
+                <StatCard
+                    title="Last Pay"
+                    value={lastPay ? formatCurrency(lastPay.net_pay) : formatCurrency(0)}
+                    icon={Calendar}
+                    subtitle={lastPay?.pay_run?.pay_date ? formatDate(lastPay.pay_run.pay_date) : undefined}
+                />
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Pay Stubs */}
+                <Card>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-foreground">Recent Pay Stubs</h2>
+                        <Link to="/employee/pay-stubs">
+                            <Button variant="ghost" size="sm">
+                                View All
+                            </Button>
+                        </Link>
                     </div>
+                    {!recentPayStubs || recentPayStubs.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-muted-foreground">No pay stubs available</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {recentPayStubs.slice(0, 3).map((item) => {
+                                const payRun = item.pay_run;
+                                if (!payRun) return null;
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="font-medium text-foreground">
+                                                {formatDate(payRun.pay_date)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(payRun.pay_period_start)} - {formatDate(payRun.pay_period_end)}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold text-foreground">
+                                                {formatCurrency(item.net_pay)}
+                                            </p>
+                                            <Link
+                                                to="/employee/pay-stubs"
+                                                className="text-xs text-neon-emerald hover:underline"
+                                            >
+                                                View
+                                            </Link>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </Card>
 
-                <Card className="p-6">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0 p-3 rounded-full bg-green-100 dark:bg-green-900/20">
-                            <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
-                                    Paid Salaries
-                                </dt>
-                                <dd className="text-2xl font-bold text-foreground">
-                                    {formatCurrency(paidSalaries)}
-                                </dd>
-                            </dl>
-                        </div>
-                    </div>
-                </Card>
-
-                <Card className="p-6">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0 p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/20">
-                            <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt className="text-sm font-medium text-muted-foreground truncate">
-                                    Pending Salaries
-                                </dt>
-                                <dd className="text-2xl font-bold text-foreground">
-                                    {formatCurrency(pendingSalaries)}
-                                </dd>
-                            </dl>
-                        </div>
+                {/* Quick Actions */}
+                <Card>
+                    <h2 className="text-xl font-semibold mb-4 text-foreground">Quick Actions</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Link to="/employee/pay-stubs">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                                <FileText className="h-5 w-5 text-neon-emerald" />
+                                <span className="text-foreground">View All Pay Stubs</span>
+                            </div>
+                        </Link>
+                        <Link to="/employee/ytd">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                                <BarChart className="h-5 w-5 text-neon-emerald" />
+                                <span className="text-foreground">YTD Summary</span>
+                            </div>
+                        </Link>
+                        <Link to="/employee/td1">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                                <FileText className="h-5 w-5 text-neon-emerald" />
+                                <span className="text-foreground">Update TD1</span>
+                            </div>
+                        </Link>
+                        <Link to="/employee/tax-documents">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                                <FileCheck className="h-5 w-5 text-neon-emerald" />
+                                <span className="text-foreground">View T4</span>
+                            </div>
+                        </Link>
+                        <Link to="/employee/info">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                                <User className="h-5 w-5 text-neon-emerald" />
+                                <span className="text-foreground">My Information</span>
+                            </div>
+                        </Link>
                     </div>
                 </Card>
             </div>
 
-            {/* Salary Records */}
-            <Card className="overflow-hidden">
-                <div className="p-6 border-b border-border">
-                    <h2 className="text-xl font-semibold text-foreground">Salary Records</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Your salary payment history</p>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
-                            <tr>
-                                <th className="px-6 py-4">Amount</th>
-                                <th className="px-6 py-4">Payment Date</th>
-                                <th className="px-6 py-4">Period</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4">Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {salaries.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                                        No salary records found
-                                    </td>
-                                </tr>
-                            ) : (
-                                salaries.map((salary) => (
-                                    <tr key={salary.id} className="hover:bg-muted/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-foreground">
-                                            {formatCurrency(salary.amount)}
-                                        </td>
-                                        <td className="px-6 py-4 text-muted-foreground">
-                                            {formatDate(salary.payment_date)}
-                                        </td>
-                                        <td className="px-6 py-4 text-muted-foreground">
-                                            {formatDate(salary.period_start)} - {formatDate(salary.period_end)}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(salary.status)}`}>
-                                                <span className="capitalize">{salary.status}</span>
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-muted-foreground max-w-xs truncate">
-                                            {salary.notes || '-'}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
+            {/* CPP/EI Progress */}
+            {ytd && (
+                <Card>
+                    <h2 className="text-xl font-semibold mb-4 text-foreground">Contribution Progress</h2>
+                    <div className="space-y-4">
+                        {/* CPP Progress */}
+                        <div>
+                            <div className="flex justify-between mb-1">
+                                <span className="text-sm text-muted-foreground">CPP Contributions</span>
+                                <span className="text-sm font-medium text-foreground">
+                                    {formatCurrency(ytd.cpp_contributions)}
+                                </span>
+                            </div>
+                            <div className="w-full bg-white/10 rounded-full h-2">
+                                <div
+                                    className="bg-neon-emerald h-2 rounded-full transition-all"
+                                    style={{
+                                        width: `${Math.min(100, ytd.cpp_maxed_out ? 100 : (ytd.cpp_contributions / 4500) * 100)}%`,
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* EI Progress */}
+                        <div>
+                            <div className="flex justify-between mb-1">
+                                <span className="text-sm text-muted-foreground">EI Premiums</span>
+                                <span className="text-sm font-medium text-foreground">
+                                    {formatCurrency(ytd.ei_premiums)}
+                                </span>
+                            </div>
+                            <div className="w-full bg-white/10 rounded-full h-2">
+                                <div
+                                    className="bg-neon-emerald h-2 rounded-full transition-all"
+                                    style={{
+                                        width: `${Math.min(100, ytd.ei_maxed_out ? 100 : (ytd.ei_premiums / 1200) * 100)}%`,
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
         </div>
     );
 };
