@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Salary } from '../lib/api';
 import Card from '../components/ui/Card';
-import { DollarSign, CheckCircle, Clock, Building2 } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Building2, Calendar, FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const EmployeeDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -32,6 +34,38 @@ const EmployeeDashboard: React.FC = () => {
             setIsLoading(false);
         }
     };
+
+    // Fetch upcoming schedules
+    const { data: schedulesData } = useQuery({
+        queryKey: ['schedules', 'employee', user?.employee?.id, 'upcoming'],
+        queryFn: async () => {
+            if (!user?.employee?.id) return [];
+            const today = new Date().toISOString().split('T')[0];
+            const result = await api.getSchedules({
+                employee_id: user.employee.id,
+                start_date: today,
+                status: 'scheduled',
+                limit: 5
+            });
+            return result.data;
+        },
+        enabled: !!user?.employee?.id,
+    });
+
+    // Fetch pending timesheets
+    const { data: timesheetsData } = useQuery({
+        queryKey: ['timesheets', 'employee', user?.employee?.id, 'pending'],
+        queryFn: async () => {
+            if (!user?.employee?.id) return [];
+            const result = await api.getTimesheets({
+                employee_id: user.employee.id,
+                status: 'pending',
+                limit: 5
+            });
+            return result.data;
+        },
+        enabled: !!user?.employee?.id,
+    });
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -99,6 +133,46 @@ const EmployeeDashboard: React.FC = () => {
                     </div>
                 </Card>
             )}
+
+            {/* Quick Links */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Link to="/employee-schedule">
+                    <Card className="p-6 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0 p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="ml-5 flex-1">
+                                <h3 className="text-lg font-semibold text-foreground">My Schedule</h3>
+                                <p className="text-sm text-muted-foreground">View your work schedule</p>
+                                {schedulesData && schedulesData.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {schedulesData.length} upcoming shift{schedulesData.length !== 1 ? 's' : ''}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                </Link>
+                <Link to="/employee-timesheet">
+                    <Card className="p-6 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0 p-3 rounded-full bg-green-100 dark:bg-green-900/20">
+                                <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
+                            </div>
+                            <div className="ml-5 flex-1">
+                                <h3 className="text-lg font-semibold text-foreground">My Timesheet</h3>
+                                <p className="text-sm text-muted-foreground">Submit and track timesheets</p>
+                                {timesheetsData && timesheetsData.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {timesheetsData.length} pending approval
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                </Link>
+            </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">

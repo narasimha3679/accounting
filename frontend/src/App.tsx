@@ -27,9 +27,22 @@ import Investments from './pages/Investments';
 import InvestmentDetail from './pages/InvestmentDetail';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import Schedules from './pages/Schedules';
+import Timesheets from './pages/Timesheets';
+import EmployeeSchedule from './pages/EmployeeSchedule';
+import EmployeeTimesheet from './pages/EmployeeTimesheet';
 
-// Create a client
-const queryClient = new QueryClient();
+// Create a client with optimized defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes - cache persists for 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false, // Don't refetch on window focus for better UX
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 // Protected Route Component (requires authentication and a company)
 // For company users only - blocks employees
@@ -146,10 +159,42 @@ function App() {
               }
             />
             <Route
+              path="/employee-schedule"
+              element={
+                <EmployeeRoute>
+                  <EmployeeSchedule />
+                </EmployeeRoute>
+              }
+            />
+            <Route
+              path="/employee-timesheet"
+              element={
+                <EmployeeRoute>
+                  <EmployeeTimesheet />
+                </EmployeeRoute>
+              }
+            />
+            <Route
               path="/employees"
               element={
                 <ProtectedRoute>
                   <Employees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/schedules"
+              element={
+                <ProtectedRoute>
+                  <Schedules />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/timesheets"
+              element={
+                <ProtectedRoute>
+                  <Timesheets />
                 </ProtectedRoute>
               }
             />

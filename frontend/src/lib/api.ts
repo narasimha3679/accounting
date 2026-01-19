@@ -70,6 +70,41 @@ export interface Employee {
     company?: Company;
 }
 
+export interface EmployeeSchedule {
+    id: number;
+    company_id: number;
+    employee_id: number;
+    schedule_date: string;
+    start_time: string;
+    end_time: string;
+    break_duration_minutes: number;
+    notes?: string | null;
+    status: 'scheduled' | 'cancelled' | 'completed';
+    created_by?: number | null;
+    created_at: string;
+    updated_at: string;
+    employee?: Employee;
+}
+
+export interface Timesheet {
+    id: number;
+    company_id: number;
+    employee_id: number;
+    timesheet_date: string;
+    start_time: string;
+    end_time: string;
+    break_duration_minutes: number;
+    notes?: string | null;
+    status: 'draft' | 'pending' | 'approved' | 'rejected';
+    submitted_by?: number | null;
+    approved_by?: number | null;
+    approved_at?: string | null;
+    rejection_reason?: string | null;
+    created_at: string;
+    updated_at: string;
+    employee?: Employee;
+}
+
 export interface InvoiceItem {
     id: number;
     invoice_id: number;
@@ -814,6 +849,214 @@ class SupabaseApi {
 
         const result = await response.json();
         return result.password;
+    }
+
+    // Employee Schedules ---------------------------------------------------
+    async getSchedules(params?: {
+        page?: number;
+        limit?: number;
+        company_id?: number;
+        employee_id?: number;
+        start_date?: string;
+        end_date?: string;
+        status?: string;
+    }): Promise<PaginatedResponse<EmployeeSchedule>> {
+        // Only select needed employee fields to reduce query size and improve performance
+        return this.paginatedSelect<EmployeeSchedule>('employee_schedules', {
+            columns: '*, employee:employees(id, first_name, last_name, email)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'schedule_date', ascending: true },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.employee_id) query = query.eq('employee_id', params.employee_id);
+                if (params?.start_date) query = query.gte('schedule_date', params.start_date);
+                if (params?.end_date) query = query.lte('schedule_date', params.end_date);
+                if (params?.status) query = query.eq('status', params.status);
+                return query;
+            },
+        });
+    }
+
+    async getSchedule(id: number): Promise<EmployeeSchedule> {
+        const { data, error } = await supabase
+            .from('employee_schedules')
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .eq('id', id)
+            .maybeSingle<EmployeeSchedule>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Schedule not found');
+        return data;
+    }
+
+    async createSchedule(schedule: Omit<EmployeeSchedule, 'id' | 'created_at' | 'updated_at' | 'employee'>): Promise<EmployeeSchedule> {
+        // Get current user's profile to set created_by
+        const profile = await this.fetchProfileByAuthUser();
+        const scheduleData: any = {
+            ...schedule,
+            created_by: profile?.id || null,
+        };
+
+        const { data, error } = await supabase
+            .from('employee_schedules')
+            .insert(scheduleData)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<EmployeeSchedule>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateSchedule(id: number, schedule: Partial<EmployeeSchedule>): Promise<EmployeeSchedule> {
+        const { data, error } = await supabase
+            .from('employee_schedules')
+            .update(schedule)
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<EmployeeSchedule>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteSchedule(id: number): Promise<void> {
+        const { error } = await supabase.from('employee_schedules').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Timesheets -----------------------------------------------------------
+    async getTimesheets(params?: {
+        page?: number;
+        limit?: number;
+        company_id?: number;
+        employee_id?: number;
+        start_date?: string;
+        end_date?: string;
+        status?: string;
+    }): Promise<PaginatedResponse<Timesheet>> {
+        // Only select needed employee fields to reduce query size and improve performance
+        return this.paginatedSelect<Timesheet>('timesheets', {
+            columns: '*, employee:employees(id, first_name, last_name, email)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'timesheet_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.employee_id) query = query.eq('employee_id', params.employee_id);
+                if (params?.start_date) query = query.gte('timesheet_date', params.start_date);
+                if (params?.end_date) query = query.lte('timesheet_date', params.end_date);
+                if (params?.status) query = query.eq('status', params.status);
+                return query;
+            },
+        });
+    }
+
+    async getTimesheet(id: number): Promise<Timesheet> {
+        const { data, error } = await supabase
+            .from('timesheets')
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .eq('id', id)
+            .maybeSingle<Timesheet>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Timesheet not found');
+        return data;
+    }
+
+    async createTimesheet(timesheet: Omit<Timesheet, 'id' | 'created_at' | 'updated_at' | 'employee' | 'submitted_by' | 'approved_by' | 'approved_at' | 'rejection_reason'>): Promise<Timesheet> {
+        // If created by owner, default status to 'approved', otherwise 'draft'
+        const profile = await this.fetchProfileByAuthUser();
+        const isOwner = profile && !profile.isEmployee;
+        const timesheetData: any = {
+            ...timesheet,
+            status: isOwner ? (timesheet.status || 'approved') : (timesheet.status || 'draft'),
+        };
+
+        const { data, error } = await supabase
+            .from('timesheets')
+            .insert(timesheetData)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<Timesheet>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateTimesheet(id: number, timesheet: Partial<Timesheet>): Promise<Timesheet> {
+        const { data, error } = await supabase
+            .from('timesheets')
+            .update(timesheet)
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<Timesheet>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async submitTimesheet(id: number): Promise<Timesheet> {
+        // Get current employee to set submitted_by
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) throw new Error('Not authenticated');
+
+        const { data: employee } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('auth_user_id', authUser.id)
+            .maybeSingle();
+
+        if (!employee) throw new Error('Employee record not found');
+
+        const { data, error } = await supabase
+            .from('timesheets')
+            .update({
+                status: 'pending',
+                submitted_by: employee.id,
+            })
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<Timesheet>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async approveTimesheet(id: number): Promise<Timesheet> {
+        const profile = await this.fetchProfileByAuthUser();
+        if (!profile) throw new Error('Not authenticated');
+
+        const { data, error } = await supabase
+            .from('timesheets')
+            .update({
+                status: 'approved',
+                approved_by: profile.id,
+                approved_at: new Date().toISOString(),
+                rejection_reason: null,
+            })
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<Timesheet>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async rejectTimesheet(id: number, reason: string): Promise<Timesheet> {
+        const profile = await this.fetchProfileByAuthUser();
+        if (!profile) throw new Error('Not authenticated');
+
+        const { data, error } = await supabase
+            .from('timesheets')
+            .update({
+                status: 'rejected',
+                approved_by: profile.id,
+                approved_at: new Date().toISOString(),
+                rejection_reason: reason,
+            })
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .single<Timesheet>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteTimesheet(id: number): Promise<void> {
+        const { error } = await supabase.from('timesheets').delete().eq('id', id);
+        if (error) throw new Error(error.message);
     }
 
     // Invoices ------------------------------------------------------------
