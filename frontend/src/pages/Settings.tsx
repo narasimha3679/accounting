@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
-import { Save, Building2, Percent, Calendar, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone } from 'lucide-react';
+import { Save, Building2, Percent, Calendar, Clock, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
@@ -24,6 +24,7 @@ const Settings: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [initialTimeEntryMode, setInitialTimeEntryMode] = useState<'allotted' | 'submitted' | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
     
     // Push notification state
@@ -74,6 +75,7 @@ const Settings: React.FC = () => {
         try {
             const companyData = await api.getCompany(user.company_id);
             setCompany(companyData);
+            setInitialTimeEntryMode(companyData.time_entry_mode ?? null);
         } catch (error) {
             console.error('Error loading company data:', error);
             setError('Failed to load company settings');
@@ -97,6 +99,7 @@ const Settings: React.FC = () => {
                 business_number: company.business_number,
                 hst_number: company.hst_number,
                 hst_registered: company.hst_registered,
+                time_entry_mode: company.time_entry_mode ?? null,
                 fiscal_year_end: company.fiscal_year_end,
                 hst_filing_frequency: company.hst_filing_frequency || 'annual',
                 hst_filing_period_start: company.hst_filing_period_start,
@@ -106,6 +109,7 @@ const Settings: React.FC = () => {
 
             // Use the updated company data directly - this ensures we have the correct value
             setCompany(updatedCompany);
+            setInitialTimeEntryMode(updatedCompany.time_entry_mode ?? null);
             setSuccess('Settings saved successfully!');
             
             // Refresh user context to update company data throughout the app
@@ -125,7 +129,7 @@ const Settings: React.FC = () => {
         }
     };
 
-    const handleInputChange = (field: keyof Company, value: string | number | boolean) => {
+    const handleInputChange = (field: keyof Company, value: string | number | boolean | null) => {
         if (!company) return;
 
         setCompany({
@@ -137,6 +141,10 @@ const Settings: React.FC = () => {
     const formatDate = (dateString: string) => {
         return new Date(dateString).toISOString().split('T')[0];
     };
+
+    const hasTimeModeChanged = !!company
+        && initialTimeEntryMode !== null
+        && company.time_entry_mode !== initialTimeEntryMode;
 
     const loadPushStatus = async () => {
         if (!user) return;
@@ -401,6 +409,64 @@ const Settings: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </Card>
+
+                {/* Time Management Settings */}
+                <Card className="p-6">
+                    <div className="flex items-center mb-4">
+                        <Clock className="h-5 w-5 text-muted-foreground mr-2" />
+                        <h2 className="text-lg font-medium text-foreground">Time Management</h2>
+                    </div>
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Choose the workflow your company uses for time tracking. Employees will see the matching experience.
+                        </p>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <label className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${company.time_entry_mode === 'submitted' ? 'border-primary bg-muted/40' : 'border-border'}`}>
+                                <input
+                                    type="radio"
+                                    name="time_entry_mode"
+                                    value="submitted"
+                                    checked={company.time_entry_mode === 'submitted'}
+                                    onChange={() => handleInputChange('time_entry_mode', 'submitted')}
+                                    className="mt-1"
+                                />
+                                <div>
+                                    <div className="text-sm font-medium text-foreground">Employees enter time</div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Employees log hours and managers approve submissions.
+                                    </p>
+                                </div>
+                            </label>
+                            <label className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${company.time_entry_mode === 'allotted' ? 'border-primary bg-muted/40' : 'border-border'}`}>
+                                <input
+                                    type="radio"
+                                    name="time_entry_mode"
+                                    value="allotted"
+                                    checked={company.time_entry_mode === 'allotted'}
+                                    onChange={() => handleInputChange('time_entry_mode', 'allotted')}
+                                    className="mt-1"
+                                />
+                                <div>
+                                    <div className="text-sm font-medium text-foreground">Fixed schedules</div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Managers build schedules and employees view assigned shifts.
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                        {!company.time_entry_mode && (
+                            <p className="text-sm text-muted-foreground">
+                                No mode selected yet. Choose one and save to enable time management.
+                            </p>
+                        )}
+                        {hasTimeModeChanged && (
+                            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                                Changing the time management mode affects what employees and managers can access. Consider saving
+                                outside of peak scheduling periods.
+                            </div>
+                        )}
                     </div>
                 </Card>
 

@@ -18,7 +18,6 @@ import {
     Briefcase,
     PieChart,
     UserCircle,
-    Calendar,
     Clock
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,8 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Owner Reimbursement', href: '/owner-payments', icon: CreditCard },
         { name: 'Clients', href: '/clients', icon: Users },
         { name: 'Employees', href: '/employees', icon: UserCircle },
-        { name: 'Schedules', href: '/schedules', icon: Calendar },
-        { name: 'Timesheets', href: '/timesheets', icon: Clock },
+        { name: 'Time Management', href: '/time-management', icon: Clock },
         { name: 'Reports', href: '/reports', icon: TrendingUp },
         { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },
         { name: 'Settings', href: '/settings', icon: Settings },
@@ -56,8 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     // Employee navigation (limited)
     const employeeNavigation = [
         { name: 'Dashboard', href: '/employee-dashboard', icon: Home },
-        { name: 'My Schedule', href: '/employee-schedule', icon: Calendar },
-        { name: 'My Timesheet', href: '/employee-timesheet', icon: Clock },
+        { name: 'My Time', href: '/employee-time-management', icon: Clock },
     ];
 
     const navigation = user?.isEmployee ? employeeNavigation : companyNavigation;

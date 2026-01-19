@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type CapitalAsset, type ExpenseCategory, type CCAClass } from '../lib/api';
 import { Plus, Edit, Trash2, Calculator, Building2, Calendar, X } from 'lucide-react';
@@ -76,6 +76,50 @@ const CapitalAssets: React.FC = () => {
         }
     };
 
+    // Compute available categories from assets
+    const availableCategories = useMemo(() => {
+        if (!assets || !categories) return [];
+        const categoryIdsInUse = new Set(assets.map(a => a.category_id));
+        return categories.filter(cat => categoryIdsInUse.has(cat.id));
+    }, [assets, categories]);
+
+    // Compute available CCA classes from assets
+    const availableCCAClasses = useMemo(() => {
+        if (!assets || !ccaClasses) return [];
+        const ccaClassesInUse = new Set(assets.map(a => a.cca_class));
+        return ccaClasses.filter(cca => ccaClassesInUse.has(cca.class_number));
+    }, [assets, ccaClasses]);
+
+    // Reset selected category if it becomes unavailable
+    useEffect(() => {
+        if (selectedCategory !== 'all') {
+            if (availableCategories.length === 0) {
+                // No categories available, reset to 'all'
+                setSelectedCategory('all');
+            } else {
+                const categoryExists = availableCategories.some(cat => cat.id === parseInt(selectedCategory));
+                if (!categoryExists) {
+                    setSelectedCategory('all');
+                }
+            }
+        }
+    }, [selectedCategory, availableCategories]);
+
+    // Reset selected CCA class if it becomes unavailable
+    useEffect(() => {
+        if (selectedCCAClass !== 'all') {
+            if (availableCCAClasses.length === 0) {
+                // No CCA classes available, reset to 'all'
+                setSelectedCCAClass('all');
+            } else {
+                const ccaClassExists = availableCCAClasses.some(cca => cca.class_number === selectedCCAClass);
+                if (!ccaClassExists) {
+                    setSelectedCCAClass('all');
+                }
+            }
+        }
+    }, [selectedCCAClass, availableCCAClasses]);
+
     // Filter assets by category and CCA class
     const filteredAssets = assets?.filter(asset => {
         if (selectedCategory !== 'all' && asset.category_id !== parseInt(selectedCategory)) return false;
@@ -128,7 +172,7 @@ const CapitalAssets: React.FC = () => {
                         className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
-                        {categories?.map(category => (
+                        {availableCategories.map(category => (
                             <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
                     </select>
@@ -140,7 +184,7 @@ const CapitalAssets: React.FC = () => {
                         className="flex h-10 w-full sm:w-auto rounded-md border border-input bg-card text-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All CCA Classes</option>
-                        {ccaClasses?.map(ccaClass => (
+                        {availableCCAClasses.map(ccaClass => (
                             <option key={ccaClass.class_number} value={ccaClass.class_number}>
                                 Class {ccaClass.class_number} - {ccaClass.description}
                             </option>

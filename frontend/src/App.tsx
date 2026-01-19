@@ -27,10 +27,8 @@ import Investments from './pages/Investments';
 import InvestmentDetail from './pages/InvestmentDetail';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
-import Schedules from './pages/Schedules';
-import Timesheets from './pages/Timesheets';
-import EmployeeSchedule from './pages/EmployeeSchedule';
-import EmployeeTimesheet from './pages/EmployeeTimesheet';
+import TimeManagement from './pages/TimeManagement';
+import EmployeeTimeManagement from './pages/EmployeeTimeManagement';
 
 // Create a client with optimized defaults
 const queryClient = new QueryClient({
@@ -159,18 +157,10 @@ function App() {
               }
             />
             <Route
-              path="/employee-schedule"
+              path="/employee-time-management"
               element={
                 <EmployeeRoute>
-                  <EmployeeSchedule />
-                </EmployeeRoute>
-              }
-            />
-            <Route
-              path="/employee-timesheet"
-              element={
-                <EmployeeRoute>
-                  <EmployeeTimesheet />
+                  <EmployeeTimeManagement />
                 </EmployeeRoute>
               }
             />
@@ -183,18 +173,10 @@ function App() {
               }
             />
             <Route
-              path="/schedules"
+              path="/time-management"
               element={
                 <ProtectedRoute>
-                  <Schedules />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/timesheets"
-              element={
-                <ProtectedRoute>
-                  <Timesheets />
+                  <TimeManagement />
                 </ProtectedRoute>
               }
             />

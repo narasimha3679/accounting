@@ -20,6 +20,7 @@ export interface Company {
     business_number: string;
     hst_number?: string | null;
     hst_registered: boolean;
+    time_entry_mode?: 'allotted' | 'submitted' | null;
     fiscal_year_end: string;
     hst_filing_frequency?: 'monthly' | 'quarterly' | 'annual' | null;
     hst_filing_period_start?: string | null;
@@ -103,6 +104,29 @@ export interface Timesheet {
     created_at: string;
     updated_at: string;
     employee?: Employee;
+}
+
+export interface TimeEntry {
+    id: number;
+    company_id: number;
+    employee_id: number;
+    entry_date: string;
+    start_time: string;
+    end_time: string;
+    break_duration_minutes: number;
+    notes?: string | null;
+    entry_type: 'allotted' | 'submitted';
+    status: 'scheduled' | 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled' | 'completed';
+    created_by?: number | null;
+    submitted_by?: number | null;
+    approved_by?: number | null;
+    approved_at?: string | null;
+    rejection_reason?: string | null;
+    allotted_entry_id?: number | null;
+    created_at: string;
+    updated_at: string;
+    employee?: Employee;
+    allotted_entry?: TimeEntry;
 }
 
 export interface InvoiceItem {
@@ -1056,6 +1080,185 @@ class SupabaseApi {
 
     async deleteTimesheet(id: number): Promise<void> {
         const { error } = await supabase.from('timesheets').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // Time Entries (Unified) ------------------------------------------------
+    async getTimeEntries(params?: {
+        page?: number;
+        limit?: number;
+        company_id?: number;
+        employee_id?: number;
+        start_date?: string;
+        end_date?: string;
+        status?: string;
+        entry_type?: 'allotted' | 'submitted';
+    }): Promise<PaginatedResponse<TimeEntry>> {
+        return this.paginatedSelect<TimeEntry>('time_entries', {
+            columns: '*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)',
+            page: params?.page,
+            limit: params?.limit,
+            order: { column: 'entry_date', ascending: false },
+            modify: (query) => {
+                if (params?.company_id) query = query.eq('company_id', params.company_id);
+                if (params?.employee_id) query = query.eq('employee_id', params.employee_id);
+                if (params?.start_date) query = query.gte('entry_date', params.start_date);
+                if (params?.end_date) query = query.lte('entry_date', params.end_date);
+                if (params?.status) query = query.eq('status', params.status);
+                if (params?.entry_type) query = query.eq('entry_type', params.entry_type);
+                return query;
+            },
+        });
+    }
+
+    async getTimeEntry(id: number): Promise<TimeEntry> {
+        const { data, error } = await supabase
+            .from('time_entries')
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .eq('id', id)
+            .maybeSingle<TimeEntry>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Time entry not found');
+        return data;
+    }
+
+    async createTimeEntry(timeEntry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'employee' | 'allotted_entry'>): Promise<TimeEntry> {
+        const profile = await this.fetchProfileByAuthUser();
+        const timeEntryData: any = {
+            ...timeEntry,
+            created_by: profile?.id || null,
+        };
+
+        const { data, error } = await supabase
+            .from('time_entries')
+            .insert(timeEntryData)
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .single<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateTimeEntry(id: number, timeEntry: Partial<TimeEntry>): Promise<TimeEntry> {
+        const { data, error } = await supabase
+            .from('time_entries')
+            .update(timeEntry)
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .single<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteTimeEntry(id: number): Promise<void> {
+        const { error } = await supabase.from('time_entries').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    async submitTimeEntry(id: number): Promise<TimeEntry> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) throw new Error('Not authenticated');
+
+        const { data: employee } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('auth_user_id', authUser.id)
+            .maybeSingle();
+
+        if (!employee) throw new Error('Employee record not found');
+
+        const { data, error } = await supabase
+            .from('time_entries')
+            .update({
+                status: 'pending',
+                submitted_by: employee.id,
+            })
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .single<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async approveTimeEntry(id: number): Promise<TimeEntry> {
+        const profile = await this.fetchProfileByAuthUser();
+        if (!profile) throw new Error('Not authenticated');
+
+        // First get the entry to check if it has an allotted_entry_id
+        const entry = await this.getTimeEntry(id);
+
+        const updateData: any = {
+            status: 'approved',
+            approved_by: profile.id,
+            approved_at: new Date().toISOString(),
+            rejection_reason: null,
+        };
+
+        // If this is a submitted entry with an allotted entry, mark the allotted entry as completed
+        if (entry.entry_type === 'submitted' && entry.allotted_entry_id) {
+            await supabase
+                .from('time_entries')
+                .update({ status: 'completed' })
+                .eq('id', entry.allotted_entry_id);
+        }
+
+        const { data, error } = await supabase
+            .from('time_entries')
+            .update(updateData)
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .single<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async rejectTimeEntry(id: number, reason: string): Promise<TimeEntry> {
+        const profile = await this.fetchProfileByAuthUser();
+        if (!profile) throw new Error('Not authenticated');
+
+        const { data, error } = await supabase
+            .from('time_entries')
+            .update({
+                status: 'rejected',
+                approved_by: profile.id,
+                approved_at: new Date().toISOString(),
+                rejection_reason: reason,
+            })
+            .eq('id', id)
+            .select('*, employee:employees(id, first_name, last_name, email), allotted_entry:time_entries!allotted_entry_id(*)')
+            .single<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async getAllottedEntryForDate(employeeId: number, date: string): Promise<TimeEntry | null> {
+        const { data, error } = await supabase
+            .from('time_entries')
+            .select('*, employee:employees(id, first_name, last_name, email)')
+            .eq('employee_id', employeeId)
+            .eq('entry_date', date)
+            .eq('entry_type', 'allotted')
+            .eq('status', 'scheduled')
+            .maybeSingle<TimeEntry>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async getCompanyTimeMode(companyId: number): Promise<'allotted' | 'submitted' | null> {
+        const { data, error } = await supabase
+            .from('companies')
+            .select('time_entry_mode')
+            .eq('id', companyId)
+            .maybeSingle();
+        if (error) throw new Error(error.message);
+        return (data?.time_entry_mode as 'allotted' | 'submitted' | null) ?? null;
+    }
+
+    async updateCompanyTimeMode(companyId: number, mode: 'allotted' | 'submitted'): Promise<void> {
+        const { error } = await supabase
+            .from('companies')
+            .update({ time_entry_mode: mode })
+            .eq('id', companyId);
         if (error) throw new Error(error.message);
     }
 

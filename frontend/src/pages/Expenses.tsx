@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
@@ -109,6 +109,28 @@ const Expenses: React.FC = () => {
             deleteMutation.mutate(expense.id);
         }
     };
+
+    // Compute available categories from expenses in current date range
+    const availableCategories = useMemo(() => {
+        if (!expenses || !categories) return [];
+        const categoryIdsInUse = new Set(expenses.map(e => e.category_id));
+        return categories.filter(cat => categoryIdsInUse.has(cat.id));
+    }, [expenses, categories]);
+
+    // Reset selected category if it becomes unavailable (e.g., after date change)
+    useEffect(() => {
+        if (selectedCategory !== 'all') {
+            if (availableCategories.length === 0) {
+                // No categories available, reset to 'all'
+                setSelectedCategory('all');
+            } else {
+                const categoryExists = availableCategories.some(cat => cat.id === parseInt(selectedCategory));
+                if (!categoryExists) {
+                    setSelectedCategory('all');
+                }
+            }
+        }
+    }, [selectedCategory, availableCategories]);
 
     // Filter expenses by category
     const filteredExpenses = expenses?.filter(expense => {
@@ -267,7 +289,7 @@ const Expenses: React.FC = () => {
                         className="flex h-10 w-full sm:w-auto rounded-md glass border border-white/10 bg-card text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">All Categories</option>
-                        {categories?.map(category => (
+                        {availableCategories.map(category => (
                             <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
                     </select>
