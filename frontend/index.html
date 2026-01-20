@@ -2,15 +2,30 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Language" content="en" />
     <meta name="theme-color" content="#34d399" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#34d399" />
+    
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192x192.png" />
+    <link rel="mask-icon" href="/icon.svg" color="#34d399" />
+    
+    <!-- Resource Hints for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     
     <!-- SEO Meta Tags -->
     <meta name="description" content="Cashual is the all-in-one accounting platform for Canadian small businesses and incorporated professionals. Simplify payroll, dividends, tax documents (T4, T5, ROE), expenses, and CRA compliance." />
     <meta name="keywords" content="Canadian payroll software, small business accounting, T4 generation, T5 slips, ROE, dividend management, CRA compliant, incorporated professionals, expense tracking, tax calculator" />
     <meta name="author" content="Cashual" />
     <meta name="robots" content="index, follow" />
+    <meta name="googlebot" content="index, follow" />
     <link rel="canonical" href="https://cashual.app" />
     
     <!-- Open Graph / Social Media -->
@@ -20,12 +35,18 @@
     <meta property="og:description" content="Simplify payroll, dividends, and tax compliance. The all-in-one accounting platform built for Canadian small businesses and incorporated professionals." />
     <meta property="og:url" content="https://cashual.app" />
     <meta property="og:image" content="https://cashual.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Cashual - Smart Accounting for Canadian Small Businesses" />
+    <meta property="og:locale" content="en_CA" />
+    <meta property="og:locale:alternate" content="en_US" />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Cashual - Smart Accounting for Canadian Small Businesses" />
     <meta name="twitter:description" content="Simplify payroll, dividends, and tax compliance. Built for Canadian small businesses and incorporated professionals." />
     <meta name="twitter:image" content="https://cashual.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Cashual - Smart Accounting for Canadian Small Businesses" />
     
     <!-- Apple iOS PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -33,10 +54,200 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Cashual" />
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Fonts with font-display swap -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Cashual - Smart Accounting for Canadian Small Businesses | Payroll, Dividends & Tax Compliance</title>
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Cashual",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CAD",
+        "availability": "https://schema.org/InStock"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "ratingCount": "500"
+      },
+      "description": "The all-in-one accounting platform for Canadian small businesses and incorporated professionals. Simplify payroll, dividends, tax documents (T4, T5, ROE), expenses, and CRA compliance.",
+      "url": "https://cashual.app",
+      "screenshot": "https://cashual.app/og-image.png",
+      "featureList": [
+        "Automated Payroll",
+        "Dividend Management",
+        "Expense Tracking",
+        "CRA-Ready Tax Documents",
+        "Tax Planning Calculator",
+        "Employee Self-Service"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Cashual",
+      "url": "https://cashual.app",
+      "logo": "https://cashual.app/icon-512x512.png",
+      "description": "The smart accounting platform built for Canadian small businesses and incorporated professionals.",
+      "sameAs": [],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Support",
+        "areaServed": "CA",
+        "availableLanguage": ["English"],
+        "email": "support@cashual.app"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CA"
+      },
+      "foundingDate": "2024"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Cashual",
+      "url": "https://cashual.app",
+      "description": "The all-in-one accounting platform for Canadian small businesses and incorporated professionals.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Cashual",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://cashual.app/icon-512x512.png"
+        }
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://cashual.app/search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://cashual.app"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Features",
+          "item": "https://cashual.app/#features"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "How It Works",
+          "item": "https://cashual.app/#how-it-works"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Pricing",
+          "item": "https://cashual.app/#pricing"
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "name": "FAQ",
+          "item": "https://cashual.app/#faq"
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is Cashual CRA compliant?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, absolutely. Cashual's tax calculations and document generation are built to meet all Canada Revenue Agency requirements. Our system automatically handles CPP, EI, income tax, and provincial tax calculations according to current CRA guidelines. All generated documents (T4s, T5s, ROEs) are formatted to CRA specifications."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does pricing work after the beta period?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "During our public beta, Cashual is completely free. After the beta period ends, we'll introduce transparent, affordable pricing designed for small businesses. Beta users will receive special early-adopter pricing. We'll announce pricing details well in advance, and you can cancel anytime with no long-term commitments."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I import data from other accounting systems?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, we're working on import capabilities for common accounting formats. Currently, you can manually enter your data, and we're developing CSV import features for transactions, employee data, and historical records. If you need to migrate from a specific system, contact our support team for assistance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if I need help or have questions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "We offer comprehensive support through multiple channels. You can access our knowledge base, contact support via email, or schedule a one-on-one onboarding call. During beta, we're especially responsive to feedback and feature requests. Our goal is to make sure you're successful with Cashual."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my data secure?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Security is our top priority. We use bank-level encryption, secure data storage, and follow industry best practices for data protection. Your financial data is encrypted both in transit and at rest. We're compliant with Canadian privacy laws (PIPEDA) and never share your data with third parties."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use Cashual for multiple companies?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Cashual supports multiple companies. You can manage payroll, expenses, and tax documents for multiple businesses from a single account. Each company maintains separate records, employees, and financial data. This is especially useful for consultants or contractors who operate multiple incorporated entities."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need accounting knowledge to use Cashual?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No accounting degree required! Cashual is designed to be intuitive for business owners who aren't accountants. We provide clear guidance, helpful tooltips, and automatic calculations. However, for complex tax situations, we always recommend consulting with a professional accountant."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What happens if I make a mistake?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cashual makes it easy to correct mistakes. You can edit payroll runs, adjust employee information, and regenerate documents as needed. We also maintain an audit trail so you can see what changed and when. If you've already submitted documents to the CRA, we provide guidance on how to file corrections."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

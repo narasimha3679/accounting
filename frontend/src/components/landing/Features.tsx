@@ -50,10 +50,15 @@ const features = [
 
 export const Features = () => {
   return (
-    <section id="features" className="py-24 relative">
+    <section 
+      id="features" 
+      className="py-24 relative" 
+      role="region" 
+      aria-labelledby="features-heading"
+    >
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+          <h2 id="features-heading" className="text-3xl md:text-5xl font-bold text-white mb-6">
             Everything You Need to Run Your <span className="text-neon-emerald">Business</span>
           </h2>
           <p className="text-slate-400 text-lg">
@@ -70,14 +75,30 @@ export const Features = () => {
               viewport={{ once: true }}
               transition={{ delay: index * 0.1, duration: 0.5 }}
             >
-              <Card className="h-full group hover:border-white/20 transition-all duration-300" glass="light">
-                <div className="mb-6 inline-flex p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
+              <Card className="h-full group hover:border-white/20 hover:shadow-lg hover:shadow-neon-emerald/10 transition-all duration-300 flex flex-col" glass="light">
+                <div className="mb-6 inline-flex p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors" aria-hidden="true">
                   <feature.icon className={`w-8 h-8 ${feature.color}`} />
                 </div>
                 <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-                <p className="text-slate-400 leading-relaxed">
+                <p className="text-slate-400 leading-relaxed flex-1 mb-4">
                   {feature.description}
                 </p>
+                <a 
+                  href="#pricing" 
+                  className="text-sm text-neon-emerald hover:text-teal-400 font-medium inline-flex items-center gap-1 group/link transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const element = document.querySelector('#pricing');
+                    if (element) {
+                      const offset = 80;
+                      const elementPosition = element.getBoundingClientRect().top;
+                      const offsetPosition = elementPosition + window.pageYOffset - offset;
+                      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                    }
+                  }}
+                >
+                  Try this feature <span className="group-hover/link:translate-x-1 transition-transform inline-block">→</span>
+                </a>
               </Card>
             </motion.div>
           ))}

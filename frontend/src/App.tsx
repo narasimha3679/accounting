@@ -42,6 +42,9 @@ import EmployeeYTDPage from './pages/EmployeeYTDPage';
 import EmployeeTaxDocumentsPage from './pages/EmployeeTaxDocumentsPage';
 import EmployeeInfoPage from './pages/EmployeeInfoPage';
 import EmployeeTD1Page from './pages/EmployeeTD1Page';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import ScrollToTop from './components/ScrollToTop';
 
 // Create a client with optimized defaults
 const queryClient = new QueryClient({
@@ -141,11 +144,14 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Router>
+            <ScrollToTop />
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route
               path="/onboarding/company"
               element={

@@ -3,9 +3,14 @@ import { Navbar } from '../components/landing/Navbar';
 import { Hero } from '../components/landing/Hero';
 import { TrustSection } from '../components/landing/TrustSection';
 import { Features } from '../components/landing/Features';
+import { Testimonials } from '../components/landing/Testimonials';
 import { HowItWorks } from '../components/landing/HowItWorks';
 import { Pricing } from '../components/landing/Pricing';
+import { FAQ } from '../components/landing/FAQ';
 import { Footer } from '../components/landing/Footer';
+import { FloatingCTA } from '../components/landing/FloatingCTA';
+import { BackToTop } from '../components/landing/BackToTop';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,15 +30,23 @@ const LandingPage = () => {
   }, [isAuthenticated, user, navigate]);
 
   return (
-    <div className="min-h-screen bg-deep-forest text-white selection:bg-neon-emerald/30 selection:text-white">
-      <Navbar />
-      <Hero />
-      <TrustSection />
-      <Features />
-      <HowItWorks />
-      <Pricing />
-      <Footer />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-deep-forest text-white selection:bg-neon-emerald/30 selection:text-white">
+        <Navbar />
+        <main id="main-content">
+          <Hero />
+          <TrustSection />
+          <Features />
+          <Testimonials />
+          <HowItWorks />
+          <Pricing />
+          <FAQ />
+        </main>
+        <Footer />
+        <FloatingCTA />
+        <BackToTop />
+      </div>
+    </ErrorBoundary>
   );
 };
 

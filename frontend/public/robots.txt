@@ -1,0 +1,12 @@
+# robots.txt for Cashual
+# https://cashual.app
+
+User-agent: *
+Allow: /
+
+# Disallow admin and API routes if they exist
+Disallow: /admin/
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://cashual.app/sitemap.xml

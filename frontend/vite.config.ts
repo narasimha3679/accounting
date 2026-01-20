@@ -13,9 +13,9 @@ export default defineConfig({
       filename: 'service-worker.ts',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Corporate Accounting',
-        short_name: 'Corp Accounting',
-        description: 'Accounting tool for incorporated contracting businesses',
+        name: 'Cashual - Smart Accounting for Canadian Small Businesses',
+        short_name: 'Cashual',
+        description: 'The all-in-one accounting platform for Canadian small businesses and incorporated professionals',
         theme_color: '#34d399',
         background_color: '#020402',
         display: 'standalone',
@@ -54,6 +54,29 @@ export default defineConfig({
     alias: {
       "@": "/src",
     },
+  },
+  build: {
+    // Optimize for static export
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['framer-motion', 'lucide-react'],
+          'query-vendor': ['@tanstack/react-query'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port: 3000,

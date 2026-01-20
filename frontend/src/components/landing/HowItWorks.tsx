@@ -24,13 +24,19 @@ const steps = [
 
 export const HowItWorks = () => {
   return (
-    <section id="how-it-works" className="py-24 relative">
+    <section 
+      id="how-it-works" 
+      className="py-24 relative"
+      role="region"
+      aria-labelledby="how-it-works-heading"
+    >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-charcoal/50 to-transparent -z-10" />
       
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <motion.h2 
+            id="how-it-works-heading"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
