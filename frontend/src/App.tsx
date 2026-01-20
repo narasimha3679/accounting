@@ -10,6 +10,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import Clients from './pages/Clients';
@@ -101,7 +102,7 @@ const EmployeeRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   // Redirect company users to dashboard
   if (!user?.isEmployee) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (!user?.company_id) {
@@ -128,7 +129,7 @@ const AuthOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   if (user?.company_id) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -141,6 +142,7 @@ function App() {
         <AuthProvider>
           <Router>
             <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -153,7 +155,7 @@ function App() {
               }
             />
             <Route
-              path="/"
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
