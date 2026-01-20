@@ -34,9 +34,9 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-tight"
             >
-              Corporate Accounting <br className="hidden md:block" />
+              Run Your Business, <br className="hidden md:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-emerald to-teal-400">
-                Reimagined.
+                Not Your Back Office.
               </span>
             </motion.h1>
             
@@ -46,8 +46,8 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg md:text-xl text-slate-400 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
             >
-              The all-in-one financial operating system for incorporated professionals, software developers, and small businesses. 
-              Payroll, dividends, taxes, and expenses—simplified.
+              The all-in-one accounting platform for Canadian small businesses and incorporated professionals. 
+              Payroll, dividends, T4s, T5s, and CRA compliance—all in one place.
             </motion.p>
             
             <motion.div

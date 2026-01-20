@@ -11,38 +11,38 @@ import {
 
 const features = [
   {
-    title: "Smart Payroll",
-    description: "Automated payroll processing with instant PD7A calculations. Generate professional pay stubs in seconds.",
+    title: "Automated Payroll",
+    description: "Run payroll in minutes, not hours. Automatic tax calculations, PD7A remittance summaries, and professional pay stubs generated instantly.",
     icon: DollarSign,
     color: "text-neon-emerald"
   },
   {
     title: "Dividend Management",
-    description: "Issue and track dividends effortlessly. Auto-generation of T5 slips and dividend resolutions.",
+    description: "Issue dividends with proper documentation. Auto-generate T5 slips and board resolutions—stay compliant without the paperwork.",
     icon: PieChart,
     color: "text-golden-hour"
   },
   {
     title: "Expense Tracking",
-    description: "Categorize expenses and manage receipts. Intelligent tracking ensures you maximize your deductions.",
+    description: "Track business expenses and maximize deductions. Smart categorization helps you identify tax savings opportunities.",
     icon: CreditCard,
     color: "text-blue-400"
   },
   {
-    title: "Tax Documents",
-    description: "One-click generation for T4s, T5s, and ROEs. Stay compliant with CRA requirements without the headache.",
+    title: "CRA-Ready Tax Documents",
+    description: "Generate T4s, T5s, and ROEs with one click. Built-in compliance checks ensure your documents meet CRA requirements.",
     icon: FileText,
     color: "text-purple-400"
   },
   {
-    title: "Tax Calculator",
-    description: "Real-time tax estimations. Know exactly how much corporate and personal tax you owe throughout the year.",
+    title: "Tax Planning Calculator",
+    description: "See your corporate and personal tax obligations in real-time. Plan salary vs. dividend mix to optimize your tax position.",
     icon: Calculator,
     color: "text-pink-400"
   },
   {
-    title: "Employee Portal",
-    description: "Self-service access for your employees to view pay stubs, tax forms, and update their personal details.",
+    title: "Employee Self-Service",
+    description: "Give employees secure access to their pay stubs, T4s, and TD1 forms. Reduce admin work and improve transparency.",
     icon: Users,
     color: "text-orange-400"
   }
@@ -54,10 +54,10 @@ export const Features = () => {
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
-            Everything you need to run your <span className="text-neon-emerald">Inc.</span>
+            Everything You Need to Run Your <span className="text-neon-emerald">Business</span>
           </h2>
           <p className="text-slate-400 text-lg">
-            Stop juggling spreadsheets and clunky software. Cashual brings all your corporate accounting needs into one beautiful dashboard.
+            Stop juggling spreadsheets and expensive accountant fees. Cashual brings payroll, dividends, tax documents, and expense tracking into one powerful platform.
           </p>
         </div>
 

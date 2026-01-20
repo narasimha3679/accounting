@@ -4,13 +4,14 @@ import { Button } from '../ui/Button';
 import { Link } from 'react-router-dom';
 
 const benefits = [
-  "Unlimited transactions",
+  "Unlimited payroll runs",
   "Unlimited employees",
-  "Payroll & Dividends",
-  "Tax Document Generation (T4, T5)",
-  "Expense Management",
-  "Invoicing & Clients",
-  "Priority Email Support"
+  "Dividend management & T5s",
+  "T4, T4A, and ROE generation",
+  "Expense tracking & categorization",
+  "Invoice management",
+  "Employee self-service portal",
+  "CRA-compliant calculations"
 ];
 
 export const Pricing = () => {
@@ -26,7 +27,7 @@ export const Pricing = () => {
               Simple, Transparent Pricing
             </h2>
             <p className="text-slate-400 text-lg">
-              We're currently in Public Beta. Enjoy full access to all features for free.
+              We're in Public Beta—get full access to all features completely free while we perfect the platform together.
             </p>
           </div>
 
@@ -47,7 +48,7 @@ export const Pricing = () => {
                   </div>
                   <h3 className="text-4xl font-bold text-white mb-2">Free Access</h3>
                   <p className="text-slate-400 mb-8">
-                    Get early access to the platform and help shape the future of corporate accounting.
+                    Join the beta and help shape the future of small business accounting in Canada. Your feedback drives our roadmap.
                   </p>
                   <Link to="/login">
                     <Button variant="cta" size="lg" className="w-full sm:w-auto px-12">
