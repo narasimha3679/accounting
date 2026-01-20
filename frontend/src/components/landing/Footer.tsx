@@ -15,7 +15,7 @@ export const Footer = () => {
               </span>
             </Link>
             <p className="text-slate-400 max-w-md">
-              The modern financial operating system designed for Canadian incorporated professionals and small businesses.
+              The smart accounting platform built for Canadian small businesses and incorporated professionals. Payroll, dividends, and tax compliance made simple.
             </p>
           </div>
           
