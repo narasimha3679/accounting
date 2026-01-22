@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const lastHandledHref = useRef<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,9 +18,25 @@ export const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Handle smooth scroll for anchor links
-  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  // Handle smooth scroll for anchor links (supports both mouse and touch events)
+  const handleAnchorClick = (
+    e: React.MouseEvent<HTMLAnchorElement> | React.TouchEvent<HTMLAnchorElement>,
+    href: string
+  ) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Prevent double-firing when both onClick and onTouchEnd fire
+    if (lastHandledHref.current === href) {
+      return;
+    }
+    lastHandledHref.current = href;
+    
+    // Reset the guard after a short delay
+    setTimeout(() => {
+      lastHandledHref.current = null;
+    }, 300);
+    
     const element = document.querySelector(href);
     if (element) {
       const offset = 80; // Account for fixed navbar
@@ -30,8 +47,15 @@ export const Navbar = () => {
         top: offsetPosition,
         behavior: 'smooth'
       });
+      
+      // Close mobile menu after a short delay to ensure scroll initiates
+      setTimeout(() => {
+        setMobileMenuOpen(false);
+      }, 150);
+    } else {
+      // If element not found, close menu immediately
+      setMobileMenuOpen(false);
     }
-    setMobileMenuOpen(false);
   };
 
   // Handle Escape key to close mobile menu
@@ -142,32 +166,36 @@ export const Navbar = () => {
               <div className="px-4 py-6 space-y-4">
                 <a
                   href="#features"
-                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
+                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2 touch-manipulation select-none cursor-pointer"
                   onClick={(e) => handleAnchorClick(e, '#features')}
+                  onTouchEnd={(e) => handleAnchorClick(e, '#features')}
                   role="menuitem"
                 >
                   Features
                 </a>
                 <a
                   href="#how-it-works"
-                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
+                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2 touch-manipulation select-none cursor-pointer"
                   onClick={(e) => handleAnchorClick(e, '#how-it-works')}
+                  onTouchEnd={(e) => handleAnchorClick(e, '#how-it-works')}
                   role="menuitem"
                 >
                   How it Works
                 </a>
                 <a
                   href="#pricing"
-                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
+                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2 touch-manipulation select-none cursor-pointer"
                   onClick={(e) => handleAnchorClick(e, '#pricing')}
+                  onTouchEnd={(e) => handleAnchorClick(e, '#pricing')}
                   role="menuitem"
                 >
                   Pricing
                 </a>
                 <a
                   href="#faq"
-                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
+                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2 touch-manipulation select-none cursor-pointer"
                   onClick={(e) => handleAnchorClick(e, '#faq')}
+                  onTouchEnd={(e) => handleAnchorClick(e, '#faq')}
                   role="menuitem"
                 >
                   FAQ

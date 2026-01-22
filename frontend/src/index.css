@@ -264,3 +264,11 @@
     top: 0;
   }
 }
+
+@layer utilities {
+  /* Touch manipulation for better mobile interaction */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
