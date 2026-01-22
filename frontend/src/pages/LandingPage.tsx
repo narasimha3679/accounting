@@ -3,12 +3,13 @@ import { Navbar } from '../components/landing/Navbar';
 import { Hero } from '../components/landing/Hero';
 import { TrustSection } from '../components/landing/TrustSection';
 import { Features } from '../components/landing/Features';
-import { Testimonials } from '../components/landing/Testimonials';
+import { UseCases } from '../components/landing/UseCases';
+import { Comparison } from '../components/landing/Comparison';
 import { HowItWorks } from '../components/landing/HowItWorks';
 import { Pricing } from '../components/landing/Pricing';
+import { Testimonials } from '../components/landing/Testimonials';
 import { FAQ } from '../components/landing/FAQ';
 import { Footer } from '../components/landing/Footer';
-import { FloatingCTA } from '../components/landing/FloatingCTA';
 import { BackToTop } from '../components/landing/BackToTop';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,13 +38,14 @@ const LandingPage = () => {
           <Hero />
           <TrustSection />
           <Features />
-          <Testimonials />
+          <UseCases />
+          <Comparison />
           <HowItWorks />
           <Pricing />
+          <Testimonials />
           <FAQ />
         </main>
         <Footer />
-        <FloatingCTA />
         <BackToTop />
       </div>
     </ErrorBoundary>

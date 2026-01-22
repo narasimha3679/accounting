@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { EmailCapture } from './EmailCapture';
+import { Logo } from '../ui/Logo';
 
 export const Footer = () => {
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -19,32 +19,22 @@ export const Footer = () => {
   return (
     <footer className="bg-charcoal border-t border-white/5 pt-16 pb-8" role="contentinfo">
       <div className="container mx-auto px-4 md:px-6">
-        {/* Email Capture Section */}
-        <div className="mb-16">
-          <EmailCapture />
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="md:col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-6" aria-label="Cashual home">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-neon-emerald to-emerald-600 flex items-center justify-center">
-                <span className="text-deep-forest font-bold text-lg">C</span>
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white">
-                Cashual<span className="text-neon-emerald">.</span>
-              </span>
+            <Link to="/" className="mb-6 inline-block" aria-label="Cashual home">
+              <Logo variant="icon-text" size="md" />
             </Link>
             <p className="text-slate-400 max-w-md">
               The smart accounting platform built for Canadian small businesses and incorporated professionals. Payroll, dividends, and tax compliance made simple.
             </p>
           </div>
-          
+
           <div>
             <h4 className="text-white font-semibold mb-6">Product</h4>
             <ul className="space-y-4" role="list">
               <li>
-                <a 
-                  href="#features" 
+                <a
+                  href="#features"
                   onClick={(e) => handleAnchorClick(e, '#features')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
@@ -52,8 +42,8 @@ export const Footer = () => {
                 </a>
               </li>
               <li>
-                <a 
-                  href="#pricing" 
+                <a
+                  href="#pricing"
                   onClick={(e) => handleAnchorClick(e, '#pricing')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
@@ -61,8 +51,8 @@ export const Footer = () => {
                 </a>
               </li>
               <li>
-                <a 
-                  href="#faq" 
+                <a
+                  href="#faq"
                   onClick={(e) => handleAnchorClick(e, '#faq')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
@@ -81,7 +71,7 @@ export const Footer = () => {
               <li><Link to="/terms-of-service" className="text-slate-400 hover:text-neon-emerald transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-white font-semibold mb-6">Support</h4>
             <ul className="space-y-4" role="list">
@@ -96,7 +86,7 @@ export const Footer = () => {
             © {new Date().getFullYear()} Cashual. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-             {/* Social icons could go here */}
+            {/* Social icons could go here */}
           </div>
         </div>
       </div>

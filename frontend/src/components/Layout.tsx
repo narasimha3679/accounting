@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { Logo } from './ui/Logo';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -93,9 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="flex h-full flex-col">
                     {/* Logo */}
                     <div className="flex h-16 items-center justify-between border-b border-white/10 px-6">
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-neon-emerald to-golden-hour bg-clip-text text-transparent">
-                            Accounting Tool
-                        </h1>
+                        <Logo variant="icon-text" size="lg" />
                         <button
                             onClick={() => setSidebarOpen(false)}
                             className="lg:hidden p-2 rounded-md text-slate-muted hover:text-white hover:bg-white/10 transition-colors"
@@ -174,9 +173,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             <Menu className="h-6 w-6" />
                         </button>
-                        <h1 className="text-lg font-bold bg-gradient-to-r from-neon-emerald to-golden-hour bg-clip-text text-transparent">
-                            Accounting Tool
-                        </h1>
+                        <Logo variant="icon-text" size="md" />
                         <div className="w-10"></div>
                     </div>
                 </div>

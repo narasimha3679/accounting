@@ -37,9 +37,15 @@ export const TermsOfService = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">4. Beta Period</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">4. Pricing and Billing</h2>
+            <p className="text-slate-300 leading-relaxed mb-4">
+              Cashual offers simple, transparent pricing: $5 per month or $50 per year (save 17% with annual billing). All features are included in this price—there are no per-employee fees or hidden costs.
+            </p>
+            <p className="text-slate-300 leading-relaxed mb-4">
+              Billing occurs on a monthly or annual basis, depending on your selected plan. Annual plans are billed upfront for the full year. Monthly plans are billed monthly in advance.
+            </p>
             <p className="text-slate-300 leading-relaxed">
-              During the public beta period, Cashual is provided free of charge. We reserve the right to modify features, introduce pricing, or discontinue the beta at any time. Beta users will receive advance notice of any changes.
+              You may cancel your subscription at any time. Cancellations take effect at the end of your current billing period. No refunds are provided for partial billing periods, except as required by law.
             </p>
           </section>
 

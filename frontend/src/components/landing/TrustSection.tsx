@@ -1,11 +1,21 @@
 import { motion } from 'framer-motion';
-import { Shield, Lock, CloudOff, BadgeCheck } from 'lucide-react';
+import { Shield, Lock, CloudOff, BadgeCheck, CreditCard, XCircle } from 'lucide-react';
 
 const trustPoints = [
   {
     icon: Shield,
-    title: "CRA Compliant",
-    description: "Tax calculations and documents meet all Canada Revenue Agency requirements"
+    title: "CRA Focused",
+    description: "Built around Canadian tax rules with HST and corporate workflows in mind"
+  },
+  {
+    icon: CreditCard,
+    title: "Simple Pricing",
+    description: "One transparent price: $5 per month or $50 per year. All features included—no hidden fees."
+  },
+  {
+    icon: XCircle,
+    title: "Cancel Anytime",
+    description: "No long-term contracts. Cancel anytime with no penalties or fees."
   },
   {
     icon: Lock,
@@ -14,8 +24,8 @@ const trustPoints = [
   },
   {
     icon: CloudOff,
-    title: "Works Offline",
-    description: "Access your data anytime with our progressive web app technology"
+    title: "Reliable Cloud Infrastructure",
+    description: "Powered by Supabase Postgres with managed backups and monitoring"
   },
   {
     icon: BadgeCheck,
@@ -36,10 +46,11 @@ export const TrustSection = () => {
         >
           <div className="text-center mb-10">
             <h2 id="trust-heading" className="text-2xl md:text-3xl font-bold text-white mb-3">
-              Built for Canadian Business Owners
+              Built for Canadian <span className="text-neon-emerald">Business Owners</span>
             </h2>
             <p className="text-slate-400">
-              Whether you're a consultant, contractor, freelancer, or run a small business—Cashual handles your accounting needs.
+              Whether you're a consultant, contractor, freelancer, or run a small business—Cashual handles your accounting needs. 
+              Especially designed for incorporated contractors and small businesses.
             </p>
           </div>
           
@@ -68,7 +79,15 @@ export const TrustSection = () => {
             <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
               <div className="flex items-center gap-2 px-4 py-2 glass-emerald rounded-lg border border-neon-emerald/20">
                 <Shield className="w-5 h-5 text-neon-emerald" aria-hidden="true" />
-                <span className="text-sm font-semibold text-neon-emerald">CRA Compliant</span>
+                <span className="text-sm font-semibold text-neon-emerald">CRA Focused Design</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 glass-emerald rounded-lg border border-neon-emerald/20">
+                <CreditCard className="w-5 h-5 text-neon-emerald" aria-hidden="true" />
+                <span className="text-sm font-semibold text-neon-emerald">Simple Pricing</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 glass rounded-lg border border-white/10">
+                <XCircle className="w-5 h-5 text-neon-emerald" aria-hidden="true" />
+                <span className="text-sm font-semibold text-white">Cancel Anytime</span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 glass rounded-lg border border-white/10">
                 <Lock className="w-5 h-5 text-neon-emerald" aria-hidden="true" />

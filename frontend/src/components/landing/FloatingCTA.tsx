@@ -43,12 +43,12 @@ export const FloatingCTA = () => {
           <div className="glass-heavy rounded-xl border border-white/10 p-4 shadow-2xl shadow-neon-emerald/20 flex items-center gap-4 max-w-md">
             <div className="flex-1">
               <p className="text-sm font-semibold text-white mb-1">Ready to get started?</p>
-              <p className="text-xs text-slate-400">Join the beta and start managing your business finances today.</p>
+              <p className="text-xs text-slate-400">Start managing your business finances today.</p>
             </div>
             <div className="flex items-center gap-2">
               <Link to="/login">
                 <Button variant="cta" size="sm" className="group whitespace-nowrap">
-                  Start Free
+                  Get Started
                   <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </Button>
               </Link>

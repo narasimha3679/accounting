@@ -37,13 +37,15 @@ export const Hero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-emerald border-neon-emerald/30 mb-6"
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-6"
             >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-emerald opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-neon-emerald"></span>
-              </span>
-              <span className="text-xs font-medium text-neon-emerald uppercase tracking-wider">Public Beta Available</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-emerald border-neon-emerald/30">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-emerald opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-neon-emerald"></span>
+                </span>
+                <span className="text-xs font-medium text-neon-emerald uppercase tracking-wider">Join 500+ Businesses</span>
+              </div>
             </motion.div>
             
             <motion.h1
@@ -53,9 +55,9 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-tight"
             >
-              Run Your Business, <br className="hidden md:block" />
+              Stop Spending Hours on Accounting. <br className="hidden md:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-emerald to-teal-400">
-                Not Your Back Office.
+                Get Back to What You Do Best.
               </span>
             </motion.h1>
             
@@ -63,11 +65,29 @@ export const Hero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-lg md:text-xl text-slate-400 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
+              className="text-lg md:text-xl text-slate-400 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
             >
-              The all-in-one accounting platform for Canadian small businesses and incorporated professionals. 
-              Payroll, dividends, T4s, T5s, and CRA compliance—all in one place.
+              The only accounting platform built for Canadian contractors. Track time, run payroll, manage expenses, and stay CRA-compliant—all in one place. Simple, transparent pricing at $5/month.
             </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="mb-8 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-sm text-slate-500"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Tired of juggling spreadsheets?</span>
+              </div>
+              <span className="hidden sm:inline text-slate-600">•</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Spending weekends on bookkeeping?</span>
+              </div>
+              <span className="hidden sm:inline text-slate-600">•</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Worried about CRA compliance?</span>
+              </div>
+            </motion.div>
             
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -77,17 +97,17 @@ export const Hero = () => {
             >
               <Link to="/login" className="w-full sm:w-auto">
                 <Button variant="cta" size="lg" className="w-full sm:w-auto min-h-[56px] text-base px-8 group">
-                  Start Free Trial
+                  Get Started
                   <ArrowRight className="ml-2 w-5 h-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </Button>
               </Link>
               <a 
-                href="#how-it-works" 
-                onClick={(e) => handleAnchorClick(e, '#how-it-works')}
+                href="#pricing" 
+                onClick={(e) => handleAnchorClick(e, '#pricing')}
                 className="w-full sm:w-auto"
               >
                 <Button variant="outline" size="lg" className="w-full sm:w-auto min-h-[56px] text-base px-8">
-                  See How It Works
+                  See Pricing
                 </Button>
               </a>
             </motion.div>
@@ -100,12 +120,16 @@ export const Hero = () => {
               role="list"
             >
               <div className="flex items-center gap-2" role="listitem">
-                <CheckCircle2 className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
-                <span>No credit card required</span>
-              </div>
-              <div className="flex items-center gap-2" role="listitem">
                 <Zap className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
                 <span>Setup in minutes</span>
+              </div>
+              <div className="flex items-center gap-2" role="listitem">
+                <CheckCircle2 className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
+                <span>Cancel anytime</span>
+              </div>
+              <div className="flex items-center gap-2" role="listitem">
+                <CheckCircle2 className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
+                <span>$5/month or $50/year</span>
               </div>
             </motion.div>
           </div>
@@ -148,13 +172,13 @@ export const Hero = () => {
                 </div>
                 
                 {/* Overlay Badge */}
-                <div className="absolute bottom-6 left-6 right-6 glass-emerald rounded-lg p-4 flex items-center gap-4" role="status" aria-label="Security and compliance badge">
+                <div className="absolute bottom-6 left-6 right-6 glass-emerald rounded-lg p-4 flex items-center gap-4" role="status" aria-label="Key benefits badge">
                   <div className="w-10 h-10 rounded-full bg-neon-emerald/20 flex items-center justify-center text-neon-emerald" aria-hidden="true">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-xs text-neon-emerald font-semibold uppercase tracking-wider">Secure & Compliant</div>
-                    <div className="text-sm text-white">CRA Compliant Tax Calculations</div>
+                    <div className="text-xs text-neon-emerald font-semibold uppercase tracking-wider">Save 5+ Hours Per Week</div>
+                    <div className="text-sm text-white">Automated calculations & CRA compliance</div>
                   </div>
                 </div>
               </div>

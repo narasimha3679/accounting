@@ -6,11 +6,27 @@ import Card from '../ui/Card';
 const faqs = [
   {
     question: "Is Cashual CRA compliant?",
-    answer: "Yes, absolutely. Cashual's tax calculations and document generation are built to meet all Canada Revenue Agency requirements. Our system automatically handles CPP, EI, income tax, and provincial tax calculations according to current CRA guidelines. All generated documents (T4s, T5s, ROEs) are formatted to CRA specifications."
+    answer: "Cashual is designed around CRA rules for Canadian small businesses, with a focus on HST, corporate accounting, and reporting. The app helps you stay organized with invoicing, expenses, HST tracking, payroll with automatic tax deductions (CPP/EI/income tax), and automated T4/T5/ROE generation. All calculations follow current CRA guidelines. We still recommend working with a professional accountant for final filings and complex tax situations."
   },
   {
-    question: "How does pricing work after the beta period?",
-    answer: "During our public beta, Cashual is completely free. After the beta period ends, we'll introduce transparent, affordable pricing designed for small businesses. Beta users will receive special early-adopter pricing. We'll announce pricing details well in advance, and you can cancel anytime with no long-term commitments."
+    question: "Can I track employee hours and schedules?",
+    answer: "Yes! Cashual includes comprehensive time management. Employees can submit timesheets, managers can approve them with one click, and you can schedule shifts using calendar views. All time data integrates with payroll for accurate pay calculations. The system supports both employee-submitted time entries and manager-assigned schedules."
+  },
+  {
+    question: "What features are included?",
+    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, investment tracking, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included in one simple price—no add-ons or per-employee fees."
+  },
+  {
+    question: "How does pricing work?",
+    answer: "Cashual offers simple, transparent pricing: $5 per month or $50 per year (save 17% with annual billing). This includes all features—accounting, payroll, tax documents, and employee management. No hidden fees, no per-employee charges. Cancel anytime with no long-term commitments."
+  },
+  {
+    question: "Can I cancel anytime?",
+    answer: "Yes, absolutely! You can cancel your subscription at any time with no penalties or fees. Cancellations take effect at the end of your current billing period. Since we offer one simple plan with all features included, there's no need to upgrade or downgrade—everything is available from day one."
+  },
+  {
+    question: "What payment methods do you accept?",
+    answer: "We accept all major credit cards and debit cards. Payment is processed securely through our payment provider. You can choose monthly billing at $5/month or save 17% with annual billing at $50/year.’ll "
   },
   {
     question: "Can I import data from other accounting systems?",
@@ -18,7 +34,7 @@ const faqs = [
   },
   {
     question: "What if I need help or have questions?",
-    answer: "We offer comprehensive support through multiple channels. You can access our knowledge base, contact support via email, or schedule a one-on-one onboarding call. During beta, we're especially responsive to feedback and feature requests. Our goal is to make sure you're successful with Cashual."
+    answer: "We offer comprehensive support through multiple channels. You can access our knowledge base, contact support via email, or schedule a one-on-one onboarding call. We're responsive to feedback and feature requests. Our goal is to make sure you're successful with Cashual."
   },
   {
     question: "Is my data secure?",
@@ -26,7 +42,7 @@ const faqs = [
   },
   {
     question: "Can I use Cashual for multiple companies?",
-    answer: "Yes, Cashual supports multiple companies. You can manage payroll, expenses, and tax documents for multiple businesses from a single account. Each company maintains separate records, employees, and financial data. This is especially useful for consultants or contractors who operate multiple incorporated entities."
+    answer: "Right now, Cashual is focused on managing one company per account, which keeps things simple while we refine the core experience. Multi-company support is on our roadmap so that consultants and contractors with multiple corporations can manage them in one place. If multi-company support is critical for you, please reach out—we’re actively shaping this part of the product based on user feedback."
   },
   {
     question: "Do I need accounting knowledge to use Cashual?",

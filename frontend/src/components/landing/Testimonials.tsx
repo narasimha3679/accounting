@@ -7,7 +7,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "Freelance Consultant",
     company: "Tech Solutions Inc.",
-    content: "Cashual has completely transformed how I manage my business finances. The payroll feature alone saves me hours every month, and the CRA compliance gives me peace of mind.",
+    content: "Cashual has completely transformed how I manage my business finances. I save at least 5 hours every week that I used to spend on spreadsheets and bookkeeping. The peace of mind knowing everything is organized for tax time is priceless.",
     rating: 5,
     image: "SC"
   },
@@ -15,7 +15,7 @@ const testimonials = [
     name: "Michael Rodriguez",
     role: "Contractor",
     company: "Rodriguez Construction",
-    content: "As a contractor, I needed something simple but powerful. Cashual handles everything from payroll to dividends, and my accountant loves how organized everything is.",
+    content: "As a contractor, I needed something simple but powerful. Cashual keeps everything organized in one place, and my accountant loves how clean the records are. No more scrambling at tax time.",
     rating: 5,
     image: "MR"
   },
@@ -23,7 +23,7 @@ const testimonials = [
     name: "Jennifer Park",
     role: "Professional Corporation Owner",
     company: "Park Legal Services",
-    content: "The tax planning calculator is a game-changer. I can now see the real-time impact of salary vs. dividends, which has helped me optimize my tax strategy significantly.",
+    content: "Finally, a platform built for Canadian businesses. Everything I need is in one place, and I can trust that the calculations are CRA-compliant. It's given me confidence in my financial management.",
     rating: 5,
     image: "JP"
   }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Logo } from '../ui/Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Navbar = () => {
@@ -56,44 +57,45 @@ export const Navbar = () => {
       <nav
         role="navigation"
         aria-label="Main navigation"
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled ? 'glass-heavy py-4 border-b border-white/5' : 'bg-transparent py-6'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'glass-heavy py-4 border-b border-white/5' : 'bg-transparent py-6'
+          }`}
       >
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2" aria-label="Cashual home">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-neon-emerald to-emerald-600 flex items-center justify-center">
-                <span className="text-deep-forest font-bold text-lg">C</span>
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white">
-                Cashual<span className="text-neon-emerald">.</span>
-              </span>
+            <Link to="/" aria-label="Cashual home">
+              <Logo variant="icon-text" size="md" />
             </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a 
-                href="#features" 
+              <a
+                href="#features"
                 onClick={(e) => handleAnchorClick(e, '#features')}
                 className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 Features
               </a>
-              <a 
-                href="#how-it-works" 
+              <a
+                href="#how-it-works"
                 onClick={(e) => handleAnchorClick(e, '#how-it-works')}
                 className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 How it Works
               </a>
-              <a 
-                href="#pricing" 
+              <a
+                href="#pricing"
                 onClick={(e) => handleAnchorClick(e, '#pricing')}
                 className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 Pricing
+              </a>
+              <a
+                href="#faq"
+                onClick={(e) => handleAnchorClick(e, '#faq')}
+                className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                FAQ
               </a>
             </div>
 
@@ -138,36 +140,44 @@ export const Navbar = () => {
               role="menu"
             >
               <div className="px-4 py-6 space-y-4">
-                <a 
-                  href="#features" 
+                <a
+                  href="#features"
                   className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
                   onClick={(e) => handleAnchorClick(e, '#features')}
                   role="menuitem"
                 >
                   Features
                 </a>
-                <a 
-                  href="#how-it-works" 
+                <a
+                  href="#how-it-works"
                   className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
                   onClick={(e) => handleAnchorClick(e, '#how-it-works')}
                   role="menuitem"
                 >
                   How it Works
                 </a>
-                <a 
-                  href="#pricing" 
+                <a
+                  href="#pricing"
                   className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
                   onClick={(e) => handleAnchorClick(e, '#pricing')}
                   role="menuitem"
                 >
                   Pricing
                 </a>
+                <a
+                  href="#faq"
+                  className="block text-slate-300 hover:text-white font-medium py-2 focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-inset rounded-lg px-2"
+                  onClick={(e) => handleAnchorClick(e, '#faq')}
+                  role="menuitem"
+                >
+                  FAQ
+                </a>
                 <div className="pt-4 flex flex-col gap-3">
                   <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="outline" className="w-full">Sign In</Button>
                   </Link>
                   <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="cta" className="w-full">Get Started</Button>
+                    <Button variant="cta" className="w-full">Start Free Forever</Button>
                   </Link>
                 </div>
               </div>

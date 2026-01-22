@@ -5,19 +5,19 @@ const steps = [
   {
     number: "01",
     title: "Set Up Your Company",
-    description: "Create your account and enter your company details. Add your business number, fiscal year end, and CRA account information.",
+    description: "Create your account and enter your company details. Add your business number, fiscal year end, and CRA account information. Get started in minutes with simple setup.",
     icon: Building2,
   },
   {
     number: "02",
-    title: "Add Your Team",
-    description: "Add employees with their tax information. Set up salary or hourly rates, benefits, and deductions. Employees get secure self-service access.",
+    title: "Add Your Team & Set Up Time Tracking",
+    description: "Add employees with their tax information. Set up salary or hourly rates, benefits, and deductions. Configure time tracking and scheduling—employees can submit timesheets and view their schedules. Employees get secure self-service access to their dashboard.",
     icon: Settings,
   },
   {
     number: "03",
     title: "Run Your Business",
-    description: "Process payroll, issue dividends, track expenses, and generate tax documents. Everything stays organized and CRA-compliant.",
+    description: "Track invoices, expenses, dividends, time entries, and run payroll. Generate financial reports, manage capital assets, track investments, and stay CRA-compliant. Everything stays organized for Canadian tax time with automated calculations and document generation.",
     icon: Rocket,
   },
 ];
@@ -51,7 +51,8 @@ export const HowItWorks = () => {
             transition={{ delay: 0.1 }}
             className="text-slate-400 text-lg"
           >
-            No complex setup. No lengthy onboarding. Just sign up and start managing your business finances.
+            No complex setup. No lengthy onboarding. Just sign up and start managing your business finances. 
+            Simple pricing at $5/month with all features included.
           </motion.p>
         </div>
 
@@ -98,9 +99,9 @@ export const HowItWorks = () => {
         >
           {[
             { value: "5 min", label: "Average Setup Time" },
-            { value: "100%", label: "CRA Compliant" },
+            { value: "CRA", label: "Designed for Canadian compliance workflows" },
             { value: "24/7", label: "Platform Access" },
-            { value: "Free", label: "During Beta" },
+            { value: "$5/mo", label: "Simple Pricing" },
           ].map((stat, index) => (
             <div key={index} className="text-center p-6 glass-light rounded-xl border border-white/5">
               <div className="text-2xl md:text-3xl font-bold text-neon-emerald mb-1">{stat.value}</div>
