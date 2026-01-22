@@ -104,6 +104,9 @@ export const Testimonials = () => {
               itemType="https://schema.org/Review"
             >
               <Card className="h-full flex flex-col group hover:border-white/20 hover:shadow-lg hover:shadow-neon-emerald/10 transition-all duration-300" glass="light">
+                <div itemProp="itemReviewed" itemScope itemType="https://schema.org/SoftwareApplication" className="hidden">
+                  <meta itemProp="name" content="Cashual" />
+                </div>
                 <div className="mb-4 flex items-center gap-1" itemProp="reviewRating" itemScope itemType="https://schema.org/Rating">
                   <meta itemProp="ratingValue" content={testimonial.rating.toString()} />
                   <meta itemProp="bestRating" content="5" />
