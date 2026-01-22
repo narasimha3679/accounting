@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     question: "What features are included?",
-    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, investment tracking, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included in one simple price—no add-ons or per-employee fees."
+    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included in one simple price—no add-ons or per-employee fees."
   },
   {
     question: "How does pricing work?",

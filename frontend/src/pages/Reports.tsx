@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary, type InvestmentIncome, type InvestmentSale } from '../lib/api';
+import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary } from '../lib/api';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
@@ -192,34 +192,6 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch investment income for the selected fiscal year
-    const { data: investmentIncome } = useQuery({
-        queryKey: ['investment_income_report', user?.company_id, selectedFiscalYear],
-        queryFn: async () => {
-            const result = await api.getInvestmentIncome({
-                company_id: user?.company_id,
-                fiscal_year: selectedFiscalYear,
-                limit: 1000
-            });
-            return result.data;
-        },
-        enabled: !!user?.company_id,
-    });
-
-    // Fetch investment sales for the selected fiscal year
-    const { data: investmentSales } = useQuery({
-        queryKey: ['investment_sales_report', user?.company_id, selectedFiscalYear],
-        queryFn: async () => {
-            const result = await api.getInvestmentSales({
-                company_id: user?.company_id,
-                fiscal_year: selectedFiscalYear,
-                limit: 1000
-            });
-            return result.data;
-        },
-        enabled: !!user?.company_id,
-    });
-
     // Get HST periods for the selected fiscal year
     const hstPeriods = useMemo(() => {
         if (!fiscalYearEnd || !user?.company?.hst_filing_frequency) {
@@ -249,7 +221,7 @@ const Reports: React.FC = () => {
 
     // Calculate report data
     const reportData = React.useMemo(() => {
-        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries || !investmentIncome || !investmentSales) return null;
+        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries) return null;
 
         const paidInvoices = invoices.filter(inv => inv.status === 'paid');
 
@@ -281,9 +253,7 @@ const Reports: React.FC = () => {
 
         const totalDividends = dividends.reduce((sum, div) => sum + div.amount, 0);
 
-        // ===== SEPARATE ACTIVE BUSINESS INCOME FROM INVESTMENT INCOME =====
-
-        // Active Business Income (excludes investment income)
+        // Active Business Income
         const grossRevenue = invoiceRevenue + clientIncome;
         const activeBusinessIncome = Math.max(0, grossRevenue + otherIncome - totalDeductibleExpenses - totalSalaries - totalDepreciationForYear);
 
@@ -291,76 +261,25 @@ const Reports: React.FC = () => {
         const smallBusinessTaxRate = user?.company?.small_business_rate || 0.125;
         const activeBusinessTax = activeBusinessIncome * smallBusinessTaxRate;
 
-        // ===== INVESTMENT INCOME CALCULATIONS =====
-
-        // Interest income - 100% taxable
-        const investmentInterestBase = investmentIncome
-            .filter(inc => inc.income_type === 'interest')
-            .reduce((sum, inc) => sum + Number(inc.amount), 0);
-
-        // Dividend income - eligible dividends get gross-up treatment (38% for Canadian eligible dividends)
-        const eligibleDividendGrossUp = 1.38;
-        const eligibleDividendsBase = investmentIncome
-            .filter(inc => inc.income_type === 'dividend' && inc.is_eligible_dividend)
-            .reduce((sum, inc) => sum + Number(inc.amount), 0);
-        const nonEligibleDividendsBase = investmentIncome
-            .filter(inc => inc.income_type === 'dividend' && !inc.is_eligible_dividend)
-            .reduce((sum, inc) => sum + Number(inc.amount), 0);
-
-        // Gross-up eligible dividends
-        const eligibleDividendsGrossedUp = eligibleDividendsBase * eligibleDividendGrossUp;
-        const investmentDividendsTaxable = eligibleDividendsGrossedUp + nonEligibleDividendsBase;
-
-        // Capital gains - 50% inclusion rate
-        const realizedCapitalGains = investmentSales
-            .filter(sale => Number(sale.realized_gain_loss) > 0)
-            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
-
-        // Capital losses - 50% deductible
-        const realizedCapitalLosses = investmentSales
-            .filter(sale => Number(sale.realized_gain_loss) < 0)
-            .reduce((sum, sale) => sum + (Number(sale.realized_gain_loss) * 0.5), 0);
-
-        // Total investment income for display (before tax)
-        const totalInvestmentIncome = investmentInterestBase + eligibleDividendsBase + nonEligibleDividendsBase + realizedCapitalGains + realizedCapitalLosses;
-
-        // Investment income tax rates (configurable, with defaults for Ontario 2024)
-        const investmentInterestTaxRate = user?.company?.investment_interest_tax_rate ?? 0.5017;
-        const investmentEligibleDividendTaxRate = user?.company?.investment_eligible_dividend_tax_rate ?? 0.3934;
-        const investmentNonEligibleDividendTaxRate = user?.company?.investment_noneligible_dividend_tax_rate ?? 0.4774;
-        const investmentCapitalGainTaxRate = user?.company?.investment_capital_gain_tax_rate ?? 0.2509;
-
-        // Calculate investment income tax separately
-        const investmentInterestTax = investmentInterestBase * investmentInterestTaxRate;
-        const investmentEligibleDividendTax = eligibleDividendsGrossedUp * investmentEligibleDividendTaxRate;
-        const investmentNonEligibleDividendTax = nonEligibleDividendsBase * investmentNonEligibleDividendTaxRate;
-        const investmentCapitalGainTax = Math.max(0, realizedCapitalGains * investmentCapitalGainTaxRate);
-
-        const totalInvestmentIncomeTax = investmentInterestTax + investmentEligibleDividendTax + investmentNonEligibleDividendTax + investmentCapitalGainTax;
-
         // ===== RDTOH (Refundable Dividend Tax on Hand) CALCULATIONS =====
-
-        // RDTOH addition: 30.67% of investment income tax is added to RDTOH
-        const rdtohRate = 0.3067; // 30.67%
-        const rdtohAddition = totalInvestmentIncomeTax * rdtohRate;
 
         // RDTOH refund: $1 refund per $2.61 of dividends paid
         const rdtohRefundRate = 1 / 2.61; // $1 refund per $2.61 dividend
         const rdtohRefund = totalDividends * rdtohRefundRate;
 
-        // RDTOH balance (previous balance + additions - refunds)
+        // RDTOH balance (previous balance - refunds)
         const previousRDTOHBalance = user?.company?.rdtoh_balance ?? 0;
-        const rdtohBalance = Math.max(0, previousRDTOHBalance + rdtohAddition - rdtohRefund);
-        const rdtohRefundable = Math.min(rdtohRefund, previousRDTOHBalance + rdtohAddition);
+        const rdtohBalance = Math.max(0, previousRDTOHBalance - rdtohRefund);
+        const rdtohRefundable = Math.min(rdtohRefund, previousRDTOHBalance);
 
-        // Total gross income for display (includes both active business and investment income)
-        const grossIncome = grossRevenue + otherIncome + totalInvestmentIncome;
+        // Total gross income for display
+        const grossIncome = grossRevenue + otherIncome;
 
-        // Total corporate tax (active business + investment income)
-        const totalCorporateTax = activeBusinessTax + totalInvestmentIncomeTax;
+        // Total corporate tax (active business only)
+        const totalCorporateTax = activeBusinessTax;
 
         // Net income after tax (accounting for RDTOH refund)
-        const netIncomeBeforeTax = activeBusinessIncome + totalInvestmentIncome;
+        const netIncomeBeforeTax = activeBusinessIncome;
         const netIncomeAfterTax = netIncomeBeforeTax - totalCorporateTax + rdtohRefundable;
 
         // Calculate HST collected from invoices
@@ -402,27 +321,7 @@ const Reports: React.FC = () => {
             activeBusinessIncome,
             activeBusinessTax,
             smallBusinessTaxRate,
-            // Investment Income
-            investmentInterest: investmentInterestBase,
-            investmentDividends: eligibleDividendsBase + nonEligibleDividendsBase,
-            eligibleDividendsBase,
-            nonEligibleDividendsBase,
-            eligibleDividendsGrossedUp,
-            investmentDividendsTaxable,
-            realizedCapitalGains,
-            realizedCapitalLosses,
-            totalInvestmentIncome,
-            investmentInterestTax,
-            investmentEligibleDividendTax,
-            investmentNonEligibleDividendTax,
-            investmentCapitalGainTax,
-            totalInvestmentIncomeTax,
-            investmentInterestTaxRate,
-            investmentEligibleDividendTaxRate,
-            investmentNonEligibleDividendTaxRate,
-            investmentCapitalGainTaxRate,
             // RDTOH
-            rdtohAddition,
             rdtohRefund,
             rdtohBalance,
             rdtohRefundable,
@@ -457,10 +356,8 @@ const Reports: React.FC = () => {
             capitalAssets,
             totalCapitalAssetCost,
             totalAccumulatedDepreciation,
-            investmentIncome,
-            investmentSales,
         };
-    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, investmentIncome, investmentSales, user?.company]);
+    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, user?.company]);
 
     // Calculate T5 compliance stats
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -552,16 +449,8 @@ const Reports: React.FC = () => {
                 ['---', '---'],
                 ['Active Business Income', formatCurrency(data.activeBusinessIncome)],
                 [`Active Business Tax (${formatPercentage(data.smallBusinessTaxRate)})`, formatCurrency(data.activeBusinessTax)],
-                ...(data.totalInvestmentIncome > 0 ? [
+                ...(data.rdtohRefund > 0 ? [
                     ['---', '---'],
-                    ['Investment Interest', formatCurrency(data.investmentInterest)],
-                    ...(data.investmentInterest > 0 ? [[`Investment Interest Tax (${formatPercentage(data.investmentInterestTaxRate)})`, formatCurrency(data.investmentInterestTax)]] : []),
-                    ...(data.investmentDividends > 0 ? [['Investment Dividends', formatCurrency(data.investmentDividends)]] : []),
-                    ...(data.investmentDividends > 0 ? [[`Investment Dividend Tax`, formatCurrency(data.investmentEligibleDividendTax + data.investmentNonEligibleDividendTax)]] : []),
-                    ...(data.realizedCapitalGains !== 0 ? [['Realized Capital Gains (50%)', formatCurrency(data.realizedCapitalGains)]] : []),
-                    ...(data.realizedCapitalGains > 0 ? [[`Capital Gains Tax (${formatPercentage(data.investmentCapitalGainTaxRate)})`, formatCurrency(data.investmentCapitalGainTax)]] : []),
-                    ['Total Investment Income Tax', formatCurrency(data.totalInvestmentIncomeTax)],
-                    ...(data.rdtohAddition > 0 ? [['RDTOH Addition (30.67%)', formatCurrency(data.rdtohAddition)]] : []),
                     ...(data.rdtohRefund > 0 ? [['RDTOH Refund', formatCurrency(data.rdtohRefundable)]] : []),
                     ...(data.rdtohBalance > 0 ? [['RDTOH Balance', formatCurrency(data.rdtohBalance)]] : []),
                 ] : []),
@@ -676,79 +565,6 @@ const Reports: React.FC = () => {
             yPosition = (pdf as any).lastAutoTable.finalY + 10;
         }
 
-        // Investment Income and Sales
-        if ((data.investmentIncome && data.investmentIncome.length > 0) || (data.investmentSales && data.investmentSales.length > 0)) {
-            checkPageBreak(30);
-            addText('INVESTMENT INCOME & SALES', 14, true);
-
-            // Investment Income Summary
-            const investmentSummaryRows = [
-                ...(data.investmentInterest > 0 ? [['Interest Income', formatCurrency(data.investmentInterest)]] : []),
-                ...(data.investmentDividends > 0 ? [['Dividend Income', formatCurrency(data.investmentDividends)]] : []),
-                ...(data.realizedCapitalGains !== 0 ? [['Realized Capital Gains (50% taxable)', formatCurrency(data.realizedCapitalGains)]] : []),
-                ['Total Investment Income', formatCurrency(data.totalInvestmentIncome || 0)],
-            ];
-
-            autoTable(pdf, {
-                startY: yPosition,
-                head: [['Item', 'Amount']],
-                body: investmentSummaryRows,
-                theme: 'striped',
-                headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
-                styles: { fontSize: 9 },
-                margin: { left: margin, right: margin },
-            });
-            yPosition = (pdf as any).lastAutoTable.finalY + 10;
-
-            // Investment Income Details
-            if (data.investmentIncome && data.investmentIncome.length > 0) {
-                checkPageBreak(30);
-                addText('Investment Income Details', 12, true);
-                const incomeRows = data.investmentIncome.map((inc: InvestmentIncome) => [
-                    inc.investment?.description || 'N/A',
-                    inc.income_type,
-                    formatDate(inc.income_date),
-                    formatCurrency(inc.amount),
-                    inc.income_type === 'dividend' ? (inc.is_eligible_dividend ? 'Eligible' : 'Non-eligible') : '-',
-                ]);
-
-                autoTable(pdf, {
-                    startY: yPosition,
-                    head: [['Investment', 'Type', 'Date', 'Amount', 'Eligible Dividend']],
-                    body: incomeRows,
-                    theme: 'striped',
-                    headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
-                    styles: { fontSize: 8 },
-                    margin: { left: margin, right: margin },
-                });
-                yPosition = (pdf as any).lastAutoTable.finalY + 10;
-            }
-
-            // Investment Sales Details
-            if (data.investmentSales && data.investmentSales.length > 0) {
-                checkPageBreak(30);
-                addText('Investment Sales', 12, true);
-                const saleRows = data.investmentSales.map((sale: InvestmentSale) => [
-                    sale.investment?.description || 'N/A',
-                    formatDate(sale.sale_date),
-                    formatCurrency(sale.cost_basis),
-                    formatCurrency(sale.sale_amount),
-                    formatCurrency(sale.realized_gain_loss),
-                    formatCurrency(sale.realized_gain_loss * 0.5),
-                ]);
-
-                autoTable(pdf, {
-                    startY: yPosition,
-                    head: [['Investment', 'Sale Date', 'Cost Basis', 'Sale Proceeds', 'Realized Gain/Loss', 'Taxable (50%)']],
-                    body: saleRows,
-                    theme: 'striped',
-                    headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
-                    styles: { fontSize: 8 },
-                    margin: { left: margin, right: margin },
-                });
-                yPosition = (pdf as any).lastAutoTable.finalY + 10;
-            }
-        }
 
         // Monthly HST Breakdown (using fiscal year months)
         checkPageBreak(30);
@@ -1096,46 +912,10 @@ const Reports: React.FC = () => {
                             <span className="text-sm text-slate-muted">Active Business Tax ({formatPercentage(reportData.smallBusinessTaxRate)}):</span>
                             <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.activeBusinessTax)}</span>
                         </div>
-                        {(reportData.investmentInterest > 0 || reportData.investmentDividends > 0 || reportData.realizedCapitalGains !== 0) && (
+                        {(reportData.rdtohRefund > 0 || reportData.rdtohBalance > 0) && (
                             <>
-                                <div className="flex justify-between border-t border-white/10 pt-2">
-                                    <span className="text-sm font-medium text-white">Investment Income:</span>
-                                    <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(reportData.totalInvestmentIncome)}</span>
-                                </div>
-                                {reportData.investmentInterest > 0 && (
-                                    <div className="flex justify-between ml-4">
-                                        <span className="text-sm text-slate-muted">Interest ({formatPercentage(reportData.investmentInterestTaxRate)}):</span>
-                                        <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.investmentInterest)}</span>
-                                    </div>
-                                )}
-                                {reportData.investmentDividends > 0 && (
-                                    <div className="flex justify-between ml-4">
-                                        <span className="text-sm text-slate-muted">Dividends:</span>
-                                        <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(reportData.investmentDividends)}</span>
-                                    </div>
-                                )}
-                                {reportData.realizedCapitalGains !== 0 && (
-                                    <div className="flex justify-between ml-4">
-                                        <span className="text-sm text-slate-muted">Capital Gains (50%, {formatPercentage(reportData.investmentCapitalGainTaxRate)}):</span>
-                                        <span className={`font-medium ${reportData.realizedCapitalGains >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {formatCurrency(reportData.realizedCapitalGains)}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between">
-                                    <span className="text-sm text-slate-muted">Investment Income Tax:</span>
-                                    <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalInvestmentIncomeTax)}</span>
-                                </div>
-                            </>
-                        )}
-                        {(reportData.rdtohAddition > 0 || reportData.rdtohRefund > 0 || reportData.rdtohBalance > 0) && (
-                            <>
-                                <div className="flex justify-between border-t border-white/10 pt-2">
-                                    <span className="text-sm font-medium text-white">RDTOH Addition:</span>
-                                    <span className="font-bold text-green-600 dark:text-green-400">+{formatCurrency(reportData.rdtohAddition)}</span>
-                                </div>
                                 {reportData.rdtohRefund > 0 && (
-                                    <div className="flex justify-between">
+                                    <div className="flex justify-between border-t border-white/10 pt-2">
                                         <span className="text-sm text-slate-muted">RDTOH Refund:</span>
                                         <span className="font-medium text-green-600 dark:text-green-400">-{formatCurrency(reportData.rdtohRefundable)}</span>
                                     </div>
@@ -1331,111 +1111,6 @@ const Reports: React.FC = () => {
                         )}
                     </div>
                 </Card>
-
-                {/* Investment Income */}
-                {(reportData.investmentIncome && reportData.investmentIncome.length > 0) || (reportData.investmentSales && reportData.investmentSales.length > 0) ? (
-                    <Card className="overflow-hidden">
-                        <div className="p-6 border-b border-white/10">
-                            <h2 className="text-xl font-semibold tracking-tight text-white">Investment Income & Sales</h2>
-                            <p className="text-sm text-slate-muted mt-1">Investment income and realized gains/losses for {formatFiscalYear(selectedFiscalYear)}</p>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="bg-muted/50 p-4 rounded-lg">
-                                    <div className="text-sm text-slate-muted">Interest Income</div>
-                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.investmentInterest || 0)}</div>
-                                </div>
-                                <div className="bg-muted/50 p-4 rounded-lg">
-                                    <div className="text-sm text-slate-muted">Dividend Income</div>
-                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.investmentDividends || 0)}</div>
-                                </div>
-                                <div className="bg-muted/50 p-4 rounded-lg">
-                                    <div className="text-sm text-slate-muted">Realized Capital Gains (50%)</div>
-                                    <div className={`text-2xl font-bold mt-1 ${(reportData.realizedCapitalGains || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                        {formatCurrency(reportData.realizedCapitalGains || 0)}
-                                    </div>
-                                </div>
-                                <div className="bg-muted/50 p-4 rounded-lg">
-                                    <div className="text-sm text-slate-muted">Total Investment Income</div>
-                                    <div className="text-2xl font-bold text-white mt-1">{formatCurrency(reportData.totalInvestmentIncome || 0)}</div>
-                                </div>
-                            </div>
-
-                            {reportData.investmentIncome && reportData.investmentIncome.length > 0 && (
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white mb-4">Investment Income Details</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
-                                                <tr>
-                                                    <th className="px-6 py-3">Investment</th>
-                                                    <th className="px-6 py-3">Type</th>
-                                                    <th className="px-6 py-3">Date</th>
-                                                    <th className="px-6 py-3 text-right">Amount</th>
-                                                    <th className="px-6 py-3">Eligible Dividend</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-border">
-                                                {reportData.investmentIncome.map((inc: InvestmentIncome) => (
-                                                    <tr key={inc.id} className="hover:bg-muted/50 transition-colors">
-                                                        <td className="px-6 py-4 font-medium text-white">{inc.investment?.description || 'N/A'}</td>
-                                                        <td className="px-6 py-4 text-slate-muted capitalize">{inc.income_type}</td>
-                                                        <td className="px-6 py-4 text-slate-muted">{formatDate(inc.income_date)}</td>
-                                                        <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(inc.amount)}</td>
-                                                        <td className="px-6 py-4">
-                                                            {inc.income_type === 'dividend' && (
-                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${inc.is_eligible_dividend
-                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                                                    }`}>
-                                                                    {inc.is_eligible_dividend ? 'Eligible' : 'Non-eligible'}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {reportData.investmentSales && reportData.investmentSales.length > 0 && (
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white mb-4">Investment Sales</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
-                                                <tr>
-                                                    <th className="px-6 py-3">Investment</th>
-                                                    <th className="px-6 py-3">Sale Date</th>
-                                                    <th className="px-6 py-3 text-right">Cost Basis</th>
-                                                    <th className="px-6 py-3 text-right">Sale Proceeds</th>
-                                                    <th className="px-6 py-3 text-right">Realized Gain/Loss</th>
-                                                    <th className="px-6 py-3 text-right">Taxable (50%)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-border">
-                                                {reportData.investmentSales.map((sale: InvestmentSale) => (
-                                                    <tr key={sale.id} className="hover:bg-muted/50 transition-colors">
-                                                        <td className="px-6 py-4 font-medium text-white">{sale.investment?.description || 'N/A'}</td>
-                                                        <td className="px-6 py-4 text-slate-muted">{formatDate(sale.sale_date)}</td>
-                                                        <td className="px-6 py-4 text-right text-slate-muted">{formatCurrency(sale.cost_basis)}</td>
-                                                        <td className="px-6 py-4 text-right text-white">{formatCurrency(sale.sale_amount)}</td>
-                                                        <td className={`px-6 py-4 text-right font-medium ${sale.realized_gain_loss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                            {formatCurrency(sale.realized_gain_loss)}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right text-white">{formatCurrency(sale.realized_gain_loss * 0.5)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                ) : null}
 
                 {/* HST Period Breakdown (if HST registered and filing frequency is set) */}
                 {user?.company?.hst_registered && user?.company?.hst_filing_frequency && hstPeriods.length > 0 && (

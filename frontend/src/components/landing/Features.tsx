@@ -49,13 +49,6 @@ const features = [
     category: "Core Accounting"
   },
   {
-    title: "Investment Tracking",
-    description: "Manage your corporate investments in one place. Track stocks, bonds, and other investments with automatic valuation updates. Perfect for professional corporations managing investment portfolios.",
-    icon: PieChart,
-    color: "text-purple-400",
-    category: "Core Accounting"
-  },
-  {
     title: "Client Management",
     description: "Keep all your client information organized. Track contact details, payment terms, and invoice history. Build better relationships with organized client records.",
     icon: Users,

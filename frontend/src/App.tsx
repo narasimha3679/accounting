@@ -24,8 +24,6 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
-import Investments from './pages/Investments';
-import InvestmentDetail from './pages/InvestmentDetail';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -317,22 +315,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TaxCalculator />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/investments"
-              element={
-                <ProtectedRoute>
-                  <Investments />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/investments/:id"
-              element={
-                <ProtectedRoute>
-                  <InvestmentDetail />
                 </ProtectedRoute>
               }
             />

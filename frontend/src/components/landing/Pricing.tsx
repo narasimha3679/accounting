@@ -17,7 +17,6 @@ const benefits = [
   "Dividend tracking and company equity updates",
   "Owner reimbursement tracking",
   "Capital asset management & depreciation",
-  "Investment tracking for corporate portfolios",
   "Client management and contact organization",
   "Tax calculator (salary vs. dividends)",
   "Financial reports (P&L, HST, retained earnings)",

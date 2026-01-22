@@ -32,10 +32,10 @@ export const Navbar = () => {
     }
     lastHandledHref.current = href;
     
-    // Reset the guard after a short delay
+    // Reset the guard after a delay
     setTimeout(() => {
       lastHandledHref.current = null;
-    }, 300);
+    }, 2000);
     
     const element = document.querySelector(href);
     if (element) {
@@ -43,15 +43,20 @@ export const Navbar = () => {
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - offset;
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
+      // Start the scroll first - use requestAnimationFrame to ensure it happens after any layout changes
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
       });
-      
-      // Close mobile menu after a short delay to ensure scroll initiates
+
+      // Close menu after scroll animation has had sufficient time to complete
+      // Smooth scroll can take 800-2000ms depending on distance
+      // Using 1500ms to ensure scroll completes before menu closing animation starts
       setTimeout(() => {
         setMobileMenuOpen(false);
-      }, 150);
+      }, 1500);
     } else {
       // If element not found, close menu immediately
       setMobileMenuOpen(false);

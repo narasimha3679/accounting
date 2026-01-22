@@ -54,13 +54,6 @@ const comparisonData = [
     wave: { value: true, note: "Available" },
     xero: { value: true, note: "Available" }
   },
-  {
-    feature: "Investment Tracking",
-    cashual: { value: true, note: "Corporate investment tracking" },
-    quickbooks: { value: false, note: "Not available" },
-    wave: { value: false, note: "Not available" },
-    xero: { value: false, note: "Not available" }
-  },
   // Payroll & HR Features
   {
     feature: "Employee Management",

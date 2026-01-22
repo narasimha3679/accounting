@@ -70,7 +70,7 @@ const useCases = [
   },
   {
     title: "For Professional Corporations",
-    description: "Built for professional corporations that need advanced tax planning and investment tracking.",
+    description: "Built for professional corporations that need advanced tax planning.",
     icon: PieChart,
     color: "text-golden-hour",
     features: [
@@ -78,11 +78,6 @@ const useCases = [
         title: "Tax Planning",
         description: "Compare salary vs. dividends to optimize your tax strategy",
         icon: Calculator
-      },
-      {
-        title: "Investment Tracking",
-        description: "Track corporate investments and portfolio performance",
-        icon: PieChart
       },
       {
         title: "Capital Assets",

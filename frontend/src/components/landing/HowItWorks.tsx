@@ -17,7 +17,7 @@ const steps = [
   {
     number: "03",
     title: "Run Your Business",
-    description: "Track invoices, expenses, dividends, time entries, and run payroll. Generate financial reports, manage capital assets, track investments, and stay CRA-compliant. Everything stays organized for Canadian tax time with automated calculations and document generation.",
+    description: "Track invoices, expenses, dividends, time entries, and run payroll. Generate financial reports, manage capital assets, and stay CRA-compliant. Everything stays organized for Canadian tax time with automated calculations and document generation.",
     icon: Rocket,
   },
 ];
