@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { cn } from '../lib/utils';
+import InvoicePreview from '../components/invoices/InvoicePreview';
 
 const Invoices: React.FC = () => {
     const { user } = useAuth();
@@ -13,6 +14,7 @@ const Invoices: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'invoices' | 'templates'>('invoices');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+    const [previewingInvoice, setPreviewingInvoice] = useState<Invoice | null>(null);
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
     const [emailInput, setEmailInput] = useState('');
@@ -306,7 +308,7 @@ const Invoices: React.FC = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => window.open(`/invoices/${invoice.id}/preview`, '_blank')}
+                                                onClick={() => setPreviewingInvoice(invoice)}
                                                 title="Preview"
                                                 className="h-8 w-8 text-slate-muted hover:text-white"
                                             >
@@ -476,6 +478,14 @@ const Invoices: React.FC = () => {
                         </div>
                     </Card>
                 </div>
+            )}
+
+            {/* Invoice Preview Modal */}
+            {previewingInvoice && (
+                <InvoicePreview
+                    invoice={previewingInvoice}
+                    onClose={() => setPreviewingInvoice(null)}
+                />
             )}
         </div>
     );
