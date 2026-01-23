@@ -1,4 +1,4 @@
-import { supabase, SUPABASE_STORAGE_BUCKET, supabaseUrl, supabaseAnonKey } from './supabaseClient';
+import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
 import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
 

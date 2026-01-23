@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { X, Check, Trash2, Filter, Download, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Check, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import Button from './ui/Button';
-import Card from './ui/Card';
 import { cn } from '../lib/utils';
 import type { ExpenseCategory } from '../lib/api';
 
@@ -32,7 +31,7 @@ const BankStatementReview: React.FC<BankStatementReviewProps> = ({
     categories,
     onSave,
     onClose,
-    companyId,
+    companyId: _companyId,
 }) => {
     const [transactions, setTransactions] = useState<ParsedTransaction[]>(initialTransactions);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set(transactions.map((_, i) => i)));
@@ -45,7 +44,7 @@ const BankStatementReview: React.FC<BankStatementReviewProps> = ({
 
     // Filter transactions
     const filteredTransactions = useMemo(() => {
-        return transactions.filter((t, index) => {
+        return transactions.filter((t) => {
             // Category filter
             if (filterCategory !== 'all') {
                 const categoryId = parseInt(filterCategory);
