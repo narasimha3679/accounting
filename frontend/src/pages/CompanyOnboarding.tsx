@@ -322,7 +322,7 @@ const CompanyOnboarding: React.FC = () => {
                         <div className="flex justify-end pt-4 border-t border-border">
                             <Button
                                 type="submit"
-                                disabled={isSaving}
+                                isLoading={isSaving}
                                 icon={Save}
                                 iconPosition="left"
                                 size="lg"
