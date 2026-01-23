@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticateUser = require('../middleware/auth');
 const { requireRole } = require('../middleware/authorization');
 const { supabaseAdmin } = require('../config/supabase');
+const { escapeHtml } = require('../utils/security');
 
 // All routes require authentication
 router.use(authenticateUser);
@@ -66,14 +67,22 @@ router.post('/invoice', async (req, res) => {
         }
 
         // Prepare email content
-        const clientName = invoice.client?.name || 'Valued Client';
-        const invoiceNumber = invoice.invoice_number;
+        const rawClientName = invoice.client?.name || 'Valued Client';
+        const rawInvoiceNumber = invoice.invoice_number;
+        const rawCompanyName = invoice.company?.name || 'Our Company';
+
+        const clientName = escapeHtml(rawClientName);
+        const invoiceNumber = escapeHtml(rawInvoiceNumber);
+        const companyName = escapeHtml(rawCompanyName);
+
         const invoiceTotal = new Intl.NumberFormat('en-CA', {
             style: 'currency',
             currency: 'CAD',
         }).format(invoice.total);
 
-        const emailSubject = `Invoice ${invoiceNumber} from ${invoice.company?.name || 'Our Company'}`;
+        // Subject uses raw values (plain text)
+        const emailSubject = `Invoice ${rawInvoiceNumber} from ${rawCompanyName}`;
+        const escapedMessage = escapeHtml(message);
 
         const emailHtml = `
       <!DOCTYPE html>
@@ -97,7 +106,7 @@ router.post('/invoice', async (req, res) => {
             <div class="content">
               <p>Dear ${clientName},</p>
               <p>Please find attached invoice <strong>${invoiceNumber}</strong> in the amount of <strong>${invoiceTotal}</strong>.</p>
-              ${message ? `<p>${message}</p>` : ''}
+              ${escapedMessage ? `<p>${escapedMessage}</p>` : ''}
               <p>Invoice Details:</p>
               <ul>
                 <li>Invoice Number: ${invoiceNumber}</li>
@@ -109,7 +118,7 @@ router.post('/invoice', async (req, res) => {
               <p>Thank you for your business!</p>
             </div>
             <div class="footer">
-              <p>This is an automated email from ${invoice.company?.name || 'Our Company'}.</p>
+              <p>This is an automated email from ${companyName}.</p>
               <p>Please do not reply to this email.</p>
             </div>
           </div>
