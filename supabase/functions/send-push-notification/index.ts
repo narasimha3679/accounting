@@ -201,11 +201,14 @@ async function sendTimesheetNotification(companyId: number, timesheetData: any):
   let totalFailed = 0;
 
   // Send to all owners
-  for (const profile of profiles) {
-    const result = await sendToUser(profile.auth_user_id, payload);
+  const results = await Promise.all(
+    profiles.map((profile) => sendToUser(profile.auth_user_id, payload))
+  );
+
+  results.forEach((result) => {
     totalSent += result.sent;
     totalFailed += result.failed;
-  }
+  });
 
   return { sent: totalSent, failed: totalFailed };
 }
