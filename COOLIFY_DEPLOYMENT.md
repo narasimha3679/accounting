@@ -263,6 +263,11 @@ After deployment, verify the following:
 - Verify all dependencies are in `package.json`
 - Ensure Node.js version matches (using Node 20 in Dockerfile)
 
+**Native module compilation errors (Python/node-gyp errors):**
+- The Dockerfile includes build tools (python3, make, g++) needed for native modules
+- If you see "Python is not set" or "node-gyp" errors, ensure the Dockerfile has been updated with build dependencies
+- Some packages like `ofx` require native compilation - the updated Dockerfile handles this
+
 ## CORS Configuration Notes
 
 The backend CORS configuration in `backend/src/app.js` uses the `FRONTEND_URL` environment variable:
