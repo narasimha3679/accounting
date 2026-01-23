@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
-import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info, Car } from 'lucide-react';
+import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info, Car, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -10,14 +10,22 @@ import HelpIcon from '../components/ui/HelpIcon';
 import { cn } from '../lib/utils';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 import { CRA_MILEAGE_RATE } from '../lib/api';
+import ReceiptScanner from '../components/ReceiptScanner';
+import { type ExtractedReceiptData } from '../lib/receiptParser';
+import ExpenseEntrySelector, { type EntryMethod } from '../components/ExpenseEntrySelector';
+import BankStatementReview, { type ParsedTransaction } from '../components/BankStatementReview';
 
 const Expenses: React.FC = () => {
-    const { user } = useAuth();
+    const { user, session } = useAuth();
     const _queryClient = useQueryClient();
+    const [showEntrySelector, setShowEntrySelector] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showMileageModal, setShowMileageModal] = useState(false);
+    const [showBankStatementReview, setShowBankStatementReview] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [bankStatementTransactions, setBankStatementTransactions] = useState<ParsedTransaction[]>([]);
+    const [isProcessingStatement, setIsProcessingStatement] = useState(false);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
         // Load saved preference on component mount
         const preferences = loadDashboardPreferences();
@@ -149,6 +157,58 @@ const Expenses: React.FC = () => {
     const mileageTripCount = mileageExpenses.length;
     const averageDistance = mileageTripCount > 0 ? totalMileageKm / mileageTripCount : 0;
 
+    // Handler for bank statement upload
+    const handleBankStatementUpload = async (file: File) => {
+        setIsProcessingStatement(true);
+        try {
+            const formData = new FormData();
+            formData.append('statement', file);
+            
+            // Include categories for AI categorization
+            if (categories && categories.length > 0) {
+                formData.append('categories', JSON.stringify(categories.map(c => ({ id: c.id, name: c.name }))));
+            }
+
+            // Include existing expenses for duplicate detection
+            if (expenses && expenses.length > 0) {
+                formData.append('existing_transactions', JSON.stringify(expenses.map(e => ({
+                    expense_date: e.expense_date,
+                    amount: e.amount,
+                    description: e.description,
+                }))));
+            }
+
+            const BACKEND_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/bank-statements/process`;
+
+            const response = await fetch(BACKEND_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to process bank statement');
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.transactions) {
+                setBankStatementTransactions(result.data.transactions);
+                setShowBankStatementReview(true);
+            } else {
+                throw new Error('Invalid response from server');
+            }
+        } catch (error) {
+            console.error('Bank statement upload error:', error);
+            alert(error instanceof Error ? error.message : 'Failed to process bank statement. Please try again.');
+        } finally {
+            setIsProcessingStatement(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -269,7 +329,7 @@ const Expenses: React.FC = () => {
                             Log Mileage
                         </Button>
                         <Button
-                            onClick={() => setShowCreateModal(true)}
+                            onClick={() => setShowEntrySelector(true)}
                             icon={Plus}
                             className="w-full sm:w-auto"
                         >
@@ -519,6 +579,100 @@ const Expenses: React.FC = () => {
                         setEditingExpense(null);
                     }}
                 />
+            )}
+
+            {/* Entry Method Selector */}
+            {showEntrySelector && (
+                <ExpenseEntrySelector
+                    onSelect={async (method: EntryMethod) => {
+                        setShowEntrySelector(false);
+                        if (method === 'manual') {
+                            setShowCreateModal(true);
+                        } else if (method === 'scan') {
+                            // Receipt scanner is already integrated in ExpenseModal
+                            setShowCreateModal(true);
+                        } else if (method === 'upload') {
+                            // Trigger file input for bank statement
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.csv,.pdf,.ofx,.qfx';
+                            input.onchange = async (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                    await handleBankStatementUpload(file);
+                                }
+                            };
+                            input.click();
+                        }
+                    }}
+                    onClose={() => setShowEntrySelector(false)}
+                />
+            )}
+
+            {/* Bank Statement Review */}
+            {showBankStatementReview && bankStatementTransactions.length > 0 && (
+                <BankStatementReview
+                    transactions={bankStatementTransactions}
+                    categories={categories || []}
+                    companyId={user?.company_id || 0}
+                    onSave={async (transactions: ParsedTransaction[]) => {
+                        try {
+                            // Convert parsed transactions to expense format
+                            // Filter out transactions without valid category_id
+                            const validTransactions = transactions.filter(t => t.category_id && t.category_id > 0);
+                            
+                            if (validTransactions.length === 0) {
+                                alert('No valid transactions to create. Please ensure all transactions have a category assigned.');
+                                return;
+                            }
+
+                            const expenses = validTransactions.map(t => ({
+                                company_id: user?.company_id || 0,
+                                description: t.description || t.suggested_description || 'Unnamed Transaction',
+                                category_id: t.category_id!,
+                                amount: t.amount || 0,
+                                hst_paid: t.hst_paid || 0,
+                                deduction_percentage: t.deduction_percentage || 1.0,
+                                expense_date: t.date,
+                                receipt_attached: false,
+                                paid_by: 'corp' as const,
+                            }));
+
+                            // Create expenses in bulk
+                            await api.createExpensesBulk(expenses);
+                            
+                            // Refresh expenses list
+                            _queryClient.invalidateQueries({ queryKey: ['expenses'] });
+                            
+                            // Close review and show success
+                            setShowBankStatementReview(false);
+                            setBankStatementTransactions([]);
+                            alert(`Successfully created ${expenses.length} expense(s)!`);
+                        } catch (error) {
+                            console.error('Failed to create expenses:', error);
+                            alert('Failed to create expenses. Please try again.');
+                        }
+                    }}
+                    onClose={() => {
+                        setShowBankStatementReview(false);
+                        setBankStatementTransactions([]);
+                    }}
+                />
+            )}
+
+            {/* Bank Statement Upload Processing */}
+            {isProcessingStatement && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                    <Card className="p-8 max-w-md">
+                        <div className="flex flex-col items-center gap-4">
+                            <Loader2 className="h-8 w-8 animate-spin text-neon-emerald" />
+                            <h3 className="text-lg font-semibold text-white">Processing Bank Statement</h3>
+                            <p className="text-sm text-muted-foreground text-center">
+                                Parsing transactions and categorizing with AI...
+                            </p>
+                        </div>
+                    </Card>
+                </div>
             )}
         </div>
     );
@@ -1031,6 +1185,35 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [uploadingFiles, setUploadingFiles] = useState(false);
 
+    const handleScanComplete = (data: ExtractedReceiptData, file: File) => {
+        setFormData(prev => ({
+            ...prev,
+            amount: data.amount || prev.amount,
+            hst_paid: data.hst || (data.amount ? parseFloat((data.amount * HST_RATE).toFixed(2)) : prev.hst_paid),
+            expense_date: data.date || prev.expense_date,
+            description: data.description || data.merchant || prev.description,
+            receipt_attached: true
+        }));
+
+        // Set Category if matched
+        if (data.category) {
+            const matchedCategory = categories.find(c => c.name.toLowerCase() === data.category?.toLowerCase());
+            if (matchedCategory) {
+                const guidance = getDeductionGuidance(matchedCategory.name);
+                setFormData(prev => ({
+                    ...prev,
+                    category_id: matchedCategory.id,
+                    deduction_percentage: matchedCategory.default_deduction_percentage ?? guidance.default
+                }));
+            }
+        }
+
+        // Add file to upload queue
+        setSelectedFiles(prev => [...prev, file]);
+
+        // Visual feedback could be added here, but the form updates are visible
+    };
+
     const createExpenseMutation = useMutation({
         mutationFn: async (data: any) => {
             return api.createExpense(data);
@@ -1176,6 +1359,21 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* OCR Scanner */}
+                    {!expense && (
+                        <div className="mb-6">
+                            <ReceiptScanner
+                                onScanComplete={handleScanComplete}
+                                className="w-full"
+                                variant="dropzone"
+                                categories={categories.map(c => c.name)}
+                            />
+                            <p className="text-xs text-center text-slate-muted mt-2">
+                                Scanned data will auto-fill the form below. Please verify all details.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         <div className="sm:col-span-2">
                             <label className="block text-sm font-medium text-white mb-2">Description *</label>
@@ -1454,8 +1652,8 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                             const distance = parseFloat(e.target.value) || 0;
                                             const rate = formData.mileage_rate_per_km ?? CRA_MILEAGE_RATE;
                                             const newAmount = distance * rate;
-                                            setFormData({ 
-                                                ...formData, 
+                                            setFormData({
+                                                ...formData,
                                                 distance_km: distance,
                                                 amount: newAmount
                                             });
@@ -1475,8 +1673,8 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
                                             const rate = parseFloat(e.target.value) || CRA_MILEAGE_RATE;
                                             const distance = formData.distance_km ?? 0;
                                             const newAmount = distance * rate;
-                                            setFormData({ 
-                                                ...formData, 
+                                            setFormData({
+                                                ...formData,
                                                 mileage_rate_per_km: rate,
                                                 amount: newAmount
                                             });

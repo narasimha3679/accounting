@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js'; // Import Session type
 import type { User, Employee } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
 
@@ -13,6 +14,7 @@ interface AuthContextType {
     isLoading: boolean;
     isAuthenticated: boolean;
     isPasswordRecovery: boolean;
+    session: Session | null; // Add session to context type
 }
 
 interface ProfileRow {
@@ -66,6 +68,7 @@ const mapProfileToUser = (profile: ProfileRow | null): User | null => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [session, setSession] = useState<Session | null>(null); // State for session
     const [isLoading, setIsLoading] = useState(true);
     const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
@@ -211,6 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setIsPasswordRecovery(false);
             }
 
+            setSession(session); // Update session state
+
             if (session?.user) {
                 loadProfile().catch((error) => {
                     console.error('Error refreshing profile', error);
@@ -310,6 +315,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: !!user,
         isPasswordRecovery,
+        session,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

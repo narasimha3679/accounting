@@ -2,6 +2,9 @@ import { supabase, SUPABASE_STORAGE_BUCKET, supabaseUrl, supabaseAnonKey } from 
 import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
 
+// Backend server URL - defaults to localhost in development
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
 export interface User {
     id: number;
     email: string;
@@ -1025,13 +1028,13 @@ class SupabaseApi {
     async createEmployee(employee: Omit<Employee, 'id' | 'created_at' | 'updated_at' | 'company' | 'auth_user_id' | 'employee_id'> & { employee_id?: string; initialPassword: string }): Promise<Employee> {
         const { initialPassword, ...employeeData } = employee;
         
-        // Call edge function to create employee with auth user
+        // Call Node server to create employee with auth user
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/create-employee`, {
+        const response = await fetch(`${BACKEND_URL}/api/employees`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1056,21 +1059,20 @@ class SupabaseApi {
         const { newEmail, ...employeeData } = employee;
         const currentEmployee = await this.getEmployee(id);
 
-        // If email changed, update auth user email via edge function
+        // If email changed, update auth user email via Node server
         if (newEmail && newEmail !== currentEmployee.email) {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 throw new Error('Not authenticated');
             }
 
-            const response = await fetch(`${supabaseUrl}/functions/v1/update-employee-email`, {
-                method: 'POST',
+            const response = await fetch(`${BACKEND_URL}/api/employees/${id}/email`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
-                    employee_id: id,
                     newEmail,
                 }),
             });
@@ -1098,14 +1100,13 @@ class SupabaseApi {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/delete-employee`, {
-            method: 'POST',
+        const response = await fetch(`${BACKEND_URL}/api/employees/${id}`, {
+            method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-                employee_id: id,
                 deleteAuthUser,
             }),
         });
@@ -1122,14 +1123,13 @@ class SupabaseApi {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/update-employee-password`, {
-            method: 'POST',
+        const response = await fetch(`${BACKEND_URL}/api/employees/${id}/password`, {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-                employee_id: id,
                 newPassword,
             }),
         });
@@ -1146,15 +1146,12 @@ class SupabaseApi {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/reset-employee-password`, {
+        const response = await fetch(`${BACKEND_URL}/api/employees/${id}/reset-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({
-                employee_id: id,
-            }),
         });
 
         if (!response.ok) {
@@ -1860,6 +1857,37 @@ class SupabaseApi {
             ...data,
             files: data.files?.map(this.mapExpenseFile.bind(this)),
         };
+    }
+
+    async createExpensesBulk(expenses: Array<Omit<Expense, 'id' | 'company' | 'files' | 'created_at' | 'updated_at'>>): Promise<Expense[]> {
+        // Validate all expenses have company_id
+        const companyId = this.ensureCompanyId(expenses[0]?.company_id);
+        
+        // Prepare payloads
+        const payloads = expenses.map(expense => ({
+            ...expense,
+            company_id: companyId,
+            receipt_attached: expense.receipt_attached ?? false,
+        }));
+
+        // Insert all expenses in a single transaction
+        const { data, error } = await supabase
+            .from('expenses')
+            .insert(payloads)
+            .select('*, category:expense_categories(*), files:expense_files(*)');
+
+        if (error) {
+            throw new Error(`Failed to create expenses: ${error.message}`);
+        }
+
+        if (!data) {
+            return [];
+        }
+
+        return data.map(expense => ({
+            ...expense,
+            files: expense.files?.map(this.mapExpenseFile.bind(this)),
+        }));
     }
 
     async deleteExpense(id: number): Promise<void> {
@@ -2787,36 +2815,25 @@ class SupabaseApi {
     }
 
     /**
-     * Trigger a test notification (calls edge function)
+     * Trigger a test notification (calls Node server)
      */
     async triggerTestNotification(): Promise<void> {
-        const { data: auth } = await supabase.auth.getUser();
-        const authUser = auth.user;
-        if (!authUser) {
-            throw new Error('Not authenticated');
-        }
-
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        const response = await fetch(`${BACKEND_URL}/api/push-notifications/test`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${session.access_token}`,
-                'apikey': supabaseAnonKey,
             },
-            body: JSON.stringify({
-                type: 'test',
-                userId: authUser.id,
-            }),
         });
 
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Failed to send test notification: ${error}`);
+            const error = await response.json();
+            throw new Error(error.error || `Failed to send test notification: ${error.message || 'Unknown error'}`);
         }
     }
 
@@ -5580,8 +5597,8 @@ class SupabaseApi {
                 reader.readAsDataURL(pdfBlob);
             });
 
-            // Call edge function with user's session token
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-invoice-email`, {
+            // Call Node server with user's session token
+            const response = await fetch(`${BACKEND_URL}/api/emails/invoice`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
