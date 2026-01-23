@@ -217,13 +217,10 @@ const Login: React.FC = () => {
                                 >
                                     <Button
                                         type="submit"
-                                        disabled={isLoading}
+                                        isLoading={isLoading}
                                         className="w-full py-3 sm:py-2.5 relative overflow-hidden"
                                         size="lg"
                                     >
-                                        {isLoading && (
-                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        )}
                                         {isLoading 
                                             ? (isRegistering ? 'Creating account...' : 'Signing in...') 
                                             : (isRegistering ? 'Create account' : 'Sign in')

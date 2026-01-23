@@ -2,7 +2,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
-import type { LucideIcon } from "lucide-react"
+import { type LucideIcon, Loader2 } from "lucide-react"
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-deep-forest disabled:pointer-events-none disabled:opacity-50",
@@ -43,13 +43,14 @@ export interface ButtonProps
   asChild?: boolean
   icon?: LucideIcon
   iconPosition?: 'left' | 'right'
+  isLoading?: boolean
   // Legacy props to ignore or map
   gradientFrom?: string
   gradientTo?: string
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, icon: Icon, iconPosition = 'left', children, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, icon: Icon, iconPosition = 'left', isLoading = false, children, disabled, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
 
     // Map legacy variants
@@ -61,11 +62,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(buttonVariants({ variant: finalVariant, size, className }))}
         ref={ref}
+        disabled={disabled || isLoading}
         {...props}
       >
-        {Icon && iconPosition === 'left' && <Icon className="mr-2 h-4 w-4" />}
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {!isLoading && Icon && iconPosition === 'left' && <Icon className="mr-2 h-4 w-4" />}
         {children}
-        {Icon && iconPosition === 'right' && <Icon className="ml-2 h-4 w-4" />}
+        {!isLoading && Icon && iconPosition === 'right' && <Icon className="ml-2 h-4 w-4" />}
       </Comp>
     )
   }
