@@ -19,13 +19,16 @@ const LandingPage = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // If user is already authenticated, redirect them to dashboard
+  // If user is already authenticated, redirect them appropriately
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.isEmployee) {
         navigate('/employee-dashboard');
       } else if (user.company_id) {
         navigate('/dashboard');
+      } else {
+        // New users without a company should go to onboarding
+        navigate('/onboarding/company');
       }
     }
   }, [isAuthenticated, user, navigate]);

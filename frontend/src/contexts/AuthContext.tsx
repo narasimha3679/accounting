@@ -262,7 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             );
 
         if (profileError) {
-            console.warn('Profile upsert failed after signup (continuing anyway)', profileError);
+            console.error('Profile upsert failed after signup:', profileError);
+            // Still continue, but log the error for debugging
         }
 
         await loadProfile();

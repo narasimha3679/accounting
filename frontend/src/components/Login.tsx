@@ -23,10 +23,14 @@ const Login: React.FC = () => {
         try {
             if (isRegistering) {
                 await register(email, password, name);
+                // After registration, redirect to onboarding if no company
+                navigate('/onboarding/company');
             } else {
                 await login(email, password);
+                // After login, navigate to landing page which will handle redirect
+                // based on user state (employee, has company, or needs onboarding)
+                navigate('/');
             }
-            navigate('/');
         } catch (err) {
             const message = err instanceof Error
                 ? err.message
