@@ -5,7 +5,7 @@ import { Plus, Edit, Eye, Trash2, Send, Check, X, Power, PowerOff, Calendar } fr
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import InvoicePreview from '../components/invoices/InvoicePreview';
 
 const Invoices: React.FC = () => {
@@ -90,7 +90,7 @@ const Invoices: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const getStatusColor = (status: string) => {
@@ -904,7 +904,7 @@ const RecurringTemplatesTab: React.FC<RecurringTemplatesTabProps> = ({ clients }
     });
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const getFrequencyLabel = (frequency: string) => {

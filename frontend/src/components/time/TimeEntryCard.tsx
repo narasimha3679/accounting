@@ -3,6 +3,7 @@ import Card from '../ui/Card';
 import type { TimeEntry } from '../../lib/api';
 import { calculateHours } from '../../lib/scheduleUtils';
 import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { formatLocalDate } from '../../lib/utils';
 
 interface TimeEntryCardProps {
     entry: TimeEntry;
@@ -62,7 +63,7 @@ const TimeEntryCard: React.FC<TimeEntryCardProps> = ({
         }
     };
 
-    const formattedDate = new Date(entry.entry_date).toLocaleDateString('en-CA', {
+    const formattedDate = formatLocalDate(entry.entry_date, {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -178,7 +179,7 @@ const TimeEntryCard: React.FC<TimeEntryCardProps> = ({
                 </span>
                 {entry.approved_at && (
                     <span className="text-xs text-muted-foreground">
-                        Approved: {new Date(entry.approved_at).toLocaleDateString('en-CA')}
+                        Approved: {formatLocalDate(entry.approved_at)}
                     </span>
                 )}
             </div>

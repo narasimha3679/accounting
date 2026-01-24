@@ -7,6 +7,7 @@ import StatCard from '../components/ui/StatCard';
 import Button from '../components/ui/Button';
 import { DollarSign, TrendingUp, Building2, Calendar, FileText, BarChart, FileCheck, User, Briefcase } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { formatLocalDate } from '../lib/utils';
 
 const EmployeeDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -66,7 +67,7 @@ const EmployeeDashboard: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA', {
+        return formatLocalDate(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',

@@ -17,6 +17,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PayRunStatusBadge from '../components/payroll/PayRunStatusBadge';
 import PayRunSummaryCard from '../components/payroll/PayRunSummaryCard';
+import { formatLocalDate } from '../lib/utils';
 import PayRunItemsTable from '../components/payroll/PayRunItemsTable';
 import AddEmployeeToPayRun from '../components/payroll/AddEmployeeToPayRun';
 import PayRunItemDetail from '../components/payroll/PayRunItemDetail';
@@ -191,7 +192,7 @@ const PayRunDetail: React.FC = () => {
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',

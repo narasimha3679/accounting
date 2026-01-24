@@ -7,6 +7,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { ROERecord, Company, Employee } from './api';
 import { getReasonCodeLabel } from './roeHelpers';
+import { formatLocalDate } from './utils';
 
 const styles = StyleSheet.create({
     page: {
@@ -131,7 +132,7 @@ export function ROEDocument({ roe, company, employee }: ROEDocumentProps) {
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
@@ -316,7 +317,7 @@ export function ROEDocument({ roe, company, employee }: ROEDocumentProps) {
                         mail.
                     </Text>
                     <Text style={{ marginTop: 4 }}>
-                        Generated: {new Date().toLocaleDateString('en-CA')}
+                        Generated: {formatLocalDate(new Date().toISOString().split('T')[0])}
                     </Text>
                 </View>
             </Page>

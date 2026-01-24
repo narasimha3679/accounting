@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { type Dividend, type DividendRecipient, type Company } from './api';
+import { formatLocalDate } from './utils';
 
 /**
  * CRA T5 Slip Generator
@@ -193,7 +194,7 @@ export async function generateT5SlipPDF(
     );
 
     pdf.text(
-        `Generated: ${new Date().toLocaleDateString('en-CA')}`,
+        `Generated: ${formatLocalDate(new Date().toISOString().split('T')[0])}`,
         pageWidth / 2,
         pageHeight - 10,
         { align: 'center' }
@@ -334,7 +335,7 @@ export async function generateT5SummaryPDF(
     );
 
     pdf.text(
-        `Generated: ${new Date().toLocaleDateString('en-CA')}`,
+        `Generated: ${formatLocalDate(new Date().toISOString().split('T')[0])}`,
         pageWidth / 2,
         pageHeight - 10,
         { align: 'center' }

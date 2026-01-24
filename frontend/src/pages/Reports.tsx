@@ -10,6 +10,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getFiscalYearRange, formatFiscalYear, getCurrentFiscalYear, isDateInFiscalYear, getFiscalYearOptions } from '../lib/fiscalYear';
 import { getHSTPeriodsForFiscalYear, formatHSTPeriod, type HSTPeriod } from '../lib/hstPeriods';
+import { formatLocalDate } from '../lib/utils';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
@@ -212,7 +213,7 @@ const Reports: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const formatPercentage = (rate: number) => {
@@ -432,7 +433,7 @@ const Reports: React.FC = () => {
         addText(`Business Number: ${user?.company?.business_number || 'N/A'}`, 10);
         addText(`HST Number: ${user?.company?.hst_number || 'Not Registered'}`, 10);
         addText(`Fiscal Year: ${formatFiscalYear(selectedFiscalYear)}`, 10);
-        addText(`Report Generated: ${new Date().toLocaleDateString('en-CA')}`, 10);
+        addText(`Report Generated: ${formatLocalDate(new Date().toISOString().split('T')[0])}`, 10);
         yPosition += 5;
 
         // Profit & Loss Summary

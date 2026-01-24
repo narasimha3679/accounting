@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Check, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import Button from './ui/Button';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import type { ExpenseCategory } from '../lib/api';
 
 export interface ParsedTransaction {
@@ -208,7 +208,7 @@ const BankStatementReview: React.FC<BankStatementReviewProps> = ({
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     return (

@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { Download } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface PayrollJournalEntryProps {
     payRunId: number;
@@ -28,8 +29,8 @@ const PayrollJournalEntry: React.FC<PayrollJournalEntryProps> = ({ payRunId }) =
 
         const csvRows = [
             ['Payroll Journal Entry'],
-            [`Pay Period: ${new Date(journalEntry.pay_period_start).toLocaleDateString()} - ${new Date(journalEntry.pay_period_end).toLocaleDateString()}`],
-            [`Pay Date: ${new Date(journalEntry.pay_date).toLocaleDateString()}`],
+            [`Pay Period: ${formatLocalDate(journalEntry.pay_period_start)} - ${formatLocalDate(journalEntry.pay_period_end)}`],
+            [`Pay Date: ${formatLocalDate(journalEntry.pay_date)}`],
             [''],
             ['Account', 'Debit', 'Credit'],
             ...journalEntry.entries.map((entry) => [
@@ -82,9 +83,9 @@ const PayrollJournalEntry: React.FC<PayrollJournalEntryProps> = ({ payRunId }) =
                 <div>
                     <h2 className="text-xl font-bold text-white">Payroll Journal Entry</h2>
                     <p className="text-muted-foreground mt-1">
-                        Pay Period: {new Date(journalEntry.pay_period_start).toLocaleDateString()} - {new Date(journalEntry.pay_period_end).toLocaleDateString()}
+                        Pay Period: {formatLocalDate(journalEntry.pay_period_start)} - {formatLocalDate(journalEntry.pay_period_end)}
                         {' | '}
-                        Pay Date: {new Date(journalEntry.pay_date).toLocaleDateString()}
+                        Pay Date: {formatLocalDate(journalEntry.pay_date)}
                     </p>
                 </div>
                 <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>

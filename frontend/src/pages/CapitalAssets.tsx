@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
 import { getCurrentFiscalYear, getFiscalYear, getFiscalYearOptions, formatFiscalYear } from '../lib/fiscalYear';
+import { formatLocalDate } from '../lib/utils';
 
 const CapitalAssets: React.FC = () => {
     const { user } = useAuth();
@@ -67,7 +68,7 @@ const CapitalAssets: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const handleDelete = (asset: CapitalAsset) => {

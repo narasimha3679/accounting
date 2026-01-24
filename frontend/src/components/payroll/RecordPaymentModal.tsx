@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { X } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface RecordPaymentModalProps {
     periodId: number;
@@ -101,7 +102,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ periodId, onClo
                 <div className="mb-4 p-4 bg-white/5 rounded-lg">
                     <p className="text-sm text-muted-foreground mb-1">Period</p>
                     <p className="text-white">
-                        {new Date(period.period_start).toLocaleDateString()} - {new Date(period.period_end).toLocaleDateString()}
+                        {formatLocalDate(period.period_start)} - {formatLocalDate(period.period_end)}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2 mb-1">Amount Due</p>
                     <p className="text-white font-semibold text-lg">{formatCurrency(period.total_owing)}</p>

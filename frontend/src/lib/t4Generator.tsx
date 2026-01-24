@@ -6,6 +6,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { T4Slip, Company } from './api';
+import { formatLocalDate } from './utils';
 
 const styles = StyleSheet.create({
     page: {
@@ -382,12 +383,12 @@ export function T4Document({ t4 }: T4DocumentProps) {
                     </Text>
                     {t4.generated_at && (
                         <Text>
-                            Generated: {new Date(t4.generated_at).toLocaleDateString('en-CA')}
+                            Generated: {formatLocalDate(t4.generated_at)}
                         </Text>
                     )}
                     {isAmended && t4.amended_at && (
                         <Text>
-                            Amended: {new Date(t4.amended_at).toLocaleDateString('en-CA')}
+                            Amended: {formatLocalDate(t4.amended_at)}
                         </Text>
                     )}
                 </View>

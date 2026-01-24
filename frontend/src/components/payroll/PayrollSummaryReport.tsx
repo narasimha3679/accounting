@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { Download } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface PayrollSummaryReportProps {
     companyId: number;
@@ -47,7 +48,7 @@ const PayrollSummaryReport: React.FC<PayrollSummaryReportProps> = ({
 
         const csvRows = [
             ['Payroll Summary Report'],
-            [`Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`],
+            [`Period: ${formatLocalDate(startDate)} - ${formatLocalDate(endDate)}`],
             [''],
             ['EARNINGS'],
             ['Regular Wages', formatCurrency(report.earnings.regular)],
@@ -123,7 +124,7 @@ const PayrollSummaryReport: React.FC<PayrollSummaryReportProps> = ({
                 <div>
                     <h2 className="text-xl font-bold text-white">Payroll Summary Report</h2>
                     <p className="text-muted-foreground mt-1">
-                        {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+                        {formatLocalDate(startDate)} - {formatLocalDate(endDate)}
                     </p>
                 </div>
                 <div className="flex gap-2">

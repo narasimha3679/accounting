@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 
 const TaxCalculator: React.FC = () => {
@@ -347,7 +347,7 @@ const TaxCalculator: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const formatPercentage = (rate: number) => {

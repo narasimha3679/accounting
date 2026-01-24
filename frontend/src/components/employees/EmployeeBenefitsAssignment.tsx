@@ -4,6 +4,7 @@ import api, { type EmployeeBenefit, type BenefitType } from '../../lib/api';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { Plus, Edit, Trash2, X, Gift } from 'lucide-react';
+import { formatLocalDate } from '../../lib/utils';
 
 interface EmployeeBenefitsAssignmentProps {
     employeeId: number;
@@ -310,10 +311,10 @@ const EmployeeBenefitsAssignment: React.FC<EmployeeBenefitsAssignmentProps> = ({
                                                 {getDisplayValue(benefit)}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-muted-foreground">
-                                                {new Date(benefit.effective_date).toLocaleDateString('en-CA')}
+                                                {formatLocalDate(benefit.effective_date)}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-muted-foreground">
-                                                {benefit.end_date ? new Date(benefit.end_date).toLocaleDateString('en-CA') : '-'}
+                                                {benefit.end_date ? formatLocalDate(benefit.end_date) : '-'}
                                             </td>
                                             <td className="py-3 px-4">
                                                 {active ? (

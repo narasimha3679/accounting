@@ -16,6 +16,7 @@ import {
     AlertCircle,
     X
 } from 'lucide-react';
+import { formatLocalDate } from '../lib/utils';
 
 const currencyFormatter = new Intl.NumberFormat('en-CA', {
     style: 'currency',
@@ -28,7 +29,7 @@ const formatDate = (dateString: string) => {
     if (!dateString) {
         return '';
     }
-    return new Date(dateString).toLocaleDateString('en-CA');
+    return formatLocalDate(dateString);
 };
 
 interface OwnerPaymentModalProps {

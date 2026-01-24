@@ -1,6 +1,7 @@
 import { Navbar } from '../components/landing/Navbar';
 import { Footer } from '../components/landing/Footer';
 import { BackToTop } from '../components/landing/BackToTop';
+import { formatLocalDate } from '../lib/utils';
 
 export const TermsOfService = () => {
   return (
@@ -8,7 +9,7 @@ export const TermsOfService = () => {
       <Navbar />
       <main className="container mx-auto px-4 md:px-6 py-24 max-w-4xl">
         <h1 className="text-4xl md:text-5xl font-bold mb-8">Terms of Service</h1>
-        <p className="text-slate-400 mb-8">Last updated: {new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <p className="text-slate-400 mb-8">Last updated: {formatLocalDate(new Date().toISOString().split('T')[0], { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
         <div className="prose prose-invert max-w-none space-y-8">
           <section>

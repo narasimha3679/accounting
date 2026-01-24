@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { Download } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface DeductionsReportProps {
     companyId: number;
@@ -39,7 +40,7 @@ const DeductionsReport: React.FC<DeductionsReportProps> = ({
 
         const csvRows = [
             ['Deductions Report'],
-            [`Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`],
+            [`Period: ${formatLocalDate(startDate)} - ${formatLocalDate(endDate)}`],
             [''],
             ['STATUTORY DEDUCTIONS'],
             ['Employee', 'CPP', 'CPP2', 'EI', 'Federal Tax', 'Provincial Tax'],
@@ -98,7 +99,7 @@ const DeductionsReport: React.FC<DeductionsReportProps> = ({
                 <div>
                     <h2 className="text-xl font-bold text-white">Deductions Report</h2>
                     <p className="text-muted-foreground mt-1">
-                        {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+                        {formatLocalDate(startDate)} - {formatLocalDate(endDate)}
                     </p>
                 </div>
                 <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>

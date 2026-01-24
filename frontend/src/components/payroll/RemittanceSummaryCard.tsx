@@ -3,6 +3,7 @@ import { type RemittancePeriod } from '../../lib/api';
 import { Calendar, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface RemittanceSummaryCardProps {
     period: RemittancePeriod;
@@ -18,7 +19,7 @@ const RemittanceSummaryCard: React.FC<RemittanceSummaryCardProps> = ({ period, o
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',

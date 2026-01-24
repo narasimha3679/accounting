@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { getReasonCodeLabel } from '../lib/roeHelpers';
 import ROEPreview from '../components/payroll/ROEPreview';
+import { formatLocalDate } from '../lib/utils';
 
 const ROEList: React.FC = () => {
     const { user } = useAuth();
@@ -136,7 +137,7 @@ const ROEList: React.FC = () => {
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',

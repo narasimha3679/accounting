@@ -5,6 +5,7 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { Edit, Save, X, AlertTriangle } from 'lucide-react';
 import type { EmployeeTaxCredits } from '../../lib/api';
+import { formatLocalDate } from '../../lib/utils';
 
 interface EmployeeTD1FormProps {
     employeeId: number;
@@ -211,7 +212,7 @@ export default function EmployeeTD1Form({ employeeId, year }: EmployeeTD1FormPro
 
                         {taxCredits && (
                             <p className="text-sm text-muted-foreground mt-4">
-                                Last Updated: {new Date(taxCredits.updated_at).toLocaleDateString('en-CA')}
+                                Last Updated: {formatLocalDate(taxCredits.updated_at)}
                             </p>
                         )}
                     </div>

@@ -8,6 +8,7 @@ import DividendRecipientList from '../components/dividends/DividendRecipientList
 import { generateT5SlipPDF, generateT5SummaryPDF } from '../lib/t5Generator';
 import { generateDividendMinutesPDF } from '../lib/dividendMinutesGenerator';
 import { getFiscalYear } from '../lib/fiscalYear';
+import { formatLocalDate } from '../lib/utils';
 import {
     Plus,
     Edit,
@@ -544,7 +545,7 @@ const Dividends: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const getStatusIcon = (status: string) => {

@@ -4,6 +4,7 @@ import api from '../../lib/api';
 import { Download } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import { formatLocalDate } from '../../lib/utils';
 
 interface EmployeeEarningsReportProps {
     companyId: number;
@@ -42,7 +43,7 @@ const EmployeeEarningsReport: React.FC<EmployeeEarningsReportProps> = ({
 
         const csvRows = [
             ['Employee Earnings Report'],
-            [`Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`],
+            [`Period: ${formatLocalDate(startDate)} - ${formatLocalDate(endDate)}`],
             [''],
             ['Employee', 'Employee ID', 'Regular Hours', 'OT Hours', 'Regular Pay', 'OT Pay', 'Gross Pay', 'Net Pay', 'Total Hours'],
             ...report.employees.map((emp) => [
@@ -100,7 +101,7 @@ const EmployeeEarningsReport: React.FC<EmployeeEarningsReportProps> = ({
                 <div>
                     <h2 className="text-xl font-bold text-white">Employee Earnings Report</h2>
                     <p className="text-muted-foreground mt-1">
-                        {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+                        {formatLocalDate(startDate)} - {formatLocalDate(endDate)}
                     </p>
                 </div>
                 <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>

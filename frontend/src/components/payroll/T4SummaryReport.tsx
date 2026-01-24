@@ -2,6 +2,7 @@ import type { T4Slip } from '../../lib/api';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { Download } from 'lucide-react';
+import { formatLocalDate } from '../../lib/utils';
 
 interface T4SummaryReportProps {
     t4s: T4Slip[];
@@ -39,7 +40,7 @@ export default function T4SummaryReport({ t4s, taxYear, companyName }: T4Summary
             ['T4 Summary Report', ''],
             ['Company', companyName],
             ['Tax Year', taxYear.toString()],
-            ['Generated', new Date().toLocaleDateString('en-CA')],
+            ['Generated', formatLocalDate(new Date().toISOString().split('T')[0])],
             [''],
             ['Summary Totals', ''],
             ['Total Number of T4s', totalT4s.toString()],

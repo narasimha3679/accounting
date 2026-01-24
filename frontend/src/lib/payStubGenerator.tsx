@@ -7,6 +7,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { PayRun, PayRunItem, Employee, Company, PayRunItemDeduction } from './api';
 import type { EmployeeYTD } from './payrollTypes';
+import { formatLocalDate } from './utils';
 
 const styles = StyleSheet.create({
     page: {
@@ -127,7 +128,7 @@ export function PayStubDocument({
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',

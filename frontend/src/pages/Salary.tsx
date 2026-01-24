@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api, { type Salary as SalaryRecord } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import { formatLocalDate } from '../lib/utils';
 import {
     Plus,
     Edit,
@@ -164,7 +165,7 @@ const SalaryPage: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const getStatusIcon = (status: string) => {

@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { calculateHours } from '../../lib/scheduleUtils';
+import { formatLocalDate } from '../../lib/utils';
 
 interface ApprovalPanelProps {
     pendingEntries: TimeEntry[];
@@ -74,7 +75,7 @@ const ApprovalPanel: React.FC<ApprovalPanelProps> = ({
                 const variance = allottedHours ? hours - allottedHours : null;
                 const matchesAllotted = variance !== null && Math.abs(variance) < 0.1;
 
-                const formattedDate = new Date(entry.entry_date).toLocaleDateString('en-CA', {
+                const formattedDate = formatLocalDate(entry.entry_date, {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',

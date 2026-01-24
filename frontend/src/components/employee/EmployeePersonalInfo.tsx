@@ -4,6 +4,7 @@ import api, { type Employee } from '../../lib/api';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { Edit, Save, X, User, Mail, Phone, Briefcase, Calendar, DollarSign, MapPin } from 'lucide-react';
+import { formatLocalDate } from '../../lib/utils';
 
 interface EmployeePersonalInfoProps {
     employeeId: number;
@@ -52,7 +53,7 @@ export default function EmployeePersonalInfo({ employeeId }: EmployeePersonalInf
 
     const formatDate = (dateString: string | null | undefined) => {
         if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-CA', {
+        return formatLocalDate(dateString, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',

@@ -8,6 +8,7 @@ import PayrollSummaryReportComponent from '../components/payroll/PayrollSummaryR
 import EmployeeEarningsReportComponent from '../components/payroll/EmployeeEarningsReport';
 import DeductionsReportComponent from '../components/payroll/DeductionsReport';
 import PayrollJournalEntry from '../components/payroll/PayrollJournalEntry';
+import { formatLocalDate } from '../lib/utils';
 
 type ReportTab = 'summary' | 'earnings' | 'deductions' | 'journal';
 
@@ -152,7 +153,7 @@ const PayrollReports: React.FC = () => {
                                 <option value="">Select Pay Run</option>
                                 {payRuns.map((pr) => (
                                     <option key={pr.id} value={pr.id}>
-                                        {new Date(pr.pay_period_start).toLocaleDateString()} - {new Date(pr.pay_period_end).toLocaleDateString()}
+                                        {formatLocalDate(pr.pay_period_start)} - {formatLocalDate(pr.pay_period_end)}
                                     </option>
                                 ))}
                             </select>

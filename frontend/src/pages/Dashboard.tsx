@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import StatCard from '../components/ui/StatCard';
 import Card from '../components/ui/Card';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import { staggerContainer, staggerItem } from '../lib/animations';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 
@@ -340,7 +340,7 @@ const Dashboard: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     // Hooks must be called before any early returns

@@ -7,6 +7,7 @@ import { Eye, Calendar } from 'lucide-react';
 import { PayStubPreview } from '../payroll/PayStubPreview';
 import type { Employee, Company, PayRunItemDeduction } from '../../lib/api';
 import type { EmployeeYTD } from '../../lib/payrollTypes';
+import { formatLocalDate } from '../../lib/utils';
 
 interface EmployeePayStubsProps {
     employeeId: number;
@@ -72,7 +73,7 @@ export default function EmployeePayStubs({ employeeId }: EmployeePayStubsProps) 
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA', {
+        return formatLocalDate(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',

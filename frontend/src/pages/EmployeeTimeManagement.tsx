@@ -10,6 +10,7 @@ import StatCard from '../components/ui/StatCard';
 import TimeEntryModal from '../components/time/TimeEntryModal';
 import TimeEntryCard from '../components/time/TimeEntryCard';
 import { calculateHours } from '../lib/scheduleUtils';
+import { formatLocalDate } from '../lib/utils';
 
 const EmployeeTimeManagement: React.FC = () => {
     const { user } = useAuth();
@@ -87,13 +88,13 @@ const EmployeeTimeManagement: React.FC = () => {
     });
 
     const handleDelete = (entry: TimeEntry) => {
-        if (confirm(`Are you sure you want to delete your time entry for ${new Date(entry.entry_date).toLocaleDateString('en-CA')}?`)) {
+        if (confirm(`Are you sure you want to delete your time entry for ${formatLocalDate(entry.entry_date)}?`)) {
             deleteMutation.mutate(entry.id);
         }
     };
 
     const handleSubmit = (entry: TimeEntry) => {
-        if (confirm(`Submit time entry for ${new Date(entry.entry_date).toLocaleDateString('en-CA')} for approval?`)) {
+        if (confirm(`Submit time entry for ${formatLocalDate(entry.entry_date)} for approval?`)) {
             submitMutation.mutate(entry.id);
         }
     };

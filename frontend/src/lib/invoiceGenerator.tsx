@@ -6,6 +6,7 @@
 
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Invoice, InvoiceItem, Client, Company } from './api';
+import { formatLocalDate } from './utils';
 
 const styles = StyleSheet.create({
     page: {
@@ -159,7 +160,7 @@ export function InvoiceDocument({ invoice, client, company }: InvoiceDocumentPro
     };
 
     const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-CA', {
+        return formatLocalDate(date, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -270,7 +271,7 @@ export function InvoiceDocument({ invoice, client, company }: InvoiceDocumentPro
                 <View style={styles.footer}>
                     <Text>Thank you for your business!</Text>
                     <Text>
-                        Generated: {new Date().toLocaleDateString('en-CA')}
+                        Generated: {formatLocalDate(new Date().toISOString().split('T')[0])}
                     </Text>
                 </View>
             </Page>

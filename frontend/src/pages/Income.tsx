@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2, DollarSign, X } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 
 const Income: React.FC = () => {
     const { user } = useAuth();
@@ -47,7 +47,7 @@ const Income: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const handleDelete = async (id: number) => {

@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 import { CRA_MILEAGE_RATE } from '../lib/api';
 import ReceiptScanner from '../components/ReceiptScanner';
@@ -109,7 +109,7 @@ const Expenses: React.FC = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
+        return formatLocalDate(dateString);
     };
 
     const handleDelete = (expense: Expense) => {

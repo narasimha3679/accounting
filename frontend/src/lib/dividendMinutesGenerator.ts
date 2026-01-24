@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { type Dividend, type DividendRecipient, type Company } from './api';
+import { formatLocalDate } from './utils';
 
 /**
  * Dividend Declaration Minutes Generator
@@ -162,7 +163,7 @@ export function generateDividendMinutesPDF(
     );
 
     pdf.text(
-        `Generated: ${new Date().toLocaleDateString('en-CA')}`,
+        `Generated: ${formatLocalDate(new Date().toISOString().split('T')[0])}`,
         pageWidth / 2,
         pageHeight - 10,
         { align: 'center' }

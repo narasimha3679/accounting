@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import EmployeeBenefitsAssignment from '../components/employees/EmployeeBenefitsAssignment';
+import { formatLocalDate } from '../lib/utils';
 
 const Employees: React.FC = () => {
     const { user } = useAuth();
@@ -260,7 +261,7 @@ const Employees: React.FC = () => {
                             {employee.hire_date && (
                                 <p>
                                     <span className="font-medium text-foreground">Hire Date:</span>{' '}
-                                    {new Date(employee.hire_date).toLocaleDateString('en-CA')}
+                                    {formatLocalDate(employee.hire_date)}
                                 </p>
                             )}
                             <p>
