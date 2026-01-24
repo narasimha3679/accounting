@@ -1,6 +1,62 @@
 const model = require('../config/gemini');
 
 /**
+ * Process batches with a concurrency limit to respect API rate limits
+ * @param {Array} batches - Array of batches to process
+ * @param {Function} processFn - Function to process each batch (batch) => Promise<result>
+ * @param {Number} concurrencyLimit - Maximum number of batches to process simultaneously
+ * @returns {Promise<Array>} Results in the same order as input batches
+ */
+const processBatchesWithConcurrency = async (batches, processFn, concurrencyLimit = 3) => {
+    const results = new Array(batches.length);
+    const executing = [];
+
+    for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        
+        // Create a promise that processes the batch and tracks its index
+        const promise = (async () => {
+            try {
+                const result = await processFn(batch);
+                return { index: i, result, error: null };
+            } catch (error) {
+                return { index: i, result: null, error };
+            }
+        })();
+
+        executing.push(promise);
+
+        // If we've reached the concurrency limit, wait for one to complete
+        if (executing.length >= concurrencyLimit) {
+            const completed = await Promise.race(executing);
+            
+            // Remove the completed promise from executing array
+            const completedIndex = executing.indexOf(completed);
+            if (completedIndex > -1) {
+                executing.splice(completedIndex, 1);
+            }
+            
+            // Store result or throw error
+            if (completed.error) {
+                throw completed.error;
+            }
+            results[completed.index] = completed.result;
+        }
+    }
+
+    // Wait for all remaining promises to complete
+    const remaining = await Promise.all(executing);
+    for (const item of remaining) {
+        if (item.error) {
+            throw item.error;
+        }
+        results[item.index] = item.result;
+    }
+
+    return results;
+};
+
+/**
  * Categorize a batch of transactions using AI
  * @param {Array} transactions - Array of transaction objects with date, description, amount
  * @param {Array} categories - Array of available expense categories
@@ -23,16 +79,32 @@ const categorizeTransactions = async (transactions, categories = []) => {
             batches.push(transactions.slice(i, i + batchSize));
         }
 
-        const categorizedTransactions = [];
+        // Get concurrency limit from environment variable (default: 3)
+        const concurrencyLimit = parseInt(process.env.GEMINI_BATCH_CONCURRENCY || '3', 10);
 
-        for (const batch of batches) {
-            const batchResults = await categorizeBatch(batch, categoryNames, categories);
-            categorizedTransactions.push(...batchResults);
-        }
+        // Process batches in parallel with concurrency limit
+        const batchResults = await processBatchesWithConcurrency(
+            batches,
+            (batch) => categorizeBatch(batch, categoryNames, categories),
+            concurrencyLimit
+        );
+
+        // Flatten results into single array
+        const categorizedTransactions = batchResults.flat();
 
         return categorizedTransactions;
     } catch (error) {
         console.error('Transaction categorization error:', error);
+        
+        // Enhanced error handling for rate limits
+        if (error.message && (
+            error.message.includes('rate limit') || 
+            error.message.includes('429') ||
+            error.message.includes('RESOURCE_EXHAUSTED')
+        )) {
+            console.error('Gemini API rate limit exceeded. Consider reducing GEMINI_BATCH_CONCURRENCY or upgrading API tier.');
+        }
+        
         // Return transactions with default values if categorization fails
         return transactions.map(t => ({
             ...t,

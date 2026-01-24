@@ -16,8 +16,8 @@ A comprehensive accounting tool built with a React 18 frontend and Supabase (Pos
 ## Architecture
 
 - **Frontend**: React 18 + TypeScript (Vite, React Router, TanStack Query, Tailwind)
-- **Backend**: Supabase (PostgreSQL, Row-Level Security, Auth, Storage)
-- **Edge Functions**: Supabase Edge Functions for secure admin operations (employee management)
+- **Backend**: Node.js Express server for secure admin operations (employee management, email, push notifications)
+- **Database**: Supabase (PostgreSQL, Row-Level Security, Auth, Storage)
 - **Storage**: Supabase Storage bucket for receipt uploads
 - **CI/CD**: Docker image for the static frontend (optional)
 
@@ -108,7 +108,7 @@ The system includes comprehensive employee management functionality. See [EMPLOY
 
 - Employee management features
 - Database schema and RLS policies
-- Supabase Edge Functions setup and deployment
+- Node.js backend API routes for employee operations
 - API usage and examples
 - Security considerations
 - Setup and troubleshooting guide
