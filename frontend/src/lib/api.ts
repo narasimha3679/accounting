@@ -3034,6 +3034,8 @@ class SupabaseApi {
             p256dh: string;
             auth: string;
         };
+        device_name?: string;
+        user_agent?: string;
     }): Promise<void> {
         const { data: auth } = await supabase.auth.getUser();
         const authUser = auth.user;
@@ -3050,6 +3052,9 @@ class SupabaseApi {
                     p256dh: subscription.keys.p256dh,
                     auth: subscription.keys.auth,
                     enabled: true,
+                    device_name: subscription.device_name || 'Unknown Device',
+                    user_agent: subscription.user_agent || navigator.userAgent,
+                    last_used_at: new Date().toISOString(),
                 },
                 {
                     onConflict: 'endpoint',
@@ -3063,8 +3068,60 @@ class SupabaseApi {
 
     /**
      * Unsubscribe from push notifications
+     * If endpoint is provided, unsubscribes only that device
+     * If no endpoint provided, unsubscribes all devices for user (legacy behavior)
      */
-    async unsubscribeFromPushNotifications(): Promise<void> {
+    async unsubscribeFromPushNotifications(endpoint?: string): Promise<void> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        let query = supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('user_id', authUser.id);
+
+        if (endpoint) {
+            query = query.eq('endpoint', endpoint);
+        }
+
+        const { error } = await query;
+
+        if (error) {
+            throw new Error(`Failed to unsubscribe: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get all push subscriptions for the current user
+     */
+    async getPushSubscriptions(): Promise<any[]> {
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            return [];
+        }
+
+        const { data, error } = await supabase
+            .from('push_subscriptions')
+            .select('*')
+            .eq('user_id', authUser.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching subscriptions:', error);
+            return [];
+        }
+
+        return data || [];
+    }
+
+    /**
+     * Delete a specific push subscription
+     */
+    async deletePushSubscription(id: string): Promise<void> {
         const { data: auth } = await supabase.auth.getUser();
         const authUser = auth.user;
         if (!authUser) {
@@ -3074,10 +3131,11 @@ class SupabaseApi {
         const { error } = await supabase
             .from('push_subscriptions')
             .delete()
+            .eq('id', id)
             .eq('user_id', authUser.id);
 
         if (error) {
-            throw new Error(`Failed to unsubscribe: ${error.message}`);
+            throw new Error(`Failed to delete subscription: ${error.message}`);
         }
     }
 

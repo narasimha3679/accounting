@@ -93,18 +93,23 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
     const registration = await getServiceWorkerRegistration();
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as any,
     });
 
     // Store subscription in database
     const subscriptionJson = subscription.toJSON();
     if (subscriptionJson.keys) {
+      // Get device info
+      const deviceName = getDeviceName();
+
       await api.subscribeToPushNotifications({
         endpoint: subscriptionJson.endpoint || '',
         keys: {
           p256dh: subscriptionJson.keys.p256dh || '',
           auth: subscriptionJson.keys.auth || '',
         },
+        device_name: deviceName,
+        user_agent: navigator.userAgent,
       });
     }
 
@@ -113,6 +118,31 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
     console.error('Error subscribing to push notifications:', error);
     throw error;
   }
+}
+
+/**
+ * Get a friendly device name
+ */
+function getDeviceName(): string {
+  const ua = navigator.userAgent;
+  let browser = 'Unknown Browser';
+  let os = 'Unknown OS';
+
+  // Detect Browser
+  if (ua.indexOf('Firefox') !== -1) browser = 'Firefox';
+  else if (ua.indexOf('Chrome') !== -1) browser = 'Chrome';
+  else if (ua.indexOf('Safari') !== -1) browser = 'Safari';
+  else if (ua.indexOf('Edge') !== -1) browser = 'Edge';
+
+  // Detect OS
+  if (ua.indexOf('Win') !== -1) os = 'Windows';
+  else if (ua.indexOf('Mac') !== -1) os = 'MacOS';
+  else if (ua.indexOf('Linux') !== -1) os = 'Linux';
+  else if (ua.indexOf('Android') !== -1) os = 'Android';
+  else if (ua.indexOf('iPhone') !== -1) os = 'iPhone';
+  else if (ua.indexOf('iPad') !== -1) os = 'iPad';
+
+  return `${browser} on ${os}`;
 }
 
 /**
@@ -128,8 +158,10 @@ export async function unsubscribeFromPush(): Promise<void> {
     const subscription = await registration.pushManager.getSubscription();
 
     if (subscription) {
+      const endpoint = subscription.endpoint;
       await subscription.unsubscribe();
-      await api.unsubscribeFromPushNotifications();
+      // Pass endpoint to only unsubscribe this device/browser
+      await api.unsubscribeFromPushNotifications(endpoint);
     }
   } catch (error) {
     console.error('Error unsubscribing from push notifications:', error);
@@ -168,18 +200,18 @@ export async function getSubscriptionStatus(): Promise<PushSubscriptionStatus> {
   }
 
   try {
-    // Check database first - this is the source of truth
-    const status = await api.getPushSubscriptionStatus();
-    if (status.subscribed && status.enabled) {
-      // Verify browser subscription exists as well
-      const subscription = await getCurrentSubscription();
-      if (subscription) {
-        return 'subscribed';
-      }
-      // Database says subscribed but browser doesn't have it - might be syncing
-      // Still return subscribed since database is source of truth
+    // Check if browser has a subscription
+    const subscription = await getCurrentSubscription();
+
+    if (subscription) {
+      // Browser is subscribed. 
+      // Ideally we should also check if it's in the DB and enabled,
+      // but 'subscribed' here means "this device is set up".
+      // The API call to get status can return global "enabled" state if needed,
+      // but for "is this device subscribed", valid browser subscription is key.
       return 'subscribed';
     }
+
     return 'not-subscribed';
   } catch (error) {
     console.error('Error getting subscription status:', error);
