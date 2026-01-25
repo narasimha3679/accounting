@@ -65,7 +65,7 @@ const CompanyMembers: React.FC = () => {
         queryKey: ['pendingInvitations', currentCompanyId],
         queryFn: async () => {
             if (!currentCompanyId) return [];
-            return api.getPendingCompanyInvitations(currentCompanyId);
+            return api.getPendingInvitations(currentCompanyId);
         },
         enabled: !!currentCompanyId && isOwner,
     });
@@ -162,10 +162,10 @@ const CompanyMembers: React.FC = () => {
                                     </div>
                                     <div>
                                         <div className="font-medium text-foreground">
-                                            {invite.user?.full_name || invite.user?.email || 'Unknown'}
+                                            {invite.name || invite.email || 'Unknown'}
                                         </div>
                                         <div className="text-sm text-muted-foreground">
-                                            {invite.user?.email}
+                                            {invite.email}
                                         </div>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className={cn(

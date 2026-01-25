@@ -1099,39 +1099,6 @@ class SupabaseApi {
         }
     }
 
-    async getPendingCompanyInvitations(companyId: number): Promise<Array<{
-        id: number;
-        user_id: number;
-        company_id: number;
-        role: string;
-        invite_status: string;
-        invite_token: string;
-        created_at: string;
-        user?: { id: number; email: string; full_name: string };
-    }>> {
-        const { data, error } = await supabase
-            .from('user_companies')
-            .select(`
-                id,
-                user_id,
-                company_id,
-                role,
-                invite_status,
-                invite_token,
-                created_at,
-                user:profiles!user_companies_user_id_fkey (id, email, full_name)
-            `)
-            .eq('company_id', companyId)
-            .eq('invite_status', 'pending')
-            .order('created_at', { ascending: false });
-
-        if (error) throw new Error(error.message);
-        return (data ?? []).map((item: any) => ({
-            ...item,
-            user: Array.isArray(item.user) ? item.user[0] : item.user,
-        }));
-    }
-
     async getUserCompanies(): Promise<Array<{
         id: number;
         company_id: number;

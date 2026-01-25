@@ -19,7 +19,7 @@ const CompanyOnboarding: React.FC = () => {
 
     useEffect(() => {
         // If user already has a company, don't allow onboarding again
-        if (user?.company_id) {
+        if (user?.companies && user.companies.length > 0) {
             // Once the user is linked to a company, leave onboarding
             navigate('/', { replace: true });
         }

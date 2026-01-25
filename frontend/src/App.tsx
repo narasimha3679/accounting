@@ -47,6 +47,7 @@ import TermsOfService from './pages/TermsOfService';
 import AcceptInvitation from './pages/AcceptInvitation';
 import CompanyMembers from './pages/CompanyMembers';
 import ScrollToTop from './components/ScrollToTop';
+import type { User } from './lib/api';
 
 // Create a client with optimized defaults
 const queryClient = new QueryClient({
@@ -59,6 +60,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Helper to check if user has any company memberships
+const hasAnyCompany = (user: User | null): boolean => {
+  return (user?.companies?.length ?? 0) > 0;
+};
 
 // Protected Route Component (requires authentication and a company)
 // For company users only - blocks employees
@@ -82,7 +88,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/employee-dashboard" replace />;
   }
 
-  if (!user?.company_id) {
+  if (!hasAnyCompany(user)) {
     return <Navigate to="/onboarding/company" replace />;
   }
 
@@ -133,7 +139,7 @@ const AuthOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.company_id) {
+  if (hasAnyCompany(user)) {
     return <Navigate to="/dashboard" replace />;
   }
 

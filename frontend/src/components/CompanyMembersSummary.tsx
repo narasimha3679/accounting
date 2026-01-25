@@ -21,7 +21,7 @@ const CompanyMembersSummary: React.FC<CompanyMembersSummaryProps> = ({ companyId
         queryKey: ['pendingInvitations', companyId],
         queryFn: async () => {
             if (!companyId) return [];
-            return api.getPendingCompanyInvitations(companyId);
+            return api.getPendingInvitations(companyId);
         },
         enabled: !!companyId,
     });
