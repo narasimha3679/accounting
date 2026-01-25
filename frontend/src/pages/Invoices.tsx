@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type Invoice, type Client, type InvoiceItem, type RecurringInvoice } from '../lib/api';
 import { Plus, Edit, Eye, Trash2, Send, Check, X, Power, PowerOff, Calendar } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import AccessDenied from '../components/AccessDenied';
 import { cn, formatLocalDate } from '../lib/utils';
 import InvoicePreview from '../components/invoices/InvoicePreview';
 
 const Invoices: React.FC = () => {
     const { user } = useAuth();
+    const { canManageInvoices, hasPermission } = useCurrentCompany();
     const _queryClient = useQueryClient();
+
+    // Check permission
+    if (!canManageInvoices && !hasPermission('can_view_financials')) {
+        return <AccessDenied requiredPermission="can_manage_invoices" />;
+    }
     const [activeTab, setActiveTab] = useState<'invoices' | 'templates'>('invoices');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);

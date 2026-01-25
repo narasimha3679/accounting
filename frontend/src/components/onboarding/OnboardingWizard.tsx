@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import Button from '../ui/Button';
 import { BusinessTypeSelector } from './BusinessTypeSelector';
 import { CompanyInfoStep } from './CompanyInfoStep';
+import { ShareholderStep, type Shareholder } from './ShareholderStep';
 import { TaxSettingsStep } from './TaxSettingsStep';
 import { FeatureConfirmation } from './FeatureConfirmation';
 import type { BusinessType, EnabledFeatures } from '../../lib/featureConfig';
@@ -20,22 +21,32 @@ export interface OnboardingData {
     hstFilingFrequency: 'monthly' | 'quarterly' | 'annual';
     smallBusinessRate: number;
     hstRate: number;
+    shareholders: Shareholder[];
 }
 
 interface OnboardingWizardProps {
     onSubmit: (data: OnboardingData, enabledFeatures: EnabledFeatures) => Promise<void>;
     isSubmitting?: boolean;
     businessNumberError?: string;
+    currentUserEmail: string;
+    currentUserName: string;
 }
 
 const STEPS = [
     { id: 1, title: 'Business Type' },
     { id: 2, title: 'Company Info' },
-    { id: 3, title: 'Tax Settings' },
-    { id: 4, title: 'Review' },
+    { id: 3, title: 'Shareholders' },
+    { id: 4, title: 'Tax Settings' },
+    { id: 5, title: 'Review' },
 ];
 
-export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, isSubmitting = false, businessNumberError }) => {
+export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
+    onSubmit,
+    isSubmitting = false,
+    businessNumberError,
+    currentUserEmail,
+    currentUserName,
+}) => {
     const [currentStep, setCurrentStep] = useState(1);
     const [businessType, setBusinessType] = useState<BusinessType | null>(null);
     const [name, setName] = useState('');
@@ -51,6 +62,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
     const [smallBusinessRate, setSmallBusinessRate] = useState(0.125);
     const [hstRate, setHstRate] = useState(0.13);
     const [internalBusinessNumberError, setInternalBusinessNumberError] = useState('');
+    const [shareholders, setShareholders] = useState<Shareholder[]>([]);
 
     const enabledFeatures = businessType ? DEFAULT_FEATURES_BY_TYPE[businessType] : DEFAULT_FEATURES_BY_TYPE.solo_corporation;
 
@@ -61,8 +73,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
             case 2:
                 return name.trim() !== '' && businessNumber.trim() !== '' && province !== '' && fiscalYearEnd !== '';
             case 3:
-                return true; // Tax settings are optional or have defaults
+                return shareholders.length >= 1; // At least current user
             case 4:
+                return true; // Tax settings are optional or have defaults
+            case 5:
                 return true; // Review step
             default:
                 return false;
@@ -95,6 +109,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
             hstFilingFrequency: hstRegistered ? hstFilingFrequency : 'annual',
             smallBusinessRate,
             hstRate,
+            shareholders,
         };
 
         try {
@@ -142,6 +157,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
                 );
             case 3:
                 return (
+                    <ShareholderStep
+                        shareholders={shareholders}
+                        currentUserEmail={currentUserEmail}
+                        currentUserName={currentUserName}
+                        onShareholdersChange={setShareholders}
+                    />
+                );
+            case 4:
+                return (
                     <TaxSettingsStep
                         hstRegistered={hstRegistered}
                         hstFilingFrequency={hstFilingFrequency}
@@ -154,7 +178,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
                         province={province}
                     />
                 );
-            case 4:
+            case 5:
                 return (
                     <FeatureConfirmation
                         enabledFeatures={enabledFeatures}
@@ -174,11 +198,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
                     <React.Fragment key={step.id}>
                         <div className="flex items-center">
                             <div
-                                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
-                                    currentStep >= step.id
-                                        ? 'bg-neon-emerald border-neon-emerald text-deep-forest'
-                                        : 'border-border text-muted-foreground'
-                                }`}
+                                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${currentStep >= step.id
+                                    ? 'bg-neon-emerald border-neon-emerald text-deep-forest'
+                                    : 'border-border text-muted-foreground'
+                                    }`}
                             >
                                 {currentStep > step.id ? (
                                     <CheckCircle2 className="h-5 w-5" />
@@ -186,16 +209,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onSubmit, is
                                     <span className="text-sm font-semibold">{step.id}</span>
                                 )}
                             </div>
-                            <span className={`ml-2 text-sm font-medium hidden sm:block ${
-                                currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
-                            }`}>
+                            <span className={`ml-2 text-sm font-medium hidden sm:block ${currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
+                                }`}>
                                 {step.title}
                             </span>
                         </div>
                         {index < STEPS.length - 1 && (
-                            <div className={`flex-1 h-0.5 mx-4 ${
-                                currentStep > step.id ? 'bg-neon-emerald' : 'bg-border'
-                            }`} />
+                            <div className={`flex-1 h-0.5 mx-4 ${currentStep > step.id ? 'bg-neon-emerald' : 'bg-border'
+                                }`} />
                         )}
                     </React.Fragment>
                 ))}

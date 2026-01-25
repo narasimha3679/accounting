@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary } from '../lib/api';
+import AccessDenied from '../components/AccessDenied';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
@@ -14,6 +16,12 @@ import { formatLocalDate } from '../lib/utils';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
+    const { canViewReports } = useCurrentCompany();
+
+    // Check permission
+    if (!canViewReports) {
+        return <AccessDenied requiredPermission="can_view_reports" />;
+    }
     const fiscalYearEnd = user?.company?.fiscal_year_end;
     const currentFiscalYear = useMemo(() => {
         return fiscalYearEnd ? getCurrentFiscalYear(fiscalYearEnd) : new Date().getFullYear();

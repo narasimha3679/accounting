@@ -44,6 +44,8 @@ import EmployeeInfoPage from './pages/EmployeeInfoPage';
 import EmployeeTD1Page from './pages/EmployeeTD1Page';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import AcceptInvitation from './pages/AcceptInvitation';
+import CompanyMembers from './pages/CompanyMembers';
 import ScrollToTop from './components/ScrollToTop';
 
 // Create a client with optimized defaults
@@ -336,6 +338,18 @@ function App() {
                   <Settings />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/company-members"
+              element={
+                <ProtectedRoute>
+                  <CompanyMembers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accept-invitation"
+              element={<AcceptInvitation />}
             />
             <Route
               path="/payroll/runs"

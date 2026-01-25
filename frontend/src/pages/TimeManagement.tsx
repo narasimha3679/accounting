@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type TimeEntry } from '../lib/api';
+import AccessDenied from '../components/AccessDenied';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -21,6 +23,12 @@ import type { EmployeeSchedule } from '../lib/api';
 
 const TimeManagement: React.FC = () => {
     const { user } = useAuth();
+    const { canManageEmployees, hasPermission } = useCurrentCompany();
+
+    // Check permission - need employee management or scheduling permission
+    if (!canManageEmployees && !hasPermission('can_schedule_employees')) {
+        return <AccessDenied requiredPermission="can_schedule_employees" />;
+    }
     const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);

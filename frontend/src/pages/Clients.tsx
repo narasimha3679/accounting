@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
+import AccessDenied from '../components/AccessDenied';
 import api, { type Client } from '../lib/api';
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +10,12 @@ import Card from '../components/ui/Card';
 
 const Clients: React.FC = () => {
     const { user } = useAuth();
+    const { canManageClients } = useCurrentCompany();
+
+    // Check permission
+    if (!canManageClients) {
+        return <AccessDenied requiredPermission="can_manage_clients" />;
+    }
     const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingClient, setEditingClient] = useState<Client | null>(null);

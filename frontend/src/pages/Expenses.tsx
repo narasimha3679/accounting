@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type Expense, type ExpenseCategory, type ExpenseFile } from '../lib/api';
+import AccessDenied from '../components/AccessDenied';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import { Plus, Edit, Trash2, Receipt, Upload, Download, X, FileText, Calendar, Info, Car, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +19,13 @@ import BankStatementReview, { type ParsedTransaction } from '../components/BankS
 
 const Expenses: React.FC = () => {
     const { user, session } = useAuth();
+    const { canManageExpenses, hasPermission } = useCurrentCompany();
     const _queryClient = useQueryClient();
+
+    // Check permission
+    if (!canManageExpenses && !hasPermission('can_view_financials')) {
+        return <AccessDenied requiredPermission="can_manage_expenses" />;
+    }
     const [showEntrySelector, setShowEntrySelector] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showMileageModal, setShowMileageModal] = useState(false);

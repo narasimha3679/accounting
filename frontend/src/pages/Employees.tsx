@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type Employee } from '../lib/api';
 import { Plus, Edit, Trash2, X, Users, UserCheck, UserX, Search, Key } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import EmployeeBenefitsAssignment from '../components/employees/EmployeeBenefitsAssignment';
+import AccessDenied from '../components/AccessDenied';
 import { formatLocalDate } from '../lib/utils';
 
 const Employees: React.FC = () => {
     const { user } = useAuth();
+    const { canManageEmployees } = useCurrentCompany();
+
+    // Check permission
+    if (!canManageEmployees) {
+        return <AccessDenied requiredPermission="can_manage_employees" />;
+    }
     const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);

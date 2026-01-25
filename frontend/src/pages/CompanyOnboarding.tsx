@@ -42,6 +42,7 @@ const CompanyOnboarding: React.FC = () => {
                 return;
             }
 
+            // Create the company
             const company = await api.createCompany({
                 name: data.name,
                 business_number: data.businessNumber,
@@ -55,15 +56,36 @@ const CompanyOnboarding: React.FC = () => {
                 enabled_features: enabledFeatures,
             });
 
-            await api.assignCurrentUserCompany(company.id);
+            // Create user_companies entry for current user as primary owner
+            await api.createUserCompanyMembership({
+                company_id: company.id,
+                role: 'owner',
+                is_primary: true,
+                invite_status: 'accepted',
+            });
+
+            // Create pending invitations for additional shareholders
+            const additionalShareholders = data.shareholders.filter(s => !s.isCurrentUser);
+            for (const shareholder of additionalShareholders) {
+                await api.inviteShareholder({
+                    company_id: company.id,
+                    email: shareholder.email,
+                    name: shareholder.name,
+                    role: 'owner',
+                });
+            }
+
             await refreshUser();
 
-            setSuccess('Company created successfully. Redirecting to your dashboard...');
+            const successMessage = additionalShareholders.length > 0
+                ? `Company created successfully! Invitations sent to ${additionalShareholders.length} shareholder(s). Redirecting...`
+                : 'Company created successfully. Redirecting to your dashboard...';
+            setSuccess(successMessage);
 
-            // As an extra safeguard, force a full reload so AuthContext picks up the new company reliably
+            // Force a full reload so AuthContext picks up the new company reliably
             setTimeout(() => {
                 window.location.href = '/';
-            }, 800);
+            }, 1200);
         } catch (err: any) {
             console.error('Error creating company during onboarding:', err);
             setError(err?.message ?? 'Failed to create company. Please try again.');
@@ -123,6 +145,8 @@ const CompanyOnboarding: React.FC = () => {
                         onSubmit={handleWizardSubmit}
                         isSubmitting={isSaving}
                         businessNumberError={businessNumberError}
+                        currentUserEmail={user?.email ?? ''}
+                        currentUserName={user?.name ?? ''}
                     />
                 </Card>
             </motion.div>

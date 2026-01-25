@@ -10,13 +10,42 @@ export interface User {
     id: number;
     email: string;
     name: string;
-    role: 'admin' | 'accountant' | 'viewer' | 'employee';
-    company_id: number;
+    role: 'owner' | 'admin' | 'manager' | 'accountant' | 'viewer' | 'employee';
+    company_id: number; // Backward compatibility - current company
     company?: Company;
+    // Multi-company support
+    companies?: CompanyMembership[];
+    currentCompanyId?: number | null;
+    currentCompany?: Company;
+    permissions?: ManagerPermissions;
     isEmployee?: boolean;
     employee?: Employee;
     created_at: string;
     updated_at: string;
+}
+
+export interface CompanyMembership {
+    id: number;
+    user_id: number;
+    company_id: number;
+    role: 'owner' | 'manager' | 'accountant' | 'viewer';
+    permissions: ManagerPermissions | null;
+    is_primary: boolean;
+    invite_status: 'pending' | 'accepted';
+    created_at: string;
+    updated_at: string;
+    company: Company;
+}
+
+export interface ManagerPermissions {
+    can_schedule_employees?: boolean;
+    can_approve_timesheets?: boolean;
+    can_view_reports?: boolean;
+    can_manage_expenses?: boolean;
+    can_manage_invoices?: boolean;
+    can_manage_clients?: boolean;
+    can_manage_employees?: boolean;
+    can_view_financials?: boolean;
 }
 
 export interface Company {
@@ -925,16 +954,16 @@ class SupabaseApi {
             .update(company)
             .eq('id', id)
             .select('id'); // Just select id to verify update happened
-        
+
         if (updateError) {
             throw new Error(`Failed to update company: ${updateError.message}`);
         }
-        
+
         // Check if update actually affected any rows
         if (!updateResult || updateResult.length === 0) {
             throw new Error('Update did not affect any rows. You may not have permission to update this company, or the company does not exist.');
         }
-        
+
         // Fetch the updated company using getCompany which we know works with RLS
         // This avoids RLS issues with select after update
         return await this.getCompany(id);
@@ -942,6 +971,322 @@ class SupabaseApi {
 
     async deleteCompany(id: number): Promise<void> {
         const { error } = await supabase.from('companies').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    // User Company Memberships (Multi-Ownership) ------------------------------
+
+    async createUserCompanyMembership(data: {
+        company_id: number;
+        role: 'owner' | 'manager' | 'accountant' | 'viewer';
+        is_primary?: boolean;
+        invite_status?: 'pending' | 'accepted';
+    }): Promise<void> {
+        // Get current user's profile ID
+        const { data: auth } = await supabase.auth.getUser();
+        const authUser = auth.user;
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        // Get profile ID
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('auth_user_id', authUser.id)
+            .single();
+
+        if (profileError || !profile) {
+            throw new Error('Profile not found');
+        }
+
+        // Create user_companies entry
+        const { error } = await supabase.from('user_companies').insert({
+            user_id: profile.id,
+            company_id: data.company_id,
+            role: data.role,
+            is_primary: data.is_primary ?? true,
+            invite_status: data.invite_status ?? 'accepted',
+        });
+
+        if (error) {
+            if (error.code === '23505') { // Unique constraint violation
+                throw new Error('You are already a member of this company');
+            }
+            throw new Error(error.message);
+        }
+
+        // Also update the profile's company_id for backward compatibility
+        await supabase
+            .from('profiles')
+            .update({ company_id: data.company_id })
+            .eq('auth_user_id', authUser.id);
+    }
+
+    async inviteShareholder(data: {
+        company_id: number;
+        email: string;
+        name: string;
+        role: 'owner' | 'manager' | 'accountant' | 'viewer';
+        permissions?: ManagerPermissions;
+    }): Promise<{ invite_token: string }> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        // Call backend to handle invitation (DB insert + Email)
+        const response = await fetch(`${BACKEND_URL}/api/company-members/invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to send invitation');
+        }
+
+        const result = await response.json();
+        return { invite_token: result.invite?.invite_token || '' };
+    }
+
+    async sendInvitationEmail(data: {
+        email: string;
+        name: string;
+        role: 'owner' | 'manager' | 'accountant' | 'viewer';
+        company_id: number;
+        invite_token: string;
+    }): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${BACKEND_URL}/api/company-members/send-invitation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to send invitation email');
+        }
+    }
+
+    async updateManagerPermissions(
+        membershipId: number,
+        permissions: ManagerPermissions
+    ): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${BACKEND_URL}/api/company-members/${membershipId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ permissions }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update permissions');
+        }
+    }
+
+    async getPendingCompanyInvitations(companyId: number): Promise<Array<{
+        id: number;
+        user_id: number;
+        company_id: number;
+        role: string;
+        invite_status: string;
+        invite_token: string;
+        created_at: string;
+        user?: { id: number; email: string; full_name: string };
+    }>> {
+        const { data, error } = await supabase
+            .from('user_companies')
+            .select(`
+                id,
+                user_id,
+                company_id,
+                role,
+                invite_status,
+                invite_token,
+                created_at,
+                user:profiles!user_companies_user_id_fkey (id, email, full_name)
+            `)
+            .eq('company_id', companyId)
+            .eq('invite_status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw new Error(error.message);
+        return (data ?? []).map((item: any) => ({
+            ...item,
+            user: Array.isArray(item.user) ? item.user[0] : item.user,
+        }));
+    }
+
+    async getUserCompanies(): Promise<Array<{
+        id: number;
+        company_id: number;
+        role: string;
+        is_primary: boolean;
+        invite_status: string;
+        company: Company;
+    }>> {
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) throw new Error('Not authenticated');
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('auth_user_id', auth.user.id)
+            .single();
+
+        if (!profile) return [];
+
+        const { data, error } = await supabase
+            .from('user_companies')
+            .select(`
+                id,
+                company_id,
+                role,
+                is_primary,
+                invite_status,
+                company:companies (*)
+            `)
+            .eq('user_id', profile.id)
+            .eq('invite_status', 'accepted')
+            .order('is_primary', { ascending: false });
+
+        if (error) throw new Error(error.message);
+        // Cast to fix type inference from Supabase's nested select
+        return (data ?? []).map((item: any) => ({
+            ...item,
+            company: Array.isArray(item.company) ? item.company[0] : item.company,
+        }));
+    }
+
+    async getCompanyMembers(companyId: number): Promise<Array<{
+        id: number;
+        user_id: number;
+        role: string;
+        is_primary: boolean;
+        invite_status: string;
+        created_at: string;
+        permissions?: ManagerPermissions | null;
+        user: { id: number; email: string; full_name: string };
+    }>> {
+        const { data, error } = await supabase
+            .from('user_companies')
+            .select(`
+                id,
+                user_id,
+                role,
+                is_primary,
+                invite_status,
+                created_at,
+                permissions,
+                user:profiles!user_companies_user_id_fkey (id, email, full_name)
+            `)
+            .eq('company_id', companyId)
+            .order('is_primary', { ascending: false });
+
+        if (error) throw new Error(error.message);
+        return (data ?? []).map((item: any) => ({
+            ...item,
+            user: Array.isArray(item.user) ? item.user[0] : item.user,
+        }));
+    }
+
+    async updateMemberRole(membershipId: number, role: 'owner' | 'manager' | 'accountant' | 'viewer'): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${BACKEND_URL}/api/company-members/${membershipId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ role }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update role');
+        }
+    }
+
+    async removeMember(membershipId: number): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${BACKEND_URL}/api/company-members/${membershipId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to remove member');
+        }
+    }
+
+    async acceptInvitation(inviteToken: string): Promise<void> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${BACKEND_URL}/api/company-members/accept`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ invite_token: inviteToken }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to accept invitation');
+        }
+    }
+
+    async getPendingInvitations(companyId: number): Promise<Array<{
+        id: number;
+        email: string;
+        name: string;
+        role: string;
+        created_at: string;
+        expires_at: string;
+    }>> {
+        const { data, error } = await supabase
+            .from('pending_shareholder_invites')
+            .select('id, email, name, role, created_at, expires_at')
+            .eq('company_id', companyId)
+            .is('claimed_at', null)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false });
+
+        if (error) throw new Error(error.message);
+        return data ?? [];
+    }
+
+    async cancelInvitation(inviteId: number): Promise<void> {
+        const { error } = await supabase
+            .from('pending_shareholder_invites')
+            .delete()
+            .eq('id', inviteId);
+
         if (error) throw new Error(error.message);
     }
 
@@ -1030,7 +1375,7 @@ class SupabaseApi {
 
     async createEmployee(employee: Omit<Employee, 'id' | 'created_at' | 'updated_at' | 'company' | 'auth_user_id' | 'employee_id'> & { employee_id?: string; initialPassword: string }): Promise<Employee> {
         const { initialPassword, ...employeeData } = employee;
-        
+
         // Call Node server to create employee with auth user
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -1598,7 +1943,7 @@ class SupabaseApi {
         const total = subtotal + hst_amount;
 
         // Generate invoice number: INV-FY-NNNN format (using fiscal year)
-        const fiscalYear = company.fiscal_year_end 
+        const fiscalYear = company.fiscal_year_end
             ? getFiscalYear(new Date(issue_date), company.fiscal_year_end)
             : new Date(issue_date).getFullYear();
         const { data: existingInvoices, error: countError } = await supabase
@@ -1865,7 +2210,7 @@ class SupabaseApi {
     async createExpensesBulk(expenses: Array<Omit<Expense, 'id' | 'company' | 'files' | 'created_at' | 'updated_at'>>): Promise<Expense[]> {
         // Validate all expenses have company_id
         const companyId = this.ensureCompanyId(expenses[0]?.company_id);
-        
+
         // Prepare payloads
         const payloads = expenses.map(expense => ({
             ...expense,
@@ -1939,10 +2284,10 @@ class SupabaseApi {
     }): Promise<Expense> {
         const rate = data.mileage_rate_per_km ?? CRA_MILEAGE_RATE;
         const amount = parseFloat((data.distance_km * rate).toFixed(2));
-        
+
         // Generate description
-        const description = data.purpose 
-            ? data.purpose 
+        const description = data.purpose
+            ? data.purpose
             : `Mileage: ${data.start_location} to ${data.end_location} - ${data.distance_km}km`;
 
         // Find Vehicle & Automobile category (id: 13)
@@ -2712,7 +3057,7 @@ class SupabaseApi {
     }
 
     // Push Notification methods --------------------------------------------------------
-    
+
     /**
      * Subscribe to push notifications
      */
@@ -3114,14 +3459,14 @@ class SupabaseApi {
             }
             // Handle 406 or RLS errors - these are permission issues, not missing data
             // Check for 406 in various possible locations
-            const is406Error = 
-                error.code === 'PGRST301' || 
+            const is406Error =
+                error.code === 'PGRST301' ||
                 error.message?.includes('row-level security') ||
                 error.message?.includes('406') ||
-                (error as any).status === 406 || 
+                (error as any).status === 406 ||
                 (error as any).statusCode === 406 ||
                 (error as any).response?.status === 406;
-            
+
             if (is406Error) {
                 console.error(`Permission/RLS issue fetching tax constants for year ${taxYear}:`, error);
                 // Throw a specific error that indicates a permissions issue
@@ -3133,7 +3478,7 @@ class SupabaseApi {
             throw new Error(error.message);
         }
         if (!data) return null;
-        
+
         // Convert database NUMERIC values to numbers
         return {
             cpp_rate: Number(data.cpp_rate),
@@ -3166,14 +3511,14 @@ class SupabaseApi {
 
         if (error) {
             // Handle 406 or RLS errors - these are permission issues
-            const is406Error = 
-                error.code === 'PGRST301' || 
+            const is406Error =
+                error.code === 'PGRST301' ||
                 error.message?.includes('row-level security') ||
                 error.message?.includes('406') ||
-                (error as any).status === 406 || 
+                (error as any).status === 406 ||
                 (error as any).statusCode === 406 ||
                 (error as any).response?.status === 406;
-            
+
             if (is406Error) {
                 console.error(`Permission/RLS issue fetching tax rates for year ${taxYear} and jurisdiction ${jurisdiction}:`, error);
                 const permissionError = new Error(`Unable to access tax rate data for year ${taxYear} and jurisdiction ${jurisdiction}. This may be a permissions issue.`);
@@ -3183,12 +3528,12 @@ class SupabaseApi {
             }
             throw new Error(error.message);
         }
-        
+
         // Return empty array if no data (don't throw error for missing data)
         if (!data || data.length === 0) {
             return [];
         }
-        
+
         return data.map(row => ({
             min_income: Number(row.min_income),
             max_income: row.max_income ? Number(row.max_income) : null,
@@ -3214,14 +3559,14 @@ class SupabaseApi {
             }
             // Handle 406 or RLS errors - these are permission issues, not missing data
             // Check for 406 in various possible locations
-            const is406Error = 
-                error.code === 'PGRST301' || 
+            const is406Error =
+                error.code === 'PGRST301' ||
                 error.message?.includes('row-level security') ||
                 error.message?.includes('406') ||
-                (error as any).status === 406 || 
+                (error as any).status === 406 ||
                 (error as any).statusCode === 406 ||
                 (error as any).response?.status === 406;
-            
+
             if (is406Error) {
                 console.error(`Permission/RLS issue fetching provincial tax constants for year ${taxYear} and province ${province}:`, error);
                 // Throw a specific error that indicates a permissions issue
@@ -4688,7 +5033,7 @@ class SupabaseApi {
                     .from('remittance_periods')
                     .update({ status: 'overdue' })
                     .eq('id', period.id)
-                    .then(() => {});
+                    .then(() => { });
                 return { ...period, status: 'overdue' as const };
             }
             return period;
@@ -5340,10 +5685,10 @@ class SupabaseApi {
         const { data: sessionData } = await supabase.auth.getSession();
         const profile = sessionData.session?.user
             ? await supabase
-                  .from('profiles')
-                  .select('id')
-                  .eq('auth_user_id', sessionData.session.user.id)
-                  .single()
+                .from('profiles')
+                .select('id')
+                .eq('auth_user_id', sessionData.session.user.id)
+                .single()
             : { data: null };
 
         // Calculate T4 boxes from YTD
@@ -5657,7 +6002,7 @@ class SupabaseApi {
 
             // Generate PDF
             const pdfBlob = await this.getInvoicePDF(invoiceId);
-            
+
             // Convert blob to base64
             const base64 = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
@@ -5957,10 +6302,10 @@ class SupabaseApi {
         const { data: sessionData } = await supabase.auth.getSession();
         const profile = sessionData.session?.user
             ? await supabase
-                  .from('profiles')
-                  .select('id')
-                  .eq('auth_user_id', sessionData.session.user.id)
-                  .single()
+                .from('profiles')
+                .select('id')
+                .eq('auth_user_id', sessionData.session.user.id)
+                .single()
             : { data: null };
 
         const { data, error } = await supabase

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Cursor Rules for Corporate Accounting Project
 
 ## Database Management
@@ -71,4 +75,3 @@ This project uses **Supabase MCP** for all database operations and reference. Wh
 3. Ensure all colors use semantic variables
 4. Test in both light and dark modes
 5. Ensure focus states are properly implemented (`focus-visible:ring-2 focus-visible:ring-ring`)
-

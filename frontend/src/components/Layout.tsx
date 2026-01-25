@@ -25,8 +25,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatures } from '../contexts/FeatureContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import { cn } from '../lib/utils';
 import { Logo } from './ui/Logo';
+import { CompanySelector } from './CompanySelector';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -35,6 +37,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { user, logout } = useAuth();
     const { isFeatureEnabled } = useFeatures();
+    const { hasPermission, canManageEmployees, canManageInvoices, canManageExpenses, canManageClients, canViewReports } = useCurrentCompany();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -72,10 +75,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'My Time', href: '/employee-time-management', icon: Clock, feature: null },
     ];
 
-    // Filter company navigation based on enabled features
-    const filteredCompanyNavigation = companyNavigation.filter(item => 
-        item.feature === null || isFeatureEnabled(item.feature)
-    );
+    // Filter company navigation based on enabled features and permissions
+    const filteredCompanyNavigation = companyNavigation.filter(item => {
+        // Check feature flag first
+        if (item.feature !== null && !isFeatureEnabled(item.feature)) {
+            return false;
+        }
+
+        // Check permissions for specific items
+        if (item.href === '/employees' && !canManageEmployees) {
+            return false;
+        }
+        if (item.href === '/invoices' && !canManageInvoices && !hasPermission('can_view_financials')) {
+            return false;
+        }
+        if (item.href === '/expenses' && !canManageExpenses && !hasPermission('can_view_financials')) {
+            return false;
+        }
+        if (item.href === '/clients' && !canManageClients) {
+            return false;
+        }
+        if (item.href === '/reports' && !canViewReports) {
+            return false;
+        }
+        // Time management requires employee management or scheduling permission
+        if (item.href === '/time-management' && !canManageEmployees && !hasPermission('can_schedule_employees')) {
+            return false;
+        }
+        // Payroll features require employee management
+        if ((item.href.startsWith('/payroll') || item.href === '/payroll/runs' || item.href === '/payroll/reports' || item.href === '/payroll/remittances' || item.href === '/payroll/roe' || item.href === '/payroll/t4') && !canManageEmployees) {
+            return false;
+        }
+
+        return true;
+    });
 
     const navigation = user?.isEmployee ? employeeNavigation : filteredCompanyNavigation;
 
@@ -108,6 +141,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         >
                             <X className="h-5 w-5" />
                         </button>
+                    </div>
+
+                    {/* Company Selector */}
+                    <div className="px-4 py-3 border-b border-white/10">
+                        <CompanySelector />
                     </div>
 
                     {/* Navigation */}

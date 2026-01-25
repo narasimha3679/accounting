@@ -41,8 +41,10 @@ router.post('/', async (req, res) => {
             initialPassword,
         } = req.body;
 
-        // Verify company_id matches user's company
-        if (company_id !== req.user.profile.company_id) {
+        // Verify company_id matches user's company (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === parseInt(company_id)) ||
+                         (req.user.profile.company_id === parseInt(company_id));
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 
@@ -145,8 +147,10 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
-        // Verify company_id matches
-        if (employee.company_id !== req.user.profile.company_id) {
+        // Verify company_id matches (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === employee.company_id) ||
+                         (req.user.profile.company_id === employee.company_id);
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 
@@ -202,8 +206,10 @@ router.post('/:id/reset-password', async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
-        // Verify company_id matches
-        if (employee.company_id !== req.user.profile.company_id) {
+        // Verify company_id matches (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === employee.company_id) ||
+                         (req.user.profile.company_id === employee.company_id);
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 
@@ -259,8 +265,10 @@ router.put('/:id/email', async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
-        // Verify company_id matches
-        if (employee.company_id !== req.user.profile.company_id) {
+        // Verify company_id matches (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === employee.company_id) ||
+                         (req.user.profile.company_id === employee.company_id);
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 
@@ -323,8 +331,10 @@ router.put('/:id/password', async (req, res) => {
             return res.status(404).json({ error: 'Employee not found' });
         }
 
-        // Verify company_id matches
-        if (employee.company_id !== req.user.profile.company_id) {
+        // Verify company_id matches (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === employee.company_id) ||
+                         (req.user.profile.company_id === employee.company_id);
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 

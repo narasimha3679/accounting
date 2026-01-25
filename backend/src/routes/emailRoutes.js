@@ -52,7 +52,7 @@ router.post('/invoice', async (req, res) => {
                 items:invoice_items(*)
             `)
             .eq('id', invoiceId)
-            .eq('company_id', req.user.profile.company_id)
+            .eq('company_id', req.user.currentCompanyId || req.user.profile.company_id)
             .single();
 
         if (invoiceError || !invoice) {
@@ -60,8 +60,10 @@ router.post('/invoice', async (req, res) => {
             return res.status(404).json({ error: 'Invoice not found or access denied' });
         }
 
-        // Verify company_id matches
-        if (invoice.company_id !== req.user.profile.company_id) {
+        // Verify company_id matches (check user_companies memberships)
+        const hasAccess = req.user.memberships?.some(m => m.company_id === invoice.company_id) ||
+                         (req.user.profile.company_id === invoice.company_id);
+        if (!hasAccess) {
             return res.status(403).json({ error: 'Forbidden: Company ID mismatch' });
         }
 

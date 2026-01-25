@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
-import { Save, Building2, Percent, Calendar, Clock, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Building2, Percent, Calendar, Clock, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone, Settings as SettingsIcon, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
@@ -17,6 +18,7 @@ import {
 import { isInstallable, isInstalled, showInstallPrompt } from '../lib/pwa';
 import PayrollSettingsComponent from '../components/settings/PayrollSettings';
 import BenefitTypesManager from '../components/settings/BenefitTypesManager';
+import CompanyMembersSummary from '../components/CompanyMembersSummary';
 import { useFeatures } from '../contexts/FeatureContext';
 import { FEATURE_LABELS, FEATURE_GROUPS, type EnabledFeatures } from '../lib/featureConfig';
 
@@ -620,6 +622,24 @@ const Settings: React.FC = () => {
                         </div>
                     </div>
                 </Card>
+
+                {/* Company Members */}
+                {user && !user.isEmployee && (
+                    <Card className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center">
+                                <Users className="h-5 w-5 text-slate-muted mr-2" />
+                                <h2 className="text-lg font-medium text-white">Company Members</h2>
+                            </div>
+                            <Link to="/company-members">
+                                <Button variant="outline" size="sm" icon={Users}>
+                                    Manage Members
+                                </Button>
+                            </Link>
+                        </div>
+                        <CompanyMembersSummary companyId={user.currentCompanyId || user.company_id} />
+                    </Card>
+                )}
 
                 {/* Push Notifications */}
                 <Card className="p-6">

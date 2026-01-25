@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { Session } from '@supabase/supabase-js'; // Import Session type
-import type { User, Employee } from '../lib/api';
+import type { Session } from '@supabase/supabase-js';
+import type { User, Employee, CompanyMembership } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
 
 interface AuthContextType {
@@ -9,12 +9,13 @@ interface AuthContextType {
     register: (email: string, password: string, name: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
+    switchCompany: (companyId: number) => Promise<void>;
     resetPasswordForEmail: (email: string) => Promise<void>;
     updatePassword: (newPassword: string) => Promise<void>;
     isLoading: boolean;
     isAuthenticated: boolean;
     isPasswordRecovery: boolean;
-    session: Session | null; // Add session to context type
+    session: Session | null;
 }
 
 interface ProfileRow {
@@ -22,22 +23,10 @@ interface ProfileRow {
     auth_user_id: string;
     email: string;
     full_name: string | null;
-    role: 'admin' | 'accountant' | 'viewer';
+    role: 'admin' | 'owner' | 'accountant' | 'viewer';
     company_id: number | null;
     created_at: string;
     updated_at: string;
-    company?: {
-        id: number;
-        name: string;
-        business_number: string;
-        hst_number: string | null;
-        hst_registered: boolean;
-        fiscal_year_end: string;
-        small_business_rate: number;
-        hst_rate: number;
-        created_at: string;
-        updated_at: string;
-    } | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,16 +39,25 @@ export const useAuth = () => {
     return context;
 };
 
-const mapProfileToUser = (profile: ProfileRow | null): User | null => {
+const mapProfileToUser = (profile: ProfileRow | null, companies?: CompanyMembership[]): User | null => {
     if (!profile) return null;
+
+    // Find the primary company membership or fallback to first one
+    const primaryMembership = companies?.find(c => c.is_primary) || companies?.[0];
+    const currentCompany = primaryMembership?.company;
+    const currentRole = primaryMembership?.role ?? profile.role;
 
     return {
         id: profile.id,
         email: profile.email,
         name: profile.full_name ?? '',
-        role: profile.role,
-        company_id: profile.company_id ?? 0,
-        company: profile.company ?? undefined,
+        role: currentRole as User['role'],
+        company_id: primaryMembership?.company_id ?? profile.company_id ?? 0,
+        company: currentCompany,
+        companies: companies,
+        currentCompanyId: primaryMembership?.company_id ?? profile.company_id,
+        currentCompany: currentCompany,
+        permissions: primaryMembership?.permissions ?? undefined,
         isEmployee: false,
         created_at: profile.created_at,
         updated_at: profile.updated_at,
@@ -182,10 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        const mapped = mapProfileToUser(data);
-        if (mapped) {
-            setUser({ ...mapped, isEmployee: false });
-        } else {
+        if (!data) {
             // No profile row yet – still allow using the bare auth user
             const fallback: User = {
                 id: 0,
@@ -199,6 +194,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 updated_at: new Date().toISOString(),
             };
             setUser(fallback);
+            return;
+        }
+
+        // Load user's company memberships from user_companies table
+        const { data: memberships, error: membershipError } = await supabase
+            .from('user_companies')
+            .select(`
+                id,
+                user_id,
+                company_id,
+                role,
+                permissions,
+                is_primary,
+                invite_status,
+                created_at,
+                updated_at,
+                company:companies (*)
+            `)
+            .eq('user_id', data.id)
+            .eq('invite_status', 'accepted')
+            .order('is_primary', { ascending: false });
+
+        if (membershipError) {
+            console.warn('Failed to load company memberships', membershipError);
+        }
+
+        // Transform memberships to match CompanyMembership interface
+        const companies: CompanyMembership[] = (memberships ?? []).map((m: any) => ({
+            id: m.id,
+            user_id: m.user_id,
+            company_id: m.company_id,
+            role: m.role,
+            permissions: m.permissions,
+            is_primary: m.is_primary,
+            invite_status: m.invite_status,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            company: Array.isArray(m.company) ? m.company[0] : m.company,
+        }));
+
+        // Check for stored company preference
+        const storedCompanyId = localStorage.getItem('selectedCompanyId');
+        if (storedCompanyId && companies.length > 0) {
+            const storedMembership = companies.find(c => c.company_id === parseInt(storedCompanyId));
+            if (storedMembership) {
+                // Move stored preference to be treated as "primary" for this session
+                const idx = companies.indexOf(storedMembership);
+                if (idx > 0) {
+                    companies.splice(idx, 1);
+                    companies.unshift(storedMembership);
+                }
+            }
+        }
+
+        const mapped = mapProfileToUser(data, companies);
+        if (mapped) {
+            setUser({ ...mapped, isEmployee: false });
         }
     };
 
@@ -308,12 +360,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await loadProfile();
     };
 
+    const switchCompany = async (companyId: number) => {
+        if (!user || !user.companies) return;
+
+        const membership = user.companies.find(c => c.company_id === companyId);
+        if (!membership) {
+            throw new Error('You do not have access to this company');
+        }
+
+        // Update the user state with new current company
+        setUser({
+            ...user,
+            company_id: companyId,
+            company: membership.company,
+            currentCompanyId: companyId,
+            currentCompany: membership.company,
+            role: membership.role as User['role'],
+            permissions: membership.permissions ?? undefined,
+        });
+
+        // Persist selection to localStorage (optional - for session persistence)
+        localStorage.setItem('selectedCompanyId', companyId.toString());
+    };
+
     const value = {
         user,
         login,
         register,
         logout,
         refreshUser,
+        switchCompany,
         resetPasswordForEmail,
         updatePassword,
         isLoading,
