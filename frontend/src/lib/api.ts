@@ -1,6 +1,7 @@
 import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
 import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
 import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
+import type { BusinessType, EnabledFeatures } from './featureConfig';
 
 // Backend server URL - defaults to localhost in development
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -32,6 +33,8 @@ export interface Company {
     hst_rate: number;
     rdtoh_balance?: number;
     capital_loss_carryforward?: number; // Unused capital losses from previous years (50% included amount)
+    business_type?: BusinessType | null;
+    enabled_features?: EnabledFeatures | null;
     created_at: string;
     updated_at: string;
 }
@@ -3097,15 +3100,39 @@ class SupabaseApi {
     /**
      * Get tax constants for a specific tax year
      */
-    async getTaxConstants(taxYear: number): Promise<TaxConstants> {
+    async getTaxConstants(taxYear: number): Promise<TaxConstants | null> {
         const { data, error } = await supabase
             .from('tax_constants')
             .select('*')
             .eq('tax_year', taxYear)
-            .single();
+            .maybeSingle();
 
-        if (error) throw new Error(error.message);
-        if (!data) throw new Error(`Tax constants for year ${taxYear} not found`);
+        if (error) {
+            // PGRST116 means no rows found - this is expected for missing data
+            if (error.code === 'PGRST116') {
+                return null;
+            }
+            // Handle 406 or RLS errors - these are permission issues, not missing data
+            // Check for 406 in various possible locations
+            const is406Error = 
+                error.code === 'PGRST301' || 
+                error.message?.includes('row-level security') ||
+                error.message?.includes('406') ||
+                (error as any).status === 406 || 
+                (error as any).statusCode === 406 ||
+                (error as any).response?.status === 406;
+            
+            if (is406Error) {
+                console.error(`Permission/RLS issue fetching tax constants for year ${taxYear}:`, error);
+                // Throw a specific error that indicates a permissions issue
+                const permissionError = new Error(`Unable to access tax rate data for year ${taxYear}. This may be a permissions issue.`);
+                (permissionError as any).isPermissionError = true;
+                (permissionError as any).originalError = error;
+                throw permissionError;
+            }
+            throw new Error(error.message);
+        }
+        if (!data) return null;
         
         // Convert database NUMERIC values to numbers
         return {
@@ -3137,10 +3164,31 @@ class SupabaseApi {
             .eq('jurisdiction', jurisdiction)
             .order('bracket_number', { ascending: true });
 
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) {
-            throw new Error(`Tax rates for year ${taxYear} and jurisdiction ${jurisdiction} not found`);
+        if (error) {
+            // Handle 406 or RLS errors - these are permission issues
+            const is406Error = 
+                error.code === 'PGRST301' || 
+                error.message?.includes('row-level security') ||
+                error.message?.includes('406') ||
+                (error as any).status === 406 || 
+                (error as any).statusCode === 406 ||
+                (error as any).response?.status === 406;
+            
+            if (is406Error) {
+                console.error(`Permission/RLS issue fetching tax rates for year ${taxYear} and jurisdiction ${jurisdiction}:`, error);
+                const permissionError = new Error(`Unable to access tax rate data for year ${taxYear} and jurisdiction ${jurisdiction}. This may be a permissions issue.`);
+                (permissionError as any).isPermissionError = true;
+                (permissionError as any).originalError = error;
+                throw permissionError;
+            }
+            throw new Error(error.message);
         }
+        
+        // Return empty array if no data (don't throw error for missing data)
+        if (!data || data.length === 0) {
+            return [];
+        }
+        
         return data.map(row => ({
             min_income: Number(row.min_income),
             max_income: row.max_income ? Number(row.max_income) : null,
@@ -3151,16 +3199,40 @@ class SupabaseApi {
     /**
      * Get provincial tax constants for a specific tax year and province
      */
-    async getProvincialTaxConstants(taxYear: number, province: string): Promise<ProvincialTaxConstants> {
+    async getProvincialTaxConstants(taxYear: number, province: string): Promise<ProvincialTaxConstants | null> {
         const { data, error } = await supabase
             .from('provincial_tax_constants')
             .select('*')
             .eq('tax_year', taxYear)
             .eq('province', province)
-            .single<ProvincialTaxConstants>();
+            .maybeSingle<ProvincialTaxConstants>();
 
-        if (error) throw new Error(error.message);
-        if (!data) throw new Error(`Provincial tax constants for year ${taxYear} and province ${province} not found`);
+        if (error) {
+            // PGRST116 means no rows found - this is expected for missing data
+            if (error.code === 'PGRST116') {
+                return null;
+            }
+            // Handle 406 or RLS errors - these are permission issues, not missing data
+            // Check for 406 in various possible locations
+            const is406Error = 
+                error.code === 'PGRST301' || 
+                error.message?.includes('row-level security') ||
+                error.message?.includes('406') ||
+                (error as any).status === 406 || 
+                (error as any).statusCode === 406 ||
+                (error as any).response?.status === 406;
+            
+            if (is406Error) {
+                console.error(`Permission/RLS issue fetching provincial tax constants for year ${taxYear} and province ${province}:`, error);
+                // Throw a specific error that indicates a permissions issue
+                const permissionError = new Error(`Unable to access provincial tax rate data for year ${taxYear} and province ${province}. This may be a permissions issue.`);
+                (permissionError as any).isPermissionError = true;
+                (permissionError as any).originalError = error;
+                throw permissionError;
+            }
+            throw new Error(error.message);
+        }
+        if (!data) return null;
         return {
             basic_personal_amount: Number(data.basic_personal_amount),
             surtax_threshold_1: data.surtax_threshold_1 ? Number(data.surtax_threshold_1) : null,

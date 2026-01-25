@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { FeatureProvider } from './contexts/FeatureContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -24,6 +25,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
+import SalaryDividendOptimizer from './pages/SalaryDividendOptimizer';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -141,7 +143,8 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Router>
+          <FeatureProvider>
+            <Router>
             <ScrollToTop />
             <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -319,6 +322,14 @@ function App() {
               }
             />
             <Route
+              path="/salary-dividend-optimizer"
+              element={
+                <ProtectedRoute>
+                  <SalaryDividendOptimizer />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/settings"
               element={
                 <ProtectedRoute>
@@ -395,6 +406,7 @@ function App() {
             <UpdateAvailable />
             <InstallPrompt />
           </Router>
+          </FeatureProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

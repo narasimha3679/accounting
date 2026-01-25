@@ -473,6 +473,14 @@ export async function createPayrollCalculator(
         throw new Error('Payroll settings not found for company');
     }
 
+    if (!taxConstants) {
+        throw new Error(`Tax constants for year ${taxYear} not found`);
+    }
+
+    if (!provincialConstants) {
+        throw new Error(`Provincial tax constants for year ${taxYear} and province ${province} not found`);
+    }
+
     return new PayrollCalculator(
         taxConstants,
         federalBrackets,

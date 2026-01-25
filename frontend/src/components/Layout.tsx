@@ -20,9 +20,11 @@ import {
     Clock,
     BarChart,
     FileCheck,
-    User
+    User,
+    TrendingDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeatures } from '../contexts/FeatureContext';
 import { cn } from '../lib/utils';
 import { Logo } from './ui/Logo';
 
@@ -32,43 +34,50 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { user, logout } = useAuth();
+    const { isFeatureEnabled } = useFeatures();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Company user navigation
+    // Company user navigation with feature flags
     const companyNavigation = [
-        { name: 'Dashboard', href: '/', icon: Home },
-        { name: 'Invoices', href: '/invoices', icon: FileText },
-        { name: 'Income', href: '/income', icon: DollarSign },
-        { name: 'Expenses', href: '/expenses', icon: Receipt },
-        { name: 'Capital Assets', href: '/capital-assets', icon: Building2 },
-        { name: 'Dividends', href: '/dividends', icon: Banknote },
-        { name: 'Salary', href: '/salary', icon: Briefcase },
-        { name: 'Owner Reimbursement', href: '/owner-payments', icon: CreditCard },
-        { name: 'Clients', href: '/clients', icon: Users },
-        { name: 'Employees', href: '/employees', icon: UserCircle },
-        { name: 'Time Management', href: '/time-management', icon: Clock },
-        { name: 'Pay Runs', href: '/payroll/runs', icon: DollarSign },
-        { name: 'Payroll Reports', href: '/payroll/reports', icon: BarChart },
-        { name: 'Remittances', href: '/payroll/remittances', icon: Banknote },
-        { name: 'ROEs', href: '/payroll/roe', icon: FileCheck },
-        { name: 'T4 Generation', href: '/payroll/t4', icon: FileCheck },
-        { name: 'Reports', href: '/reports', icon: TrendingUp },
-        { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { name: 'Dashboard', href: '/', icon: Home, feature: null }, // Always shown
+        { name: 'Invoices', href: '/invoices', icon: FileText, feature: 'invoices' as const },
+        { name: 'Income', href: '/income', icon: DollarSign, feature: 'income' as const },
+        { name: 'Expenses', href: '/expenses', icon: Receipt, feature: 'expenses' as const },
+        { name: 'Capital Assets', href: '/capital-assets', icon: Building2, feature: 'capital_assets' as const },
+        { name: 'Dividends', href: '/dividends', icon: Banknote, feature: 'dividends' as const },
+        { name: 'Salary', href: '/salary', icon: Briefcase, feature: 'salary' as const },
+        { name: 'Owner Reimbursement', href: '/owner-payments', icon: CreditCard, feature: 'owner_reimbursement' as const },
+        { name: 'Clients', href: '/clients', icon: Users, feature: 'clients' as const },
+        { name: 'Employees', href: '/employees', icon: UserCircle, feature: 'employees' as const },
+        { name: 'Time Management', href: '/time-management', icon: Clock, feature: 'time_management' as const },
+        { name: 'Pay Runs', href: '/payroll/runs', icon: DollarSign, feature: 'payroll' as const },
+        { name: 'Payroll Reports', href: '/payroll/reports', icon: BarChart, feature: 'payroll' as const },
+        { name: 'Remittances', href: '/payroll/remittances', icon: Banknote, feature: 'payroll' as const },
+        { name: 'ROEs', href: '/payroll/roe', icon: FileCheck, feature: 'payroll' as const },
+        { name: 'T4 Generation', href: '/payroll/t4', icon: FileCheck, feature: 'payroll' as const },
+        { name: 'Reports', href: '/reports', icon: TrendingUp, feature: 'reports' as const },
+        { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator, feature: 'tax_calculator' as const },
+        { name: 'Salary vs Dividend Optimizer', href: '/salary-dividend-optimizer', icon: TrendingDown, feature: 'salary_dividend_optimizer' as const },
+        { name: 'Settings', href: '/settings', icon: Settings, feature: null }, // Always shown
     ];
 
     // Employee navigation (limited)
     const employeeNavigation = [
-        { name: 'Dashboard', href: '/employee-dashboard', icon: Home },
-        { name: 'Pay Stubs', href: '/employee/pay-stubs', icon: FileText },
-        { name: 'YTD Summary', href: '/employee/ytd', icon: BarChart },
-        { name: 'Tax Documents', href: '/employee/tax-documents', icon: FileCheck },
-        { name: 'My Info', href: '/employee/info', icon: User },
-        { name: 'My Time', href: '/employee-time-management', icon: Clock },
+        { name: 'Dashboard', href: '/employee-dashboard', icon: Home, feature: null },
+        { name: 'Pay Stubs', href: '/employee/pay-stubs', icon: FileText, feature: null },
+        { name: 'YTD Summary', href: '/employee/ytd', icon: BarChart, feature: null },
+        { name: 'Tax Documents', href: '/employee/tax-documents', icon: FileCheck, feature: null },
+        { name: 'My Info', href: '/employee/info', icon: User, feature: null },
+        { name: 'My Time', href: '/employee-time-management', icon: Clock, feature: null },
     ];
 
-    const navigation = user?.isEmployee ? employeeNavigation : companyNavigation;
+    // Filter company navigation based on enabled features
+    const filteredCompanyNavigation = companyNavigation.filter(item => 
+        item.feature === null || isFeatureEnabled(item.feature)
+    );
+
+    const navigation = user?.isEmployee ? employeeNavigation : filteredCompanyNavigation;
 
     const isActive = (href: string) => {
         return location.pathname === href;

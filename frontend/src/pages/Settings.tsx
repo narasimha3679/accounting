@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Company } from '../lib/api';
-import { Save, Building2, Percent, Calendar, Clock, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone } from 'lucide-react';
+import { Save, Building2, Percent, Calendar, Clock, Bell, BellOff, CheckCircle, XCircle, AlertCircle, Download, Smartphone, Settings as SettingsIcon } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import HelpIcon from '../components/ui/HelpIcon';
@@ -17,9 +17,12 @@ import {
 import { isInstallable, isInstalled, showInstallPrompt } from '../lib/pwa';
 import PayrollSettingsComponent from '../components/settings/PayrollSettings';
 import BenefitTypesManager from '../components/settings/BenefitTypesManager';
+import { useFeatures } from '../contexts/FeatureContext';
+import { FEATURE_LABELS, FEATURE_GROUPS, type EnabledFeatures } from '../lib/featureConfig';
 
 const Settings: React.FC = () => {
     const { user, refreshUser } = useAuth();
+    const { enabledFeatures } = useFeatures();
     const navigate = useNavigate();
     const [company, setCompany] = useState<Company | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +99,7 @@ const Settings: React.FC = () => {
         setSuccess('');
 
         try {
-            const updatedCompany = await api.updateCompany(company.id, {
+            const updatedCompany =             await api.updateCompany(company.id, {
                 name: company.name,
                 business_number: company.business_number,
                 hst_number: company.hst_number,
@@ -107,6 +110,7 @@ const Settings: React.FC = () => {
                 hst_filing_period_start: company.hst_filing_period_start,
                 small_business_rate: company.small_business_rate,
                 hst_rate: company.hst_rate,
+                enabled_features: company.enabled_features,
             });
 
             // Use the updated company data directly - this ensures we have the correct value
@@ -138,6 +142,38 @@ const Settings: React.FC = () => {
             ...company,
             [field]: value,
         });
+    };
+
+    const handleFeatureToggle = async (feature: keyof EnabledFeatures, enabled: boolean) => {
+        if (!company) return;
+
+        const updatedFeatures: EnabledFeatures = {
+            ...(company.enabled_features || enabledFeatures),
+            [feature]: enabled,
+        };
+
+        setCompany({
+            ...company,
+            enabled_features: updatedFeatures,
+        });
+
+        // Auto-save feature changes
+        try {
+            await api.updateCompany(company.id, {
+                enabled_features: updatedFeatures,
+            });
+            await refreshUser();
+            setSuccess('Feature settings updated successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err: any) {
+            console.error('Error updating features:', err);
+            setError('Failed to update feature settings. Please try again.');
+            // Revert on error
+            setCompany({
+                ...company,
+                enabled_features: company.enabled_features,
+            });
+        }
     };
 
     const formatDate = (dateString: string) => {
@@ -764,6 +800,92 @@ const Settings: React.FC = () => {
                         </div>
                     </Card>
                 )}
+
+                {/* Feature Management */}
+                <Card className="p-6">
+                    <div className="flex items-center mb-4">
+                        <SettingsIcon className="h-5 w-5 text-slate-muted mr-2" />
+                        <h2 className="text-lg font-medium text-white">Feature Management</h2>
+                        <HelpIcon
+                            content="Customize which features are visible in your navigation. You can enable or disable features based on your business needs."
+                            size="sm"
+                        />
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Financial Management */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white mb-3">Financial Management</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {FEATURE_GROUPS.financial.map((feature) => (
+                                    <label
+                                        key={feature}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-card/50 transition-colors cursor-pointer"
+                                    >
+                                        <span className="text-sm text-foreground">{FEATURE_LABELS[feature]}</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={company.enabled_features?.[feature] ?? enabledFeatures[feature]}
+                                                onChange={(e) => handleFeatureToggle(feature, e.target.checked)}
+                                            />
+                                            <div className="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-ring/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-input after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Payroll & Employees */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white mb-3">Payroll & Employees</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {FEATURE_GROUPS.payroll.map((feature) => (
+                                    <label
+                                        key={feature}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-card/50 transition-colors cursor-pointer"
+                                    >
+                                        <span className="text-sm text-foreground">{FEATURE_LABELS[feature]}</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={company.enabled_features?.[feature] ?? enabledFeatures[feature]}
+                                                onChange={(e) => handleFeatureToggle(feature, e.target.checked)}
+                                            />
+                                            <div className="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-ring/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-input after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Tools */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white mb-3">Tools & Reports</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {FEATURE_GROUPS.tools.map((feature) => (
+                                    <label
+                                        key={feature}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-card/50 transition-colors cursor-pointer"
+                                    >
+                                        <span className="text-sm text-foreground">{FEATURE_LABELS[feature]}</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={company.enabled_features?.[feature] ?? enabledFeatures[feature]}
+                                                onChange={(e) => handleFeatureToggle(feature, e.target.checked)}
+                                            />
+                                            <div className="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-ring/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-input after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </Card>
 
                 {/* Payroll Settings */}
                 <PayrollSettingsComponent companyId={company.id} />

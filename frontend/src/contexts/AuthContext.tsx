@@ -107,6 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     fiscal_year_end,
                     small_business_rate,
                     hst_rate,
+                    business_type,
+                    enabled_features,
                     created_at,
                     updated_at
                 )
@@ -153,6 +155,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     fiscal_year_end,
                     small_business_rate,
                     hst_rate,
+                    business_type,
+                    enabled_features,
                     created_at,
                     updated_at
                 )
