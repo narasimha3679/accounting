@@ -1,4 +1,4 @@
-export type BusinessType = 'solo_corporation' | 'small_business' | 'professional_corporation' | 'holding_company';
+export type BusinessType = 'solo_corporation' | 'small_business';
 
 export interface EnabledFeatures {
     invoices: boolean;
@@ -20,15 +20,11 @@ export interface EnabledFeatures {
 export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
     solo_corporation: 'Solo Corporation',
     small_business: 'Small Business with Employees',
-    professional_corporation: 'Professional Corporation',
-    holding_company: 'Holding/Investment Company',
 };
 
 export const BUSINESS_TYPE_DESCRIPTIONS: Record<BusinessType, string> = {
-    solo_corporation: 'Perfect for contractors, consultants, and freelancers with no employees to manage.',
+    solo_corporation: 'Perfect for contractors, consultants, freelancers, and professionals (doctors, lawyers, engineers) with no employees to manage.',
     small_business: 'Manage payroll, employees, time tracking, and all business operations.',
-    professional_corporation: 'For regulated professionals (doctors, lawyers, accountants, engineers).',
-    holding_company: 'Passive income companies focused on investments, rental properties, and capital gains.',
 };
 
 export const DEFAULT_FEATURES_BY_TYPE: Record<BusinessType, EnabledFeatures> = {
@@ -63,38 +59,6 @@ export const DEFAULT_FEATURES_BY_TYPE: Record<BusinessType, EnabledFeatures> = {
         time_management: true,
         payroll: true,
         salary: true,
-    },
-    professional_corporation: {
-        invoices: true,
-        income: true,
-        expenses: true,
-        capital_assets: true,
-        dividends: true,
-        clients: true,
-        reports: true,
-        tax_calculator: true,
-        salary_dividend_optimizer: true,
-        owner_reimbursement: true,
-        employees: false,
-        time_management: false,
-        payroll: false,
-        salary: false,
-    },
-    holding_company: {
-        invoices: false,
-        income: true,
-        expenses: true,
-        capital_assets: true,
-        dividends: true,
-        clients: false,
-        reports: true,
-        tax_calculator: true,
-        salary_dividend_optimizer: false,
-        owner_reimbursement: true,
-        employees: false,
-        time_management: false,
-        payroll: false,
-        salary: false,
     },
 };
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, Users, Briefcase, Building2 } from 'lucide-react';
+import { User, Users } from 'lucide-react';
 import Card from '../ui/Card';
 import type { BusinessType } from '../../lib/featureConfig';
 import { BUSINESS_TYPE_LABELS, BUSINESS_TYPE_DESCRIPTIONS } from '../../lib/featureConfig';
@@ -14,19 +14,15 @@ interface BusinessTypeSelectorProps {
 const businessTypeIcons = {
     solo_corporation: User,
     small_business: Users,
-    professional_corporation: Briefcase,
-    holding_company: Building2,
 };
 
 const businessTypeColors = {
     solo_corporation: 'from-neon-emerald/20 to-neon-emerald/10',
     small_business: 'from-golden-hour/20 to-golden-hour/10',
-    professional_corporation: 'from-blue-500/20 to-blue-500/10',
-    holding_company: 'from-purple-500/20 to-purple-500/10',
 };
 
 export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ selectedType, onSelect }) => {
-    const types: BusinessType[] = ['solo_corporation', 'small_business', 'professional_corporation', 'holding_company'];
+    const types: BusinessType[] = ['solo_corporation', 'small_business'];
 
     return (
         <div className="space-y-6">
@@ -39,7 +35,7 @@ export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ sele
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                 {types.map((type) => {
                     const Icon = businessTypeIcons[type];
                     const isSelected = selectedType === type;
