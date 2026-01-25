@@ -6,6 +6,8 @@ trigger: always_on
 
 ## Database Management
 
+- **Supabase Project ID**: `lxuvaxqkmwwoabyfokjd`
+
 This project uses **Supabase MCP** for all database operations and reference. When working with the database:
 
 - **Always use Supabase MCP tools** instead of local SQL files:

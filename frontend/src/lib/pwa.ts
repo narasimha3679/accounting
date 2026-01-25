@@ -23,7 +23,7 @@ export function setupInstallPrompt(onPromptAvailable?: () => void): void {
     // Prevent default to capture the event for our custom banner
     e.preventDefault();
     deferredPrompt = e as BeforeInstallPromptEvent;
-    
+
     // Notify all registered callbacks
     installPromptCallbacks.forEach(callback => callback());
   });
@@ -63,12 +63,12 @@ export function isInstallable(): boolean {
  */
 export function onInstallPromptAvailable(callback: () => void): () => void {
   installPromptCallbacks.push(callback);
-  
+
   // If prompt is already available, call immediately
   if (deferredPrompt) {
     callback();
   }
-  
+
   // Return cleanup function
   return () => {
     installPromptCallbacks = installPromptCallbacks.filter(cb => cb !== callback);
@@ -80,8 +80,8 @@ export function onInstallPromptAvailable(callback: () => void): () => void {
  */
 export function isInstalled(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches ||
-         (window.navigator as any).standalone === true ||
-         document.referrer.includes('android-app://');
+    (window.navigator as any).standalone === true ||
+    document.referrer.includes('android-app://');
 }
 
 /**
@@ -108,7 +108,7 @@ export function registerSWUpdateHandler(
       navigator.serviceWorker.getRegistration().then((registration) => {
         if (registration) {
           registration.update();
-          
+
           // Listen for waiting service worker (update available)
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
@@ -142,12 +142,22 @@ export function registerSWUpdateHandler(
     return () => clearInterval(intervalId);
   }
 
-  return () => {};
+  return () => { };
 }
 
 /**
  * Reload the page to apply service worker updates
  */
 export function reloadToUpdate(): void {
-  window.location.reload();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (registration && registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    });
+  } else {
+    window.location.reload();
+  }
 }
