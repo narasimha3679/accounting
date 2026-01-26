@@ -58,6 +58,7 @@ export interface OptimizerInputs {
         surtax_rate_1?: number | null;
         surtax_rate_2?: number | null;
     };
+    dividendType?: 'eligible' | 'non_eligible';
 }
 
 export interface CompensationScenario {
@@ -400,14 +401,23 @@ export function findOptimalMix(inputs: OptimizerInputs): CompensationScenario[] 
         const corporateTax = calculateSmallBusinessTax(remainingCorpIncome, inputs.smallBusinessTaxRate);
         const afterTaxIncome = remainingCorpIncome - corporateTax;
 
-        // Use RDTOH balance first with non-eligible dividends
-        if (inputs.rdtohBalance > 0) {
-            const maxNonEligibleFromRDTOH = inputs.rdtohBalance / RDTOH_REFUND_RATE;
-            optimalNonEligibleDividends = Math.min(maxNonEligibleFromRDTOH, afterTaxIncome * 0.5);
+        // Determine dividend mix based on preference
+        if (inputs.dividendType === 'eligible') {
+            optimalEligibleDividends = afterTaxIncome;
+            optimalNonEligibleDividends = 0;
+        } else if (inputs.dividendType === 'non_eligible') {
+            optimalEligibleDividends = 0;
+            optimalNonEligibleDividends = afterTaxIncome;
+        } else {
+            // Default mixed behavior (legacy or undefined preference)
+            // Use RDTOH balance first with non-eligible dividends
+            if (inputs.rdtohBalance > 0) {
+                const maxNonEligibleFromRDTOH = inputs.rdtohBalance / RDTOH_REFUND_RATE;
+                optimalNonEligibleDividends = Math.min(maxNonEligibleFromRDTOH, afterTaxIncome * 0.5);
+            }
+            // Remaining as eligible dividends
+            optimalEligibleDividends = Math.max(0, afterTaxIncome - optimalNonEligibleDividends);
         }
-
-        // Remaining as eligible dividends
-        optimalEligibleDividends = Math.max(0, afterTaxIncome - optimalNonEligibleDividends);
 
         scenarios.push(calculateScenario(inputs, optimalSalary, optimalEligibleDividends, optimalNonEligibleDividends));
     }
@@ -430,33 +440,60 @@ export function findOptimalMix(inputs: OptimizerInputs): CompensationScenario[] 
         const afterTax = remaining - corpTax;
 
         // Try different dividend mixes (0%, 25%, 50%, 75%, 100% non-eligible)
-        // More granular dividend mix check
-        const dividendSteps = 5;
-
-        for (let i = 0; i <= dividendSteps; i++) {
-            const nonEligiblePct = i / dividendSteps;
-            const nonEligible = afterTax * nonEligiblePct;
-            const eligible = afterTax * (1 - nonEligiblePct);
-
-            const scenario = calculateScenario(inputs, salary, eligible, nonEligible);
-
+        // Try different dividend mixes
+        // If specific type is enforced, strictly use that type
+        if (inputs.dividendType === 'eligible') {
+            const scenario = calculateScenario(inputs, salary, afterTax, 0);
             if (inputs.desiredPersonalCash) {
-                // If targeting specific cash, we want the lowest tax burden that meets the cash requirement
                 if (scenario.netCashToOwner >= inputs.desiredPersonalCash) {
-                    // Check if this is better than current best
-                    // We prioritize:
-                    // 1. Meeting the cash target (already checked)
-                    // 2. Lowest total tax burden
                     if (scenario.totalTaxBurden < bestMetric) {
                         bestMetric = scenario.totalTaxBurden;
                         bestScenario = scenario;
                     }
                 }
             } else {
-                // Standard optimization: Minimize total tax burden
                 if (scenario.totalTaxBurden < bestMetric) {
                     bestMetric = scenario.totalTaxBurden;
                     bestScenario = scenario;
+                }
+            }
+        } else if (inputs.dividendType === 'non_eligible') {
+            const scenario = calculateScenario(inputs, salary, 0, afterTax);
+            if (inputs.desiredPersonalCash) {
+                if (scenario.netCashToOwner >= inputs.desiredPersonalCash) {
+                    if (scenario.totalTaxBurden < bestMetric) {
+                        bestMetric = scenario.totalTaxBurden;
+                        bestScenario = scenario;
+                    }
+                }
+            } else {
+                if (scenario.totalTaxBurden < bestMetric) {
+                    bestMetric = scenario.totalTaxBurden;
+                    bestScenario = scenario;
+                }
+            }
+        } else {
+            // Mixed mode (original logic)
+            const dividendSteps = 5;
+            for (let i = 0; i <= dividendSteps; i++) {
+                const nonEligiblePct = i / dividendSteps;
+                const nonEligible = afterTax * nonEligiblePct;
+                const eligible = afterTax * (1 - nonEligiblePct);
+
+                const scenario = calculateScenario(inputs, salary, eligible, nonEligible);
+
+                if (inputs.desiredPersonalCash) {
+                    if (scenario.netCashToOwner >= inputs.desiredPersonalCash) {
+                        if (scenario.totalTaxBurden < bestMetric) {
+                            bestMetric = scenario.totalTaxBurden;
+                            bestScenario = scenario;
+                        }
+                    }
+                } else {
+                    if (scenario.totalTaxBurden < bestMetric) {
+                        bestMetric = scenario.totalTaxBurden;
+                        bestScenario = scenario;
+                    }
                 }
             }
         }

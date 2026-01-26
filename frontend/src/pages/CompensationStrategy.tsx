@@ -102,7 +102,10 @@ const CompensationStrategy: React.FC = () => {
                     </select>
                 </div>
             </div>
-            <StrategyTrackingDashboard progress={progress} />
+            <StrategyTrackingDashboard
+                progress={progress}
+                dividendType={user?.company?.default_dividend_type || 'non_eligible'}
+            />
         </div>
     );
 };

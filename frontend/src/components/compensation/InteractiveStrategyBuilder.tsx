@@ -13,8 +13,6 @@ import HelpTooltip from './HelpTooltip';
 import {
     generateStrategyOptions,
     calculateScenario,
-    type StrategyOption,
-    type CompensationScenario,
 } from '../../lib/salaryDividendOptimizer';
 import { cn } from '../../lib/utils';
 import type { OptimizerInputs } from '../../lib/salaryDividendOptimizer';
@@ -45,7 +43,7 @@ const InteractiveStrategyBuilder: React.FC<InteractiveStrategyBuilderProps> = ({
     const [customEligibleDividends, setCustomEligibleDividends] = useState<number | undefined>(undefined);
     const [isSaving, setIsSaving] = useState(false);
     const [showComparison, setShowComparison] = useState(false);
-    
+
     // Override flags for auto-populated fields
     const [overrideCorporateNetIncome, setOverrideCorporateNetIncome] = useState(false);
     const [overrideRDTOHBalance, setOverrideRDTOHBalance] = useState(false);

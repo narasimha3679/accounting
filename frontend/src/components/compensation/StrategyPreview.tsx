@@ -1,7 +1,6 @@
 import React from 'react';
-import { Loader2, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import Card from '../ui/Card';
-import { cn } from '../../lib/utils';
 import type { CompensationScenario } from '../../lib/salaryDividendOptimizer';
 
 interface StrategyPreviewProps {

@@ -110,6 +110,7 @@ const PayMyselfOptimizer: React.FC<PayMyselfOptimizerProps> = ({
             provincialBrackets,
             taxConstants,
             provincialConstants: provincialConstants || undefined,
+            dividendType: user?.company?.default_dividend_type || 'non_eligible',
         };
 
         try {
@@ -131,8 +132,13 @@ const PayMyselfOptimizer: React.FC<PayMyselfOptimizerProps> = ({
             const corpTax = Math.max(0, remaining) * (user?.company?.small_business_rate || 0.125);
             const avail = Math.max(0, remaining - corpTax);
 
-            // Pass the available after-tax funds as non-eligible dividends (default for small biz)
-            return calculateScenario(inputs, salaryAmount, 0, avail);
+            // Pass the available after-tax funds based on dividend type preference
+            if (inputs.dividendType === 'eligible') {
+                return calculateScenario(inputs, salaryAmount, avail, 0);
+            } else {
+                // Default to non-eligible (most common for small biz)
+                return calculateScenario(inputs, salaryAmount, 0, avail);
+            }
 
         } catch (error) {
             console.error(error);
@@ -167,7 +173,8 @@ const PayMyselfOptimizer: React.FC<PayMyselfOptimizerProps> = ({
             taxConstants,
             provincialConstants: provincialConstants || undefined,
             maximizeCPP: false,
-            prioritizeRRSPRoom: false
+            prioritizeRRSPRoom: false,
+            dividendType: user?.company?.default_dividend_type || 'non_eligible',
         };
 
         const results = findOptimalMix(inputs);

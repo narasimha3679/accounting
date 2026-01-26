@@ -18,7 +18,7 @@ const supabase = createClient(
  */
 async function getActiveStrategy(companyId, ownerId, fiscalYear, userClient) {
     const client = userClient || supabase;
-    
+
     const { data, error } = await client
         .from('compensation_strategies')
         .select('*')
@@ -27,7 +27,7 @@ async function getActiveStrategy(companyId, ownerId, fiscalYear, userClient) {
         .eq('fiscal_year', fiscalYear)
         .eq('status', 'active')
         .maybeSingle();
-    
+
     if (error) throw error;
     return data;
 }
@@ -37,22 +37,32 @@ async function getActiveStrategy(companyId, ownerId, fiscalYear, userClient) {
  */
 async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
     const client = userClient || supabase;
-    
+
     // 1. Get the active strategy
     const strategy = await getActiveStrategy(companyId, ownerId, fiscalYear, client);
     if (!strategy) {
         return { hasStrategy: false };
     }
-    
+
     // 2. Get owner's profile to find their email/auth_user_id
     const { data: ownerProfile, error: profileError } = await client
         .from('profiles')
         .select('id, email, auth_user_id')
         .eq('id', ownerId)
         .single();
-    
+
     if (profileError) throw profileError;
-    
+
+    // 2.5 Get company settings for dividend type
+    const { data: company, error: companyError } = await client
+        .from('companies')
+        .select('default_dividend_type')
+        .eq('id', companyId)
+        .single();
+
+    if (companyError) throw companyError;
+    const defaultDividendType = company.default_dividend_type || 'non_eligible';
+
     // 3. Get YTD salary paid to this owner
     // Find employee record linked to owner (by email or auth_user_id)
     const { data: employees, error: employeesError } = await client
@@ -60,17 +70,17 @@ async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
         .select('id')
         .eq('company_id', companyId)
         .or(`email.eq.${ownerProfile.email},auth_user_id.eq.${ownerProfile.auth_user_id}`);
-    
+
     let ytdSalary = 0;
     if (employees && employees.length > 0) {
         const employeeIds = employees.map(e => e.id);
-        
+
         // Calculate fiscal year date range
         // For now, assume calendar year (Jan 1 - Dec 31)
         // TODO: Use company's fiscal_year_end to calculate proper range
         const fiscalYearStart = `${fiscalYear}-01-01`;
         const fiscalYearEnd = `${fiscalYear}-12-31`;
-        
+
         const { data: salaries, error: salariesError } = await client
             .from('salaries')
             .select('amount')
@@ -78,11 +88,11 @@ async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
             .in('employee_id', employeeIds)
             .gte('payment_date', fiscalYearStart)
             .lte('payment_date', fiscalYearEnd);
-        
+
         if (salariesError) throw salariesError;
         ytdSalary = salaries?.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0) || 0;
     }
-    
+
     // 4. Get YTD dividends paid
     // For now, assume all dividends are for the owner (company-level)
     // TODO: Check dividend_recipients table if it exists
@@ -92,45 +102,46 @@ async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
         .eq('company_id', companyId)
         .eq('fiscal_year', fiscalYear)
         .in('status', ['declared', 'paid']);
-    
+
     if (dividendsError) throw dividendsError;
-    
+
     const ytdEligibleDividends = dividends
         ?.filter(d => d.dividend_type === 'eligible')
         .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0) || 0;
-    
+
     const ytdNonEligibleDividends = dividends
         ?.filter(d => d.dividend_type === 'non_eligible')
         .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0) || 0;
-    
+
     // 5. Calculate progress percentages
-    const salaryProgress = strategy.planned_salary > 0 
-        ? (ytdSalary / parseFloat(strategy.planned_salary)) * 100 
+    const salaryProgress = strategy.planned_salary > 0
+        ? (ytdSalary / parseFloat(strategy.planned_salary)) * 100
         : 0;
-    
+
     const eligibleDividendProgress = strategy.planned_eligible_dividends > 0
         ? (ytdEligibleDividends / parseFloat(strategy.planned_eligible_dividends)) * 100
         : 0;
-    
+
     const nonEligibleDividendProgress = strategy.planned_non_eligible_dividends > 0
         ? (ytdNonEligibleDividends / parseFloat(strategy.planned_non_eligible_dividends)) * 100
         : 0;
-    
+
     // 6. Determine recommendation for next withdrawal
     const recommendation = determineNextWithdrawalType(
         strategy,
         ytdSalary,
         ytdEligibleDividends,
-        ytdNonEligibleDividends
+        ytdNonEligibleDividends,
+        defaultDividendType
     );
-    
+
     // 7. Calculate overall progress (weighted average)
-    const totalPlanned = parseFloat(strategy.planned_salary) + 
-                         parseFloat(strategy.planned_eligible_dividends) + 
-                         parseFloat(strategy.planned_non_eligible_dividends);
+    const totalPlanned = parseFloat(strategy.planned_salary) +
+        parseFloat(strategy.planned_eligible_dividends) +
+        parseFloat(strategy.planned_non_eligible_dividends);
     const totalYtd = ytdSalary + ytdEligibleDividends + ytdNonEligibleDividends;
     const overallProgress = totalPlanned > 0 ? (totalYtd / totalPlanned) * 100 : 0;
-    
+
     return {
         hasStrategy: true,
         strategy,
@@ -153,12 +164,12 @@ async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
 /**
  * Determine what type the next withdrawal should be
  */
-function determineNextWithdrawalType(strategy, ytdSalary, ytdEligible, ytdNonEligible) {
+function determineNextWithdrawalType(strategy, ytdSalary, ytdEligible, ytdNonEligible, defaultDividendType = 'non_eligible') {
     const salaryRemaining = Math.max(0, parseFloat(strategy.planned_salary) - ytdSalary);
     const eligibleRemaining = Math.max(0, parseFloat(strategy.planned_eligible_dividends) - ytdEligible);
     const nonEligibleRemaining = Math.max(0, parseFloat(strategy.planned_non_eligible_dividends) - ytdNonEligible);
-    
-    // Priority: Salary first (for CPP/RRSP), then non-eligible (for RDTOH), then eligible
+
+    // Priority: Salary first (for CPP/RRSP), then preferred dividend type
     if (salaryRemaining > 0) {
         return {
             type: 'salary',
@@ -166,23 +177,42 @@ function determineNextWithdrawalType(strategy, ytdSalary, ytdEligible, ytdNonEli
             reason: 'Take salary to build CPP contributions and RRSP room before year-end.'
         };
     }
-    
-    if (nonEligibleRemaining > 0) {
-        return {
-            type: 'non_eligible_dividend',
-            remaining: nonEligibleRemaining,
-            reason: 'Take non-eligible dividends to trigger RDTOH refund.'
-        };
+
+    // Only recommend the default dividend type
+    if (defaultDividendType === 'non_eligible') {
+        if (nonEligibleRemaining > 0) {
+            return {
+                type: 'non_eligible_dividend',
+                remaining: nonEligibleRemaining,
+                reason: 'Take non-eligible dividends to trigger RDTOH refund.'
+            };
+        }
+    } else if (defaultDividendType === 'eligible') {
+        if (eligibleRemaining > 0) {
+            return {
+                type: 'eligible_dividend',
+                remaining: eligibleRemaining,
+                reason: 'Take eligible dividends with favorable tax treatment.'
+            };
+        }
+    } else {
+        // Fallback or Mixed
+        if (nonEligibleRemaining > 0) {
+            return {
+                type: 'non_eligible_dividend',
+                remaining: nonEligibleRemaining,
+                reason: 'Take non-eligible dividends to trigger RDTOH refund.'
+            };
+        }
+        if (eligibleRemaining > 0) {
+            return {
+                type: 'eligible_dividend',
+                remaining: eligibleRemaining,
+                reason: 'Take eligible dividends with favorable tax treatment.'
+            };
+        }
     }
-    
-    if (eligibleRemaining > 0) {
-        return {
-            type: 'eligible_dividend',
-            remaining: eligibleRemaining,
-            reason: 'Take eligible dividends with favorable tax treatment.'
-        };
-    }
-    
+
     return {
         type: 'complete',
         remaining: 0,
@@ -195,7 +225,7 @@ function determineNextWithdrawalType(strategy, ytdSalary, ytdEligible, ytdNonEli
  */
 async function upsertStrategy(strategyData, userClient) {
     const client = userClient || supabase;
-    
+
     const { data, error } = await client
         .from('compensation_strategies')
         .upsert(strategyData, {
@@ -203,7 +233,7 @@ async function upsertStrategy(strategyData, userClient) {
         })
         .select()
         .single();
-    
+
     if (error) throw error;
     return data;
 }
@@ -213,16 +243,16 @@ async function upsertStrategy(strategyData, userClient) {
  */
 async function getWithdrawalRecommendation(companyId, ownerId, fiscalYear, amount, userClient) {
     const progress = await getStrategyProgress(companyId, ownerId, fiscalYear, userClient);
-    
+
     if (!progress.hasStrategy) {
         return {
             hasStrategy: false,
             message: 'No active strategy. Consider setting up an annual compensation plan.'
         };
     }
-    
+
     const recommendation = progress.recommendation;
-    
+
     return {
         hasStrategy: true,
         recommendedType: recommendation.type,

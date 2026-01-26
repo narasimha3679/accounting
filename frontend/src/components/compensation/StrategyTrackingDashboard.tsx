@@ -6,9 +6,13 @@ import { cn } from '../../lib/utils';
 
 interface StrategyTrackingDashboardProps {
     progress: StrategyProgress;
+    dividendType?: 'eligible' | 'non_eligible';
 }
 
-const StrategyTrackingDashboard: React.FC<StrategyTrackingDashboardProps> = ({ progress }) => {
+const StrategyTrackingDashboard: React.FC<StrategyTrackingDashboardProps> = ({
+    progress,
+    dividendType = 'non_eligible'
+}) => {
     const { strategy, ytd, progress: progressPercentages, recommendation } = progress;
 
     if (!strategy) return null;
@@ -78,7 +82,7 @@ const StrategyTrackingDashboard: React.FC<StrategyTrackingDashboardProps> = ({ p
                         <div className="font-semibold">
                             {formatCurrency(
                                 strategy.planned_eligible_dividends +
-                                    strategy.planned_non_eligible_dividends
+                                strategy.planned_non_eligible_dividends
                             )}
                         </div>
                     </div>
@@ -131,94 +135,98 @@ const StrategyTrackingDashboard: React.FC<StrategyTrackingDashboardProps> = ({ p
                 </Card>
 
                 {/* Non-Eligible Dividends Progress */}
-                <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <div className="text-sm text-muted-foreground">Non-Eligible Dividends</div>
-                            <div className="text-2xl font-bold">
-                                {formatCurrency(ytd.nonEligibleDividends)} /{' '}
-                                {formatCurrency(strategy.planned_non_eligible_dividends)}
+                {dividendType === 'non_eligible' && (
+                    <Card className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <div className="text-sm text-muted-foreground">Non-Eligible Dividends</div>
+                                <div className="text-2xl font-bold">
+                                    {formatCurrency(ytd.nonEligibleDividends)} /{' '}
+                                    {formatCurrency(strategy.planned_non_eligible_dividends)}
+                                </div>
                             </div>
+                            {progressPercentages.nonEligibleDividends >= 100 ? (
+                                <CheckCircle className="w-8 h-8 text-green-500" />
+                            ) : (
+                                <TrendingUp className="w-8 h-8 text-primary" />
+                            )}
                         </div>
-                        {progressPercentages.nonEligibleDividends >= 100 ? (
-                            <CheckCircle className="w-8 h-8 text-green-500" />
-                        ) : (
-                            <TrendingUp className="w-8 h-8 text-primary" />
-                        )}
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span className="font-semibold">
-                                {formatPercent(progressPercentages.nonEligibleDividends)}
-                            </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                                className={cn(
-                                    'h-2 rounded-full transition-all',
-                                    getProgressColor(progressPercentages.nonEligibleDividends)
-                                )}
-                                style={{
-                                    width: `${Math.min(100, progressPercentages.nonEligibleDividends)}%`,
-                                }}
-                            />
-                        </div>
-                        {ytd.nonEligibleDividends < strategy.planned_non_eligible_dividends && (
-                            <div className="text-xs text-muted-foreground">
-                                {formatCurrency(
-                                    strategy.planned_non_eligible_dividends - ytd.nonEligibleDividends
-                                )}{' '}
-                                remaining
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span>Progress</span>
+                                <span className="font-semibold">
+                                    {formatPercent(progressPercentages.nonEligibleDividends)}
+                                </span>
                             </div>
-                        )}
-                    </div>
-                </Card>
+                            <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                    className={cn(
+                                        'h-2 rounded-full transition-all',
+                                        getProgressColor(progressPercentages.nonEligibleDividends)
+                                    )}
+                                    style={{
+                                        width: `${Math.min(100, progressPercentages.nonEligibleDividends)}%`,
+                                    }}
+                                />
+                            </div>
+                            {ytd.nonEligibleDividends < strategy.planned_non_eligible_dividends && (
+                                <div className="text-xs text-muted-foreground">
+                                    {formatCurrency(
+                                        strategy.planned_non_eligible_dividends - ytd.nonEligibleDividends
+                                    )}{' '}
+                                    remaining
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                )}
 
                 {/* Eligible Dividends Progress */}
-                <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <div className="text-sm text-muted-foreground">Eligible Dividends</div>
-                            <div className="text-2xl font-bold">
-                                {formatCurrency(ytd.eligibleDividends)} /{' '}
-                                {formatCurrency(strategy.planned_eligible_dividends)}
+                {dividendType === 'eligible' && (
+                    <Card className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <div className="text-sm text-muted-foreground">Eligible Dividends</div>
+                                <div className="text-2xl font-bold">
+                                    {formatCurrency(ytd.eligibleDividends)} /{' '}
+                                    {formatCurrency(strategy.planned_eligible_dividends)}
+                                </div>
                             </div>
+                            {progressPercentages.eligibleDividends >= 100 ? (
+                                <CheckCircle className="w-8 h-8 text-green-500" />
+                            ) : (
+                                <TrendingUp className="w-8 h-8 text-primary" />
+                            )}
                         </div>
-                        {progressPercentages.eligibleDividends >= 100 ? (
-                            <CheckCircle className="w-8 h-8 text-green-500" />
-                        ) : (
-                            <TrendingUp className="w-8 h-8 text-primary" />
-                        )}
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span className="font-semibold">
-                                {formatPercent(progressPercentages.eligibleDividends)}
-                            </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                                className={cn(
-                                    'h-2 rounded-full transition-all',
-                                    getProgressColor(progressPercentages.eligibleDividends)
-                                )}
-                                style={{
-                                    width: `${Math.min(100, progressPercentages.eligibleDividends)}%`,
-                                }}
-                            />
-                        </div>
-                        {ytd.eligibleDividends < strategy.planned_eligible_dividends && (
-                            <div className="text-xs text-muted-foreground">
-                                {formatCurrency(
-                                    strategy.planned_eligible_dividends - ytd.eligibleDividends
-                                )}{' '}
-                                remaining
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span>Progress</span>
+                                <span className="font-semibold">
+                                    {formatPercent(progressPercentages.eligibleDividends)}
+                                </span>
                             </div>
-                        )}
-                    </div>
-                </Card>
+                            <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                    className={cn(
+                                        'h-2 rounded-full transition-all',
+                                        getProgressColor(progressPercentages.eligibleDividends)
+                                    )}
+                                    style={{
+                                        width: `${Math.min(100, progressPercentages.eligibleDividends)}%`,
+                                    }}
+                                />
+                            </div>
+                            {ytd.eligibleDividends < strategy.planned_eligible_dividends && (
+                                <div className="text-xs text-muted-foreground">
+                                    {formatCurrency(
+                                        strategy.planned_eligible_dividends - ytd.eligibleDividends
+                                    )}{' '}
+                                    remaining
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                )}
             </div>
 
             {/* Recommendation */}
