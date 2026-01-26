@@ -62,6 +62,8 @@ export interface Company {
     hst_rate: number;
     rdtoh_balance?: number;
     capital_loss_carryforward?: number; // Unused capital losses from previous years (50% included amount)
+
+
     business_type?: BusinessType | null;
     enabled_features?: EnabledFeatures | null;
     created_at: string;
@@ -6411,6 +6413,92 @@ class SupabaseApi {
         // Generate zip file
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         return zipBlob;
+    }
+
+    // Pay Myself Optimizer methods --------------------------------------------------------
+
+    /**
+     * Optimize withdrawal strategy (salary vs dividend vs reimbursement)
+     */
+    async optimizeWithdrawal(params: {
+        corporateCost: number;
+        owedToOwner?: number;
+        province?: string;
+        taxYear?: number;
+        ytdPersonalIncome?: number;
+        dividendType?: 'eligible' | 'non_eligible';
+    }): Promise<{
+        input: any;
+        options: {
+            reimbursement: any;
+            dividend: any;
+            salary: any;
+        };
+        recommendation: {
+            strategy: string;
+            totalNetInPocket: number;
+            totalEfficiency: string;
+            breakdown: Array<{ type: string; amount: number }>;
+            explanation: string;
+        };
+        disclaimer: string;
+    }> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${BACKEND_URL}/api/pay-myself/optimize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(params),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to optimize withdrawal');
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Get YTD income (salaries + dividends) recorded on the platform for a company member
+     * Used by Pay Myself Optimizer for accurate marginal rate calculations
+     */
+    async getYtdIncome(companyId: number, memberId: string, fiscalYear?: number): Promise<{
+        companyId: number;
+        memberId: string;
+        fiscalYear: number;
+        ytdSalaries: number;
+        ytdDividends: number;
+        total: number;
+    }> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const year = fiscalYear || new Date().getFullYear();
+        const response = await fetch(
+            `${BACKEND_URL}/api/pay-myself/ytd-income/${companyId}/${memberId}?fiscalYear=${year}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch YTD income');
+        }
+
+        return response.json();
     }
 }
 

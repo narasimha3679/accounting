@@ -54,6 +54,7 @@ import TermsOfService from './pages/TermsOfService';
 import AcceptInvitation from './pages/AcceptInvitation';
 import CompanyMembers from './pages/CompanyMembers';
 import ScrollToTop from './components/ScrollToTop';
+import { TooltipProvider } from './components/ui/Tooltip';
 import type { User } from './lib/api';
 
 // Create a client with optimized defaults
@@ -159,289 +160,291 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <FeatureProvider>
-            <Router>
-              <ScrollToTop />
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="/terms-of-service" element={<TermsOfService />} />
-                <Route
-                  path="/onboarding/company"
-                  element={
-                    <AuthOnlyRoute>
-                      <CompanyOnboarding />
-                    </AuthOnlyRoute>
-                  }
-                />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/employee-dashboard"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeDashboard />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee-time-management"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeTimeManagement />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee/pay-stubs"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeePayStubsPage />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee/ytd"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeYTDPage />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee/tax-documents"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeTaxDocumentsPage />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee/info"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeInfoPage />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employee/td1"
-                  element={
-                    <EmployeeRoute>
-                      <EmployeeTD1Page />
-                    </EmployeeRoute>
-                  }
-                />
-                <Route
-                  path="/employees"
-                  element={
-                    <ProtectedRoute>
-                      <Employees />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/time-management"
-                  element={
-                    <ProtectedRoute>
-                      <TimeManagement />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/invoices"
-                  element={
-                    <ProtectedRoute>
-                      <Invoices />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/expenses"
-                  element={
-                    <ProtectedRoute>
-                      <Expenses />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/capital-assets"
-                  element={
-                    <ProtectedRoute>
-                      <CapitalAssets />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/income"
-                  element={
-                    <ProtectedRoute>
-                      <Income />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/dividends"
-                  element={
-                    <ProtectedRoute>
-                      <Dividends />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/salary"
-                  element={
-                    <ProtectedRoute>
-                      <SalaryPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/owner-payments"
-                  element={
-                    <ProtectedRoute>
-                      <OwnerPayments />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/clients"
-                  element={
-                    <ProtectedRoute>
-                      <Clients />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/reports"
-                  element={
-                    <ProtectedRoute>
-                      <Reports />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/tax-calculator"
-                  element={
-                    <ProtectedRoute>
-                      <TaxCalculator />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/salary-dividend-optimizer"
-                  element={
-                    <ProtectedRoute>
-                      <SalaryDividendOptimizer />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute>
-                      <SettingsLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<Navigate to="general" replace />} />
-                  <Route path="general" element={<GeneralSettings />} />
-                  <Route path="tax" element={<TaxSettings />} />
-                  <Route path="features" element={<FeatureSettings />} />
-                  <Route path="time" element={<TimeSettings />} />
-                  <Route path="payroll" element={<PayrollSettingsPage />} />
-                  <Route path="benefits" element={<BenefitsSettingsPage />} />
-                  <Route path="notifications" element={<NotificationSettings />} />
-                </Route>
-                <Route
-                  path="/company-members"
-                  element={
-                    <ProtectedRoute>
-                      <CompanyMembers />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/accept-invitation"
-                  element={<AcceptInvitation />}
-                />
-                <Route
-                  path="/payroll/runs"
-                  element={
-                    <ProtectedRoute>
-                      <PayRuns />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/runs/:id"
-                  element={
-                    <ProtectedRoute>
-                      <PayRunDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/reports"
-                  element={
-                    <ProtectedRoute>
-                      <PayrollReports />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/remittances"
-                  element={
-                    <ProtectedRoute>
-                      <PayrollRemittances />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/roe"
-                  element={
-                    <ProtectedRoute>
-                      <ROEList />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/roe/new"
-                  element={
-                    <ProtectedRoute>
-                      <ROEGeneration />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/roe/:id"
-                  element={
-                    <ProtectedRoute>
-                      <ROEGeneration />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/payroll/t4"
-                  element={
-                    <ProtectedRoute>
-                      <T4Generation />
-                    </ProtectedRoute>
-                  }
-                />
-              </Routes>
-              <OfflineIndicator />
-              <UpdateAvailable />
-              <InstallPrompt />
-            </Router>
+            <TooltipProvider>
+              <Router>
+                <ScrollToTop />
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route
+                    path="/onboarding/company"
+                    element={
+                      <AuthOnlyRoute>
+                        <CompanyOnboarding />
+                      </AuthOnlyRoute>
+                    }
+                  />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee-dashboard"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeDashboard />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee-time-management"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeTimeManagement />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee/pay-stubs"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeePayStubsPage />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee/ytd"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeYTDPage />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee/tax-documents"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeTaxDocumentsPage />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee/info"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeInfoPage />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employee/td1"
+                    element={
+                      <EmployeeRoute>
+                        <EmployeeTD1Page />
+                      </EmployeeRoute>
+                    }
+                  />
+                  <Route
+                    path="/employees"
+                    element={
+                      <ProtectedRoute>
+                        <Employees />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/time-management"
+                    element={
+                      <ProtectedRoute>
+                        <TimeManagement />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/invoices"
+                    element={
+                      <ProtectedRoute>
+                        <Invoices />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/expenses"
+                    element={
+                      <ProtectedRoute>
+                        <Expenses />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/capital-assets"
+                    element={
+                      <ProtectedRoute>
+                        <CapitalAssets />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/income"
+                    element={
+                      <ProtectedRoute>
+                        <Income />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/dividends"
+                    element={
+                      <ProtectedRoute>
+                        <Dividends />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/salary"
+                    element={
+                      <ProtectedRoute>
+                        <SalaryPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/owner-payments"
+                    element={
+                      <ProtectedRoute>
+                        <OwnerPayments />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/clients"
+                    element={
+                      <ProtectedRoute>
+                        <Clients />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/reports"
+                    element={
+                      <ProtectedRoute>
+                        <Reports />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/tax-calculator"
+                    element={
+                      <ProtectedRoute>
+                        <TaxCalculator />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/salary-dividend-optimizer"
+                    element={
+                      <ProtectedRoute>
+                        <SalaryDividendOptimizer />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute>
+                        <SettingsLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route index element={<Navigate to="general" replace />} />
+                    <Route path="general" element={<GeneralSettings />} />
+                    <Route path="tax" element={<TaxSettings />} />
+                    <Route path="features" element={<FeatureSettings />} />
+                    <Route path="time" element={<TimeSettings />} />
+                    <Route path="payroll" element={<PayrollSettingsPage />} />
+                    <Route path="benefits" element={<BenefitsSettingsPage />} />
+                    <Route path="notifications" element={<NotificationSettings />} />
+                  </Route>
+                  <Route
+                    path="/company-members"
+                    element={
+                      <ProtectedRoute>
+                        <CompanyMembers />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/accept-invitation"
+                    element={<AcceptInvitation />}
+                  />
+                  <Route
+                    path="/payroll/runs"
+                    element={
+                      <ProtectedRoute>
+                        <PayRuns />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/runs/:id"
+                    element={
+                      <ProtectedRoute>
+                        <PayRunDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/reports"
+                    element={
+                      <ProtectedRoute>
+                        <PayrollReports />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/remittances"
+                    element={
+                      <ProtectedRoute>
+                        <PayrollRemittances />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/roe"
+                    element={
+                      <ProtectedRoute>
+                        <ROEList />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/roe/new"
+                    element={
+                      <ProtectedRoute>
+                        <ROEGeneration />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/roe/:id"
+                    element={
+                      <ProtectedRoute>
+                        <ROEGeneration />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/payroll/t4"
+                    element={
+                      <ProtectedRoute>
+                        <T4Generation />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Routes>
+                <OfflineIndicator />
+                <UpdateAvailable />
+                <InstallPrompt />
+              </Router>
+            </TooltipProvider>
           </FeatureProvider>
         </AuthProvider>
       </QueryClientProvider>

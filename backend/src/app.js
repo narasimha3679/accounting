@@ -8,6 +8,7 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const pushNotificationRoutes = require('./routes/pushNotificationRoutes');
 const companyMemberRoutes = require('./routes/companyMemberRoutes');
+const payMyselfRoutes = require('./routes/payMyselfRoutes');
 
 const app = express();
 
@@ -15,8 +16,21 @@ const app = express();
 app.use(helmet());
 
 // CORS Configuration
+const allowedOrigins = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    : ['http://localhost:3000', 'http://localhost:5173', 'https://cashual.org'];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Adjust for production
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -42,6 +56,8 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/push-notifications', pushNotificationRoutes);
 app.use('/api/company-members', companyMemberRoutes);
+app.use('/api/pay-myself', payMyselfRoutes);
+
 
 // Health Check
 app.get('/health', (req, res) => {

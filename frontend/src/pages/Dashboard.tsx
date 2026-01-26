@@ -1,27 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Invoice, type Expense, type IncomeEntry, type HSTPayment, type Dividend, type OwnerPayment, type Salary } from '../lib/api';
+import api, { type Dividend, type OwnerPayment } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import {
     DollarSign,
-    Receipt,
     TrendingUp,
-    AlertCircle,
     Calendar,
-    CreditCard,
     Check,
     Percent,
     Banknote,
-    FileText,
     Building2,
     Calculator
 } from 'lucide-react';
 import StatCard from '../components/ui/StatCard';
 import Card from '../components/ui/Card';
-import { cn, formatLocalDate } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { staggerContainer, staggerItem } from '../lib/animations';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
+import { SafeToSpendWidget } from '../components/dashboard/SafeToSpendWidget';
+import { PayMyselfSlider } from '../components/dashboard/PayMyselfSlider';
+import { ActionCenter } from '../components/dashboard/ActionCenter';
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
@@ -31,6 +30,7 @@ const Dashboard: React.FC = () => {
         netIncome: 0,
         outstandingInvoices: 0,
         overdueInvoices: 0,
+        overdueInvoicesTotal: 0,
         hstOwed: 0,
         hstPaid: 0,
         inputTaxCredits: 0,
@@ -54,13 +54,8 @@ const Dashboard: React.FC = () => {
         totalAccumulatedDepreciation: 0,
         totalAssetBookValue: 0,
     });
-    const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
-    const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
-    const [recentIncomeEntries, setRecentIncomeEntries] = useState<IncomeEntry[]>([]);
-    const [recentHSTPayments, setRecentHSTPayments] = useState<HSTPayment[]>([]);
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
-    const [recentSalaries, setRecentSalaries] = useState<Salary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
         // Load saved preference on component mount
@@ -181,6 +176,7 @@ const Dashboard: React.FC = () => {
             });
             const outstandingInvoices = allInvoices.filter(invoice => invoice.status === 'sent');
             const overdueInvoices = allInvoices.filter(invoice => invoice.status === 'overdue');
+            const overdueInvoicesTotal = overdueInvoices.reduce((sum, inv) => sum + inv.total, 0);
 
             // Data is already filtered by date from the API
             const expenses = expensesResponse.data;
@@ -245,7 +241,9 @@ const Dashboard: React.FC = () => {
             // If company is HST registered, they can claim Input Tax Credits (ITCs) for HST paid on expenses
             // This reduces the HST they owe to the government
             const isHSTRegistered = user?.company?.hst_registered || false;
-            const hstPaid = isHSTRegistered ? hstPaidToCRA : hstPaidFromExpenses + hstPaidToCRA;
+            // HST Paid for the purpose of the 'Owed' calculation is just what we've remitted to CRA.
+            // ITCs are handled separately.
+            const hstPaid = hstPaidToCRA;
             const inputTaxCredits = isHSTRegistered ? hstPaidFromExpenses : 0;
 
             // Calculate HST owed (collected - paid - ITCs)
@@ -280,6 +278,7 @@ const Dashboard: React.FC = () => {
                 netIncome,
                 outstandingInvoices: outstandingInvoices.length,
                 overdueInvoices: overdueInvoices.length,
+                overdueInvoicesTotal,
                 hstOwed,
                 hstPaid: hstPaidToCRA, // Only show HST payments to CRA in the stats
                 inputTaxCredits, // Add ITCs to stats
@@ -304,24 +303,7 @@ const Dashboard: React.FC = () => {
                 totalAssetBookValue,
             });
 
-            // Extract recent items from already-fetched data (sorted by date, take first 5)
-            // Recent invoices - all invoices sorted by issue_date descending
-            const sortedInvoices = [...allInvoices].sort((a, b) =>
-                new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime()
-            );
-            setRecentInvoices(sortedInvoices.slice(0, 5));
 
-            // Recent expenses - already sorted by expense_date descending from API
-            setRecentExpenses(expenses.slice(0, 5));
-
-            // Recent income entries - already sorted by income_date descending from API
-            setRecentIncomeEntries(incomeEntries.slice(0, 5));
-
-            // Recent HST payments - already sorted by payment_date descending from API
-            setRecentHSTPayments(hstPayments.slice(0, 5));
-
-            // Recent salaries - already sorted by payment_date descending from API
-            setRecentSalaries(salaries.slice(0, 5));
 
             setAllDividends(dividends);
             setOwnerPayments(ownerPayments);
@@ -339,9 +321,7 @@ const Dashboard: React.FC = () => {
         }).format(amount);
     };
 
-    const formatDate = (dateString: string) => {
-        return formatLocalDate(dateString);
-    };
+
 
     // Hooks must be called before any early returns
     // Note: Removed scroll reveal hooks as they were causing content to be hidden
@@ -364,7 +344,7 @@ const Dashboard: React.FC = () => {
                 className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"
             >
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Cockpit</h1>
                     <p className="text-muted-foreground mt-2">Welcome back, {user?.name}</p>
                 </div>
 
@@ -462,271 +442,142 @@ const Dashboard: React.FC = () => {
                 </div>
             </motion.div>
 
-            {/* Financial Overview Section */}
+            {/* --- DASHBOARD 2.0 OWNER'S COCKPIT --- */}
             <motion.div
                 initial="hidden"
                 animate="visible"
                 variants={staggerContainer}
-                className="space-y-6"
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Financial Overview</h2>
+                {/* Hero: Safe To Spend (Spans 2 cols on Desktop) */}
+                <motion.div variants={staggerItem} className="lg:col-span-2">
+                    <SafeToSpendWidget
+                        hstOwed={stats.hstOwed}
+                        corpTaxOwed={stats.smallBusinessTaxOwed}
+                        availableCash={(stats.totalRevenue + stats.totalIncome + stats.hstOwed) - (stats.totalExpenses + stats.ownerPaymentsTotal + stats.smallBusinessTaxPaid)}
+                    />
+                </motion.div>
 
-                {/* Key Metrics Row */}
-                <motion.div
-                    variants={staggerContainer}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
-                >
-                    <motion.div variants={staggerItem}>
+                {/* Sidebar: Action Center */}
+                <motion.div variants={staggerItem} className="lg:col-span-1">
+                    <ActionCenter
+                        overdueCount={stats.overdueInvoices}
+                        overdueTotal={stats.overdueInvoicesTotal}
+                        hstFilingDue={user?.company?.hst_filing_period_start ? undefined : undefined} // TODO: Calculate actual deadline
+                    />
+                </motion.div>
+
+                {/* Simulator: Pay Myself (Full Width) */}
+                <motion.div variants={staggerItem} className="lg:col-span-3">
+                    <PayMyselfSlider
+                        availableDividends={stats.availableDividends}
+                        reimbursementsOwed={stats.ownerReimbursementOwed} // Using gross owed
+                    />
+                </motion.div>
+            </motion.div>
+
+            {/* --- DETAILED ANALYTICS (Legacy Dashboard) --- */}
+            <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
+                className="space-y-6 pt-8 border-t border-border"
+            >
+                <div className="flex items-center justify-between cursor-pointer group" onClick={() => {
+                    const el = document.getElementById('detailed-financials');
+                    if (el) el.classList.toggle('hidden');
+                }}>
+                    <h2 className="text-2xl font-semibold tracking-tight text-foreground/80 group-hover:text-foreground transition-colors">
+                        Detailed Financials
+                    </h2>
+                    <span className="text-sm text-muted-foreground group-hover:text-primary">Toggle View</span>
+                </div>
+
+                <div id="detailed-financials" className="space-y-6">
+                    {/* Key Metrics Row */}
+                    <motion.div
+                        variants={staggerContainer}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+                    >
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Total Revenue"
+                                value={formatCurrency(stats.totalRevenue)}
+                                subtitle="Money received from clients"
+                                icon={DollarSign}
+                                gradient="emerald"
+                                accent="emerald"
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Net Income"
+                                value={formatCurrency(stats.netIncome)}
+                                subtitle="Profit after all expenses"
+                                icon={TrendingUp}
+                                gradient={stats.netIncome >= 0 ? "emerald" : "red"}
+                                accent={stats.netIncome >= 0 ? "emerald" : "default"}
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="Taxable Income"
+                                value={formatCurrency(stats.taxableIncome)}
+                                subtitle="Before tax"
+                                icon={Calculator}
+                                gradient="blue"
+                                accent="default"
+                            />
+                        </motion.div>
+                        <motion.div variants={staggerItem}>
+                            <StatCard
+                                title="HST Collected"
+                                value={formatCurrency(stats.hstOwed + stats.hstPaid)} // Roughly collected
+                                subtitle="Not your money!"
+                                icon={Banknote}
+                                gradient="red"
+                                accent="default"
+                            />
+                        </motion.div>
+                    </motion.div>
+
+                    {/* Owner Balance Section - KEEPING FOR DATA RECONCILIATION */}
+                    {Math.abs(stats.netOwnerBalance) > 0.01 && (
+                        <motion.div
+                            variants={staggerItem}
+                            className="relative opacity-80 hover:opacity-100 transition-opacity"
+                        >
+                            <Card className="p-4 bg-muted/20 border-border border-dashed">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="text-sm font-semibold uppercase text-muted-foreground">Reconciliation Status</h3>
+                                    <span className="text-lg font-mono">
+                                        Net Balance: {formatCurrency(stats.netOwnerBalance)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        (This is the formal accounting view of what you owe/are owed)
+                                    </span>
+                                </div>
+                            </Card>
+                        </motion.div>
+                    )}
+
+                    {/* Dividend Summary */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <StatCard
-                            title="Total Revenue"
-                            value={formatCurrency(stats.totalRevenue)}
-                            subtitle="Money received from clients"
-                            icon={DollarSign}
+                            title="Dividends Paid YTD"
+                            value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'paid').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
+                            icon={Check}
                             gradient="emerald"
                             accent="emerald"
                         />
-                    </motion.div>
-                    <motion.div variants={staggerItem}>
                         <StatCard
-                            title="Total Expenses"
-                            value={formatCurrency(stats.totalExpenses)}
-                            subtitle="Money spent on business"
-                            icon={Receipt}
+                            title="Corporate Tax Est."
+                            value={formatCurrency(stats.smallBusinessTaxOwed)}
+                            icon={Calculator}
                             gradient="red"
                             accent="default"
                         />
-                    </motion.div>
-                    <motion.div variants={staggerItem}>
-                        <StatCard
-                            title="Net Income"
-                            value={formatCurrency(stats.netIncome)}
-                            subtitle="Profit after all expenses"
-                            icon={TrendingUp}
-                            gradient={stats.netIncome >= 0 ? "emerald" : "red"}
-                            accent={stats.netIncome >= 0 ? "emerald" : "default"}
-                        />
-                    </motion.div>
-                    <motion.div variants={staggerItem}>
-                        <StatCard
-                            title="Dividends Available to Pay"
-                            value={formatCurrency(stats.availableDividends)}
-                            subtitle="Available to pay to owners"
-                            icon={Banknote}
-                            gradient="amber"
-                            accent="golden"
-                        />
-                    </motion.div>
-                </motion.div>
-
-                {/* Owner Balance Section */}
-                {Math.abs(stats.netOwnerBalance) > 0.01 && (
-                    <motion.div
-                        variants={staggerItem}
-                        className="relative"
-                    >
-                        <Card
-                            glass={stats.netOwnerBalance > 0 ? 'golden' : stats.netOwnerBalance < 0 ? 'emerald' : 'default'}
-                            className={cn(
-                                "relative overflow-hidden",
-                                stats.netOwnerBalance > 0 && "border-l-4 border-l-golden-hour glow-golden",
-                                stats.netOwnerBalance < 0 && "border-l-4 border-l-neon-emerald glow-emerald"
-                            )}
-                            padding="lg"
-                        >
-                            {/* Decorative gradient overlay */}
-                            <div className={cn(
-                                "absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-20 -z-0",
-                                stats.netOwnerBalance > 0 ? "bg-golden-hour" :
-                                    stats.netOwnerBalance < 0 ? "bg-neon-emerald" :
-                                        "bg-white/10"
-                            )} />
-
-                            <div className="relative z-10">
-                                {/* Header Section */}
-                                <div className="flex items-start gap-4 mb-6">
-                                    <div className={cn(
-                                        "flex-shrink-0 p-3 rounded-xl border",
-                                        stats.netOwnerBalance > 0 ? "bg-golden-hour/20 border-golden-hour/30" :
-                                            stats.netOwnerBalance < 0 ? "bg-neon-emerald/20 border-neon-emerald/30" :
-                                                "bg-muted/50 border-border"
-                                    )}>
-                                        {stats.netOwnerBalance > 0 ? (
-                                            <AlertCircle className={cn("h-6 w-6", stats.netOwnerBalance > 0 ? "text-golden-hour" : "text-foreground")} />
-                                        ) : stats.netOwnerBalance < 0 ? (
-                                            <Check className="h-6 w-6 text-neon-emerald" />
-                                        ) : (
-                                            <Banknote className="h-6 w-6 text-muted-foreground" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className={cn(
-                                            "text-2xl font-bold tracking-tight mb-2",
-                                            stats.netOwnerBalance > 0 ? 'text-golden-hour' :
-                                                stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
-                                                    'text-foreground'
-                                        )}>
-                                            {stats.netOwnerBalance > 0
-                                                ? 'Owner Reimbursement Required'
-                                                : stats.netOwnerBalance < 0
-                                                    ? 'Owner Overpaid'
-                                                    : 'Owner Balance Settled'
-                                            }
-                                        </h3>
-                                        {stats.netOwnerBalance > 0 && (
-                                            <p className="text-muted-foreground text-base leading-relaxed">
-                                                The corporation owes the owner <span className="font-bold text-foreground tabular-nums">{formatCurrency(stats.netOwnerBalance)}</span> for business expenses paid personally.
-                                            </p>
-                                        )}
-                                        {stats.netOwnerBalance < 0 && (
-                                            <p className="text-muted-foreground text-base leading-relaxed">
-                                                The corporation has overpaid the owner by <span className="font-bold text-foreground tabular-nums">{formatCurrency(Math.abs(stats.netOwnerBalance))}</span>.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Metrics Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                                    {/* Owner Paid Card */}
-                                    <motion.div
-                                        whileHover={{ scale: 1.02 }}
-                                        transition={{ duration: 0.2 }}
-                                        className={cn(
-                                            "glass-golden border border-golden-hour/30 p-5 rounded-xl relative overflow-hidden"
-                                        )}
-                                    >
-                                        <div className="absolute top-0 right-0 w-24 h-24 bg-golden-hour/10 rounded-full blur-2xl -z-0" />
-                                        <div className="relative z-10">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className="text-sm font-semibold text-golden-hour uppercase tracking-wide">Owner Paid</span>
-                                                <div className="p-2 rounded-lg bg-golden-hour/20 border border-golden-hour/30">
-                                                    <AlertCircle className="h-5 w-5 text-golden-hour" />
-                                                </div>
-                                            </div>
-                                            <div className="text-3xl font-bold text-foreground tabular-nums mb-1">
-                                                {formatCurrency(stats.ownerReimbursementOwed)}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {stats.ownerExpenseCount} {stats.ownerExpenseCount === 1 ? 'expense' : 'expenses'}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-
-                                    {/* Corp Paid Back Card */}
-                                    <motion.div
-                                        whileHover={{ scale: 1.02 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="glass border border-border p-5 rounded-xl relative overflow-hidden"
-                                    >
-                                        <div className="absolute top-0 right-0 w-24 h-24 bg-neon-emerald/10 rounded-full blur-2xl -z-0" />
-                                        <div className="relative z-10">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className="text-sm font-semibold text-foreground uppercase tracking-wide">Corp Paid Back</span>
-                                                <div className="p-2 rounded-lg bg-neon-emerald/20 border border-neon-emerald/30">
-                                                    <Banknote className="h-5 w-5 text-neon-emerald" />
-                                                </div>
-                                            </div>
-                                            <div className="text-3xl font-bold text-foreground tabular-nums mb-1">
-                                                {formatCurrency(stats.ownerPaymentsTotal)}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {stats.ownerPaymentsTotal > 0 ? 'payments made' : 'no payments yet'}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-
-                                    {/* Net Balance Card */}
-                                    <motion.div
-                                        whileHover={{ scale: 1.02 }}
-                                        transition={{ duration: 0.2 }}
-                                        className={cn(
-                                            "border p-5 rounded-xl relative overflow-hidden",
-                                            stats.netOwnerBalance > 0 ? 'glass-golden border-golden-hour/30' :
-                                                stats.netOwnerBalance < 0 ? 'glass-emerald border-neon-emerald/30' :
-                                                    'glass border-border'
-                                        )}
-                                    >
-                                        <div className={cn(
-                                            "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -z-0",
-                                            stats.netOwnerBalance > 0 ? "bg-golden-hour/20" :
-                                                stats.netOwnerBalance < 0 ? "bg-neon-emerald/20" :
-                                                    "bg-white/5"
-                                        )} />
-                                        <div className="relative z-10">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className={cn(
-                                                    "text-sm font-semibold uppercase tracking-wide",
-                                                    stats.netOwnerBalance > 0 ? 'text-golden-hour' :
-                                                        stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
-                                                            'text-foreground'
-                                                )}>
-                                                    Net Balance
-                                                </span>
-                                                <div className={cn(
-                                                    "p-2 rounded-lg border",
-                                                    stats.netOwnerBalance > 0 ? 'bg-golden-hour/20 border-golden-hour/30' :
-                                                        stats.netOwnerBalance < 0 ? 'bg-neon-emerald/20 border-neon-emerald/30' :
-                                                            'bg-muted/50 border-border'
-                                                )}>
-                                                    {stats.netOwnerBalance > 0 ? (
-                                                        <AlertCircle className={cn("h-5 w-5", stats.netOwnerBalance > 0 ? "text-golden-hour" : "text-foreground")} />
-                                                    ) : stats.netOwnerBalance < 0 ? (
-                                                        <Check className="h-5 w-5 text-neon-emerald" />
-                                                    ) : (
-                                                        <Banknote className="h-5 w-5 text-muted-foreground" />
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className={cn(
-                                                "text-3xl font-bold tabular-nums mb-1",
-                                                stats.netOwnerBalance > 0 ? 'text-golden-hour' :
-                                                    stats.netOwnerBalance < 0 ? 'text-neon-emerald' :
-                                                        'text-foreground'
-                                            )}>
-                                                {formatCurrency(stats.netOwnerBalance)}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {stats.netOwnerBalance > 0 ? 'owed to owner' : stats.netOwnerBalance < 0 ? 'overpaid' : 'settled'}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                </div>
-
-                                {/* Info Note */}
-                                <div className={cn(
-                                    "glass border p-4 rounded-lg",
-                                    stats.netOwnerBalance > 0 ? 'border-golden-hour/30 glass-golden' :
-                                        'border-border'
-                                )}>
-                                    <p className={cn(
-                                        "text-sm leading-relaxed",
-                                        stats.netOwnerBalance > 0 ? 'text-golden-hour' : 'text-muted-foreground'
-                                    )}>
-                                        <strong className="text-foreground">Note:</strong> Owner reimbursement includes both the expense amount and HST paid on owner-funded expenses.
-                                        {stats.netOwnerBalance > 0 && ' This amount should be paid to the owner to reimburse their personal funds used for business expenses.'}
-                                    </p>
-                                </div>
-                            </div>
-                        </Card>
-                    </motion.div>
-                )}
-
-                {/* Dividend Summary */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                    <StatCard
-                        title="Dividends Paid"
-                        value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'paid').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
-                        icon={Check}
-                        gradient="emerald"
-                        accent="emerald"
-                    />
-                    <StatCard
-                        title="Announced (Not Paid Yet)"
-                        value={formatCurrency(allDividends.filter((d: Dividend) => d.status === 'declared').reduce((sum: number, dividend: Dividend) => sum + dividend.amount, 0))}
-                        icon={AlertCircle}
-                        gradient="amber"
-                        accent="golden"
-                    />
+                    </div>
                 </div>
             </motion.div>
 
@@ -735,330 +586,39 @@ const Dashboard: React.FC = () => {
                 initial="hidden"
                 animate="visible"
                 variants={staggerContainer}
-                className="space-y-6"
+                className="space-y-6 opacity-60 hover:opacity-100 transition-opacity"
             >
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Tax & Compliance</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Compliance & Assets</h2>
 
                 <motion.div
                     variants={staggerContainer}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
                 >
                     <motion.div variants={staggerItem}>
                         <StatCard
-                            title="HST Owed"
-                            value={formatCurrency(stats.hstOwed)}
-                            subtitle="To CRA"
-                            icon={AlertCircle}
-                            gradient="red"
+                            title="Input Tax Credits"
+                            value={formatCurrency(stats.inputTaxCredits)}
+                            subtitle="HST on expenses"
+                            icon={Percent}
+                            gradient="cyan"
                             accent="default"
                         />
                     </motion.div>
                     <motion.div variants={staggerItem}>
                         <StatCard
-                            title="HST Paid"
-                            value={formatCurrency(stats.hstPaid)}
-                            subtitle="To CRA"
-                            icon={Check}
-                            gradient="emerald"
-                            accent="emerald"
+                            title="Total Capital Assets"
+                            value={stats.totalCapitalAssets.toString()}
+                            subtitle={`Book Value: ${formatCurrency(stats.totalAssetBookValue)}`}
+                            icon={Building2}
+                            gradient="purple"
+                            accent="default"
                         />
-                    </motion.div>
-                    {user?.company?.hst_registered && stats.inputTaxCredits > 0 && (
-                        <motion.div variants={staggerItem}>
-                            <StatCard
-                                title="HST Credits from Expenses"
-                                value={formatCurrency(stats.inputTaxCredits)}
-                                subtitle="HST on expenses"
-                                icon={Percent}
-                                gradient="cyan"
-                                accent="default"
-                                helpText="HST you paid on business expenses that you can claim back as a credit against HST you collected. This reduces the amount of HST you owe to the government."
-                            />
-                        </motion.div>
-                    )}
-                </motion.div>
-            </motion.div>
-
-            {/* Capital Assets Section */}
-            {stats.totalCapitalAssets > 0 && (
-                <motion.div
-                    initial="hidden"
-                    animate="visible"
-                    variants={staggerContainer}
-                    className="space-y-6"
-                >
-                    <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Capital Assets</h2>
-
-                    <motion.div
-                        variants={staggerContainer}
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
-                    >
-                        <motion.div variants={staggerItem}>
-                            <StatCard
-                                title="Total Assets"
-                                value={stats.totalCapitalAssets}
-                                subtitle="Capital assets"
-                                icon={Building2}
-                                gradient="cyan"
-                                accent="default"
-                            />
-                        </motion.div>
-                        <motion.div variants={staggerItem}>
-                            <StatCard
-                                title="Total Cost"
-                                value={formatCurrency(stats.totalAssetCost)}
-                                subtitle="Original cost"
-                                icon={DollarSign}
-                                gradient="amber"
-                                accent="golden"
-                            />
-                        </motion.div>
-                        <motion.div variants={staggerItem}>
-                            <StatCard
-                                title="Total Depreciation Taken"
-                                value={formatCurrency(stats.totalAccumulatedDepreciation)}
-                                subtitle="Accumulated"
-                                icon={Calculator}
-                                gradient="amber"
-                                accent="default"
-                                helpText="The total amount of depreciation claimed on all capital assets over time"
-                            />
-                        </motion.div>
-                        <motion.div variants={staggerItem}>
-                            <StatCard
-                                title="Book Value"
-                                value={formatCurrency(stats.totalAssetBookValue)}
-                                subtitle="Current value"
-                                icon={TrendingUp}
-                                gradient="amber"
-                                accent="golden"
-                                helpText="The current value of an asset after subtracting depreciation"
-                            />
-                        </motion.div>
-                    </motion.div>
-                </motion.div>
-            )}
-
-            {/* Alerts & Notifications Section */}
-            {(stats.outstandingInvoices > 0 || stats.overdueInvoices > 0) && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="space-y-4"
-                >
-                    <h2 className="text-xl font-semibold tracking-tight text-foreground border-b border-border pb-2">Alerts & Notifications</h2>
-                    <Card className="p-6 border-l-4 border-l-golden-hour glass-golden" padding="lg">
-                        <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 p-3 rounded-xl bg-golden-hour/20 border border-golden-hour/30">
-                                <AlertCircle className="h-6 w-6 text-golden-hour" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-golden-hour mb-3">
-                                    Invoice Alerts
-                                </h3>
-                                <div className="text-muted-foreground">
-                                    <ul className="list-disc pl-5 space-y-2">
-                                        {stats.outstandingInvoices > 0 && (
-                                            <li><strong className="text-foreground">{stats.outstandingInvoices}</strong> outstanding invoices need attention</li>
-                                        )}
-                                        {stats.overdueInvoices > 0 && (
-                                            <li><strong className="text-foreground">{stats.overdueInvoices}</strong> overdue invoices require immediate action</li>
-                                        )}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                </motion.div>
-            )}
-
-
-            {/* Recent Activity Section */}
-            <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={staggerContainer}
-                className="space-y-6"
-            >
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-3">Recent Activity</h2>
-                <motion.div
-                    variants={staggerContainer}
-                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                >
-                    {/* Recent Invoices */}
-                    <motion.div variants={staggerItem}>
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
-                                    <FileText className="h-5 w-5 text-neon-emerald" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Recent Invoices</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentInvoices.map((invoice) => (
-                                    <div key={invoice.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-foreground">
-                                                {invoice.invoice_number}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {invoice.client?.name || 'Unknown Client'}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-foreground tabular-nums">
-                                                {formatCurrency(invoice.total)}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(invoice.issue_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </motion.div>
-
-                    {/* Recent Expenses */}
-                    <motion.div variants={staggerItem}>
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-red-500/20 border border-red-500/30 p-2 rounded-lg mr-3">
-                                    <Receipt className="h-5 w-5 text-red-400" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Recent Expenses</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentExpenses.map((expense) => (
-                                    <div key={expense.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-foreground">
-                                                {expense.description}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {expense.category?.name || 'Uncategorized'} • {expense.paid_by}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-foreground tabular-nums">
-                                                {formatCurrency(expense.amount)}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(expense.expense_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </motion.div>
-
-                    {/* Recent Income Entries */}
-                    <motion.div variants={staggerItem}>
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
-                                    <DollarSign className="h-5 w-5 text-neon-emerald" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Recent Income Entries</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentIncomeEntries.map((entry) => (
-                                    <div key={entry.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-foreground">
-                                                {entry.description}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {entry.income_type} {entry.client ? `• ${entry.client.name}` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-foreground tabular-nums">
-                                                {formatCurrency(entry.amount)}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(entry.income_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </motion.div>
-
-                    {/* Recent HST Payments */}
-                    <motion.div variants={staggerItem}>
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-neon-emerald/20 border border-neon-emerald/30 p-2 rounded-lg mr-3">
-                                    <CreditCard className="h-5 w-5 text-neon-emerald" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Recent HST Payments</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentHSTPayments.map((payment) => (
-                                    <div key={payment.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-foreground">
-                                                HST Payment
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {payment.reference ? `Ref: ${payment.reference}` : 'No reference'}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-foreground tabular-nums">
-                                                {formatCurrency(payment.amount)}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(payment.payment_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </motion.div>
-
-                    {/* Recent Salaries */}
-                    <motion.div variants={staggerItem}>
-                        <Card>
-                            <div className="flex items-center mb-4">
-                                <div className="bg-blue-500/20 border border-blue-500/30 p-2 rounded-lg mr-3">
-                                    <DollarSign className="h-5 w-5 text-blue-400" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Recent Salaries</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {recentSalaries.map((salary) => (
-                                    <div key={salary.id} className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-foreground">
-                                                {salary.employee ? `${salary.employee.first_name} ${salary.employee.last_name}` : 'Unknown Employee'}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(salary.period_start)} - {formatDate(salary.period_end)}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium text-foreground tabular-nums">
-                                                {formatCurrency(salary.amount)}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDate(salary.payment_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
                     </motion.div>
                 </motion.div>
             </motion.div>
         </div>
     );
+
 };
 
 export default Dashboard;
