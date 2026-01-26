@@ -9,6 +9,7 @@ const emailRoutes = require('./routes/emailRoutes');
 const pushNotificationRoutes = require('./routes/pushNotificationRoutes');
 const companyMemberRoutes = require('./routes/companyMemberRoutes');
 const payMyselfRoutes = require('./routes/payMyselfRoutes');
+const compensationStrategyRoutes = require('./routes/compensationStrategyRoutes');
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/emails', emailRoutes);
 app.use('/api/push-notifications', pushNotificationRoutes);
 app.use('/api/company-members', companyMemberRoutes);
 app.use('/api/pay-myself', payMyselfRoutes);
+app.use('/api/compensation-strategy', compensationStrategyRoutes);
 
 
 // Health Check

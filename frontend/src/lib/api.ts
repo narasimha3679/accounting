@@ -1,5 +1,5 @@
 import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
-import { getFiscalYear, isDateInFiscalYear } from './fiscalYear';
+import { getFiscalYear, isDateInFiscalYear, getFiscalYearRange } from './fiscalYear';
 import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
 import type { BusinessType, EnabledFeatures } from './featureConfig';
 
@@ -62,7 +62,7 @@ export interface Company {
     hst_rate: number;
     rdtoh_balance?: number;
     capital_loss_carryforward?: number; // Unused capital losses from previous years (50% included amount)
-
+    default_dividend_type?: 'eligible' | 'non_eligible' | null;
 
     business_type?: BusinessType | null;
     enabled_features?: EnabledFeatures | null;
@@ -302,6 +302,60 @@ export interface Salary {
     company?: Company;
     created_at: string;
     updated_at: string;
+}
+
+export interface CompensationStrategy {
+    id: number;
+    company_id: number;
+    owner_id: number;
+    fiscal_year: number;
+    goal_type: 'net_cash' | 'maximize_rrsp' | 'maximize_cpp' | 'minimize_tax';
+    target_net_cash?: number | null;
+    planned_salary: number;
+    planned_eligible_dividends: number;
+    planned_non_eligible_dividends: number;
+    projected_net_cash?: number | null;
+    projected_total_tax?: number | null;
+    projected_rrsp_room?: number | null;
+    projected_cpp_contributions?: number | null;
+    projected_effective_tax_rate?: number | null;
+    corporate_net_income?: number | null;
+    rdtoh_balance?: number | null;
+    other_personal_income?: number | null;
+    province: string;
+    status: 'active' | 'completed' | 'abandoned';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface StrategyProgress {
+    hasStrategy: boolean;
+    strategy?: CompensationStrategy;
+    ytd: {
+        salary: number;
+        eligibleDividends: number;
+        nonEligibleDividends: number;
+        total: number;
+    };
+    progress: {
+        salary: number;
+        eligibleDividends: number;
+        nonEligibleDividends: number;
+        overall: number;
+    };
+    recommendation: {
+        type: 'salary' | 'eligible_dividend' | 'non_eligible_dividend' | 'complete';
+        remaining: number;
+        reason: string;
+    };
+}
+
+export interface WithdrawalRecommendation {
+    hasStrategy: boolean;
+    recommendedType?: 'salary' | 'eligible_dividend' | 'non_eligible_dividend' | 'complete';
+    reason?: string;
+    suggestedAmount?: number;
+    message: string;
 }
 
 export interface IncomeEntry {
@@ -6499,6 +6553,239 @@ class SupabaseApi {
         }
 
         return response.json();
+    }
+
+    // Compensation Strategy methods --------------------------------------------------------
+
+    /**
+     * Get active compensation strategy for a company and fiscal year
+     */
+    async getCompensationStrategy(companyId: number, fiscalYear: number): Promise<CompensationStrategy | null> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(
+            `${BACKEND_URL}/api/compensation-strategy/active?company_id=${companyId}&fiscal_year=${fiscalYear}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch compensation strategy');
+        }
+
+        const data = await response.json();
+        return data.hasStrategy === false ? null : data;
+    }
+
+    /**
+     * Get compensation strategy progress (YTD actuals vs plan)
+     */
+    async getCompensationStrategyProgress(companyId: number, fiscalYear: number): Promise<StrategyProgress> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(
+            `${BACKEND_URL}/api/compensation-strategy/progress?company_id=${companyId}&fiscal_year=${fiscalYear}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch strategy progress');
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Create or update a compensation strategy
+     */
+    async createCompensationStrategy(strategy: {
+        company_id: number;
+        fiscal_year: number;
+        goal_type: 'net_cash' | 'maximize_rrsp' | 'maximize_cpp' | 'minimize_tax';
+        target_net_cash?: number;
+        planned_salary: number;
+        planned_eligible_dividends: number;
+        planned_non_eligible_dividends: number;
+        projected_net_cash?: number;
+        projected_total_tax?: number;
+        projected_rrsp_room?: number;
+        projected_cpp_contributions?: number;
+        projected_effective_tax_rate?: number;
+        corporate_net_income?: number;
+        rdtoh_balance?: number;
+        other_personal_income?: number;
+        province?: string;
+    }): Promise<CompensationStrategy> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`${BACKEND_URL}/api/compensation-strategy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(strategy),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save compensation strategy');
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Get withdrawal recommendation based on active strategy
+     */
+    async getWithdrawalRecommendation(
+        companyId: number,
+        fiscalYear: number,
+        amount: number
+    ): Promise<WithdrawalRecommendation> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(
+            `${BACKEND_URL}/api/compensation-strategy/recommend-withdrawal?company_id=${companyId}&fiscal_year=${fiscalYear}&amount=${amount}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to get withdrawal recommendation');
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Calculate corporate net income for a given fiscal year
+     * Uses the same logic as Dashboard: revenue + otherIncome - deductibleExpenses - salaries
+     */
+    async calculateCorporateNetIncome(
+        companyId: number,
+        fiscalYear: number
+    ): Promise<{
+        netIncome: number;
+        breakdown: {
+            invoiceRevenue: number;
+            clientIncome: number;
+            otherIncome: number;
+            totalRevenue: number;
+            totalDeductibleExpenses: number;
+            totalSalaries: number;
+        };
+    }> {
+        // Get fiscal year date range
+        const company = await this.getCompany(companyId);
+        if (!company) {
+            throw new Error('Company not found');
+        }
+
+        // Calculate fiscal year start and end dates using the utility function
+        let fiscalYearStartDate: Date;
+        let fiscalYearEndDate: Date;
+
+        if (company.fiscal_year_end) {
+            const fiscalYearRange = getFiscalYearRange(fiscalYear, company.fiscal_year_end);
+            fiscalYearStartDate = fiscalYearRange.start;
+            fiscalYearEndDate = fiscalYearRange.end;
+        } else {
+            // Fallback to calendar year if no fiscal year end is set
+            fiscalYearStartDate = new Date(fiscalYear, 0, 1);
+            fiscalYearEndDate = new Date(fiscalYear, 11, 31);
+        }
+        
+        // Fetch all required data
+        const [invoicesResponse, incomeEntriesResponse, expensesResponse, salariesResponse] = await Promise.all([
+            this.getInvoices({ company_id: companyId, limit: 10000 }),
+            this.getIncomeEntries({ company_id: companyId, limit: 10000 }),
+            this.getExpenses({ company_id: companyId, limit: 10000 }),
+            this.getSalaries({ company_id: companyId, limit: 10000 }),
+        ]);
+
+        // Filter data for the fiscal year
+        const paidInvoices = invoicesResponse.data.filter((inv) => {
+            if (!inv.paid_date) return false;
+            const paidDate = new Date(inv.paid_date);
+            return paidDate >= fiscalYearStartDate && paidDate <= fiscalYearEndDate;
+        });
+
+        const fiscalYearIncomeEntries = incomeEntriesResponse.data.filter((entry) => {
+            const incomeDate = new Date(entry.income_date);
+            return incomeDate >= fiscalYearStartDate && incomeDate <= fiscalYearEndDate;
+        });
+
+        const fiscalYearExpenses = expensesResponse.data.filter((expense) => {
+            const expenseDate = new Date(expense.expense_date);
+            return expenseDate >= fiscalYearStartDate && expenseDate <= fiscalYearEndDate;
+        });
+
+        const fiscalYearSalaries = salariesResponse.data.filter((salary) => {
+            const paymentDate = new Date(salary.payment_date);
+            return paymentDate >= fiscalYearStartDate && paymentDate <= fiscalYearEndDate;
+        });
+
+        // Calculate components
+        const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
+        const clientIncome = fiscalYearIncomeEntries
+            .filter((entry) => entry.income_type === 'client')
+            .reduce((sum, entry) => sum + entry.amount, 0);
+        const otherIncome = fiscalYearIncomeEntries
+            .filter((entry) => entry.income_type !== 'client')
+            .reduce((sum, entry) => sum + entry.amount, 0);
+        const totalRevenue = invoiceRevenue + clientIncome;
+
+        // Calculate deductible expenses using deduction percentage
+        const totalDeductibleExpenses = fiscalYearExpenses.reduce((sum, expense) => {
+            const deductionPercentage = expense.deduction_percentage ?? 1.0;
+            return sum + expense.amount * deductionPercentage;
+        }, 0);
+
+        const totalSalaries = fiscalYearSalaries.reduce((sum, salary) => sum + salary.amount, 0);
+
+        // Calculate net income
+        const netIncome = totalRevenue + otherIncome - totalDeductibleExpenses - totalSalaries;
+
+        return {
+            netIncome: Math.max(0, netIncome), // Ensure non-negative
+            breakdown: {
+                invoiceRevenue,
+                clientIncome,
+                otherIncome,
+                totalRevenue,
+                totalDeductibleExpenses,
+                totalSalaries,
+            },
+        };
     }
 }
 

@@ -68,9 +68,11 @@ export interface CompensationScenario {
     // Corporate impact
     corporateTax: number;
     rdtohRefund: number;
+    employerCPP: number; // NEW
+    employerEI: number;  // NEW
 
     // Personal impact
-    cppContributions: number;
+    cppContributions: number; // This is employee portion
     federalTax: number;
     provincialTax: number;
     totalPersonalTax: number;
@@ -78,7 +80,7 @@ export interface CompensationScenario {
     // Net results
     rrspRoomGenerated: number;
     netCashToOwner: number;
-    totalTaxBurden: number; // corp + personal - RDTOH refund
+    totalTaxBurden: number; // corp + personal + employer cpp/ei - RDTOH refund
     effectiveTaxRate: number;
 
     // Details
@@ -240,8 +242,27 @@ export function calculateScenario(
     eligibleDividends: number,
     nonEligibleDividends: number
 ): CompensationScenario {
+    // 0. Calculate Employer Payroll Taxes (Expenses)
+    // Employer CPP
+    const employerCPP = Math.min(
+        Math.max(0, salary - (inputs.taxConstants.cpp_basic_exemption || 3500)) * (inputs.taxConstants.cpp_employer_rate || 1), // usually same as employee rate
+        inputs.taxConstants.cpp_max_contribution || 3867.50
+    );
+
+    // Employer EI - usually 1.4x employee rate
+    // Note: Owners are often EI exempt, but if we want to be safe or if they opted in:
+    // Let's assume standard for now, but keeping it minimal if 0 salary.
+    // Actually, usually owners are exempt. But if we are "accounting for it" as requested:
+    // We'll calculate it.
+    const employerEIRate = (inputs.taxConstants.ei_employee_rate || 0.0166) * (inputs.taxConstants.ei_employer_multiplier || 1.4);
+    const employerEI = Math.min(
+        salary * employerEIRate,
+        (inputs.taxConstants.ei_max_premium || 1049.12) * (inputs.taxConstants.ei_employer_multiplier || 1.4)
+    );
+
     // 1. Calculate corporate tax on remaining income
-    const remainingCorpIncome = inputs.corporateNetIncome - salary;
+    // Deduct Salary AND Employer Taxes from Net Income before tax
+    const remainingCorpIncome = inputs.corporateNetIncome - salary - employerCPP - employerEI;
     const corporateTax = calculateSmallBusinessTax(remainingCorpIncome, inputs.smallBusinessTaxRate);
 
     // 2. Calculate available funds after corporate tax
@@ -250,16 +271,22 @@ export function calculateScenario(
     // Ensure dividends don't exceed available funds
     const totalDividends = eligibleDividends + nonEligibleDividends;
     if (totalDividends > afterTaxCorporateIncome) {
-        // Scale down dividends proportionally
-        const scale = afterTaxCorporateIncome / totalDividends;
-        eligibleDividends = eligibleDividends * scale;
-        nonEligibleDividends = nonEligibleDividends * scale;
+        // Find scale, but handle cases where afterTaxCorporateIncome < 0 (loss)
+        if (afterTaxCorporateIncome <= 0) {
+            eligibleDividends = 0;
+            nonEligibleDividends = 0;
+        } else {
+            // Scale down dividends proportionally
+            const scale = afterTaxCorporateIncome / totalDividends;
+            eligibleDividends = eligibleDividends * scale;
+            nonEligibleDividends = nonEligibleDividends * scale;
+        }
     }
 
     // 3. Calculate RDTOH refund from non-eligible dividends
     const rdtohRefund = calculateRDTOHRefund(nonEligibleDividends, inputs.rdtohBalance);
 
-    // 4. Calculate CPP contributions (if taking salary)
+    // 4. Calculate CPP contributions (Employee portion)
     const cppContributions = calculateCPP(salary, inputs.taxConstants);
 
     // 5. Calculate grossed-up dividends
@@ -294,8 +321,10 @@ export function calculateScenario(
     // 11. Calculate RRSP room (18% of earned income, max $31,560 for 2024)
     const rrspRoomGenerated = round(Math.min(salary * 0.18, 31560));
 
-    // 12. Calculate total tax burden (corporate + personal - RDTOH refund)
-    const totalTaxBurden = round(corporateTax + totalPersonalTax - rdtohRefund);
+    // 12. Calculate total tax burden (corporate + personal + employer taxes - RDTOH refund)
+    // We include Employer Taxes in burden because it's money leaving the "ecosystem"
+    // (Owner + Corp combo) to the government.
+    const totalTaxBurden = round(corporateTax + totalPersonalTax + employerCPP + employerEI - rdtohRefund);
 
     // 13. Calculate effective tax rate
     const effectiveTaxRate =
@@ -309,6 +338,8 @@ export function calculateScenario(
         nonEligibleDividends: round(nonEligibleDividends),
         corporateTax,
         rdtohRefund,
+        employerCPP: round(employerCPP),
+        employerEI: round(employerEI),
         cppContributions,
         federalTax,
         provincialTax,
@@ -538,5 +569,241 @@ export function getRecommendation(scenarios: CompensationScenario[]): {
         recommended: best,
         explanation,
         considerations,
+    };
+}
+
+/**
+ * Generate multiple strategy options based on user goals
+ */
+export interface StrategyOption {
+    id: string;
+    name: string;
+    description: string;
+    scenario: CompensationScenario;
+    pros: string[];
+    cons: string[];
+}
+
+export interface StrategyOptionsResult {
+    options: StrategyOption[];
+    recommended: string;
+    explanation: string;
+}
+
+export function generateStrategyOptions(
+    inputs: OptimizerInputs,
+    selectedGoals: string[]
+): StrategyOptionsResult {
+    const options: StrategyOption[] = [];
+    const cppYmpe = inputs.taxConstants.cpp_ympe || 68500;
+
+    // Strategy 1: Tax Minimizer
+    const taxMinimizerInputs: OptimizerInputs = {
+        ...inputs,
+        maximizeCPP: false,
+        prioritizeRRSPRoom: false,
+        desiredPersonalCash: undefined,
+    };
+    const taxMinimizerScenarios = findOptimalMix(taxMinimizerInputs);
+    const taxMinimizer = taxMinimizerScenarios[0];
+
+    if (taxMinimizer) {
+        const pros: string[] = [];
+        const cons: string[] = [];
+
+        if (taxMinimizer.rdtohRefund > 0) {
+            pros.push(`Triggers $${taxMinimizer.rdtohRefund.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} RDTOH refund`);
+        }
+        pros.push(`Lowest total tax: $${taxMinimizer.totalTaxBurden.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+        pros.push(`Effective tax rate: ${taxMinimizer.effectiveTaxRate.toFixed(1)}%`);
+
+        if (taxMinimizer.rrspRoomGenerated < 10000) {
+            cons.push('Limited RRSP room generated');
+        }
+        if (taxMinimizer.cppContributions < 3000) {
+            cons.push('Lower CPP contributions');
+        }
+
+        options.push({
+            id: 'tax_minimizer',
+            name: 'Tax Minimizer',
+            description: 'Lowest total tax burden',
+            scenario: taxMinimizer,
+            pros,
+            cons,
+        });
+    }
+
+    // Strategy 2: RRSP Builder
+    const rrspBuilderInputs: OptimizerInputs = {
+        ...inputs,
+        maximizeCPP: false,
+        prioritizeRRSPRoom: true,
+        desiredPersonalCash: undefined,
+    };
+    const rrspBuilderScenarios = findOptimalMix(rrspBuilderInputs);
+    const rrspBuilder = rrspBuilderScenarios.find(s => s.rrspRoomGenerated > 0) || rrspBuilderScenarios[0];
+
+    if (rrspBuilder && rrspBuilder.rrspRoomGenerated > 0) {
+        const pros: string[] = [];
+        const cons: string[] = [];
+
+        pros.push(`Generates $${rrspBuilder.rrspRoomGenerated.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} in RRSP room`);
+        if (rrspBuilder.cppContributions > 3000) {
+            pros.push(`Builds $${rrspBuilder.cppContributions.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} in CPP contributions`);
+        }
+
+        cons.push(`Higher tax burden: $${rrspBuilder.totalTaxBurden.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+        if (rrspBuilder.netCashToOwner < taxMinimizer?.netCashToOwner * 0.9) {
+            cons.push('Lower net cash compared to tax-optimized strategy');
+        }
+
+        options.push({
+            id: 'rrsp_builder',
+            name: 'RRSP Builder',
+            description: 'Maximize RRSP contribution room',
+            scenario: rrspBuilder,
+            pros,
+            cons,
+        });
+    }
+
+    // Strategy 3: CPP Maximizer
+    const cppMaximizerInputs: OptimizerInputs = {
+        ...inputs,
+        maximizeCPP: true,
+        prioritizeRRSPRoom: false,
+        desiredPersonalCash: undefined,
+    };
+    const cppMaximizerScenarios = findOptimalMix(cppMaximizerInputs);
+    const cppMaximizer = cppMaximizerScenarios.find(s => s.salary >= Math.min(cppYmpe * 0.9, inputs.corporateNetIncome * 0.5)) || cppMaximizerScenarios[0];
+
+    if (cppMaximizer && cppMaximizer.cppContributions > 0) {
+        const pros: string[] = [];
+        const cons: string[] = [];
+
+        pros.push(`Maximizes CPP contributions: $${cppMaximizer.cppContributions.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+        if (cppMaximizer.rrspRoomGenerated > 10000) {
+            pros.push(`Also generates $${cppMaximizer.rrspRoomGenerated.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} in RRSP room`);
+        }
+
+        cons.push(`Higher tax burden: $${cppMaximizer.totalTaxBurden.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+        if (cppMaximizer.netCashToOwner < taxMinimizer?.netCashToOwner * 0.9) {
+            cons.push('Lower net cash compared to tax-optimized strategy');
+        }
+
+        options.push({
+            id: 'cpp_maximizer',
+            name: 'CPP Maximizer',
+            description: 'Maximize CPP benefits for retirement',
+            scenario: cppMaximizer,
+            pros,
+            cons,
+        });
+    }
+
+    // Strategy 4: Balanced Approach
+    const balancedSalary = Math.min(cppYmpe * 0.8, inputs.corporateNetIncome * 0.3);
+    const remainingCorpIncome = inputs.corporateNetIncome - balancedSalary;
+    const corporateTax = calculateSmallBusinessTax(remainingCorpIncome, inputs.smallBusinessTaxRate);
+    const afterTaxIncome = remainingCorpIncome - corporateTax;
+
+    // Use some RDTOH if available
+    let balancedNonEligible = 0;
+    if (inputs.rdtohBalance > 0) {
+        const maxNonEligibleFromRDTOH = inputs.rdtohBalance / RDTOH_REFUND_RATE;
+        balancedNonEligible = Math.min(maxNonEligibleFromRDTOH * 0.6, afterTaxIncome * 0.4);
+    }
+    const balancedEligible = Math.max(0, afterTaxIncome - balancedNonEligible);
+
+    const balanced = calculateScenario(inputs, balancedSalary, balancedEligible, balancedNonEligible);
+
+    const balancedPros: string[] = [];
+    const balancedCons: string[] = [];
+
+    if (balanced.rrspRoomGenerated > 5000) {
+        balancedPros.push(`Good RRSP room: $${balanced.rrspRoomGenerated.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    }
+    if (balanced.cppContributions > 2000) {
+        balancedPros.push(`Reasonable CPP contributions: $${balanced.cppContributions.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    }
+    balancedPros.push(`Balanced tax burden: $${balanced.totalTaxBurden.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+
+    if (balanced.totalTaxBurden > taxMinimizer?.totalTaxBurden * 1.1) {
+        balancedCons.push('Slightly higher taxes than pure tax minimization');
+    }
+    if (balanced.rrspRoomGenerated < 10000) {
+        balancedCons.push('Less RRSP room than dedicated RRSP strategy');
+    }
+
+    options.push({
+        id: 'balanced',
+        name: 'Balanced Approach',
+        description: 'Good mix of all benefits',
+        scenario: balanced,
+        pros: balancedPros,
+        cons: balancedCons,
+    });
+
+    // Strategy 5: Custom (if target cash is specified)
+    if (inputs.desiredPersonalCash) {
+        const customScenarios = findOptimalMix(inputs);
+        const custom = customScenarios[0];
+
+        if (custom) {
+            const customPros: string[] = [];
+            const customCons: string[] = [];
+
+            customPros.push(`Meets your cash target: $${custom.netCashToOwner.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+            if (custom.totalTaxBurden < taxMinimizer?.totalTaxBurden * 1.05) {
+                customPros.push('Tax-efficient while meeting cash needs');
+            }
+
+            if (custom.rrspRoomGenerated < 5000) {
+                customCons.push('Limited RRSP room');
+            }
+            if (custom.cppContributions < 2000) {
+                customCons.push('Lower CPP contributions');
+            }
+
+            options.push({
+                id: 'custom_cash',
+                name: 'Target Cash Strategy',
+                description: `Optimized to meet your $${inputs.desiredPersonalCash.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} cash target`,
+                scenario: custom,
+                pros: customPros,
+                cons: customCons,
+            });
+        }
+    }
+
+    // Determine recommended option based on selected goals
+    let recommended = 'balanced';
+    let explanation = '';
+
+    if (selectedGoals.includes('net_cash') && inputs.desiredPersonalCash) {
+        recommended = 'custom_cash';
+        explanation = `This strategy is optimized to meet your target cash amount of $${inputs.desiredPersonalCash.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} while minimizing taxes.`;
+    } else if (selectedGoals.includes('minimize_tax') && !selectedGoals.includes('maximize_rrsp') && !selectedGoals.includes('maximize_cpp')) {
+        recommended = 'tax_minimizer';
+        explanation = 'This strategy minimizes your total tax burden by optimizing the mix of salary and dividends.';
+    } else if (selectedGoals.includes('maximize_rrsp') && !selectedGoals.includes('maximize_cpp')) {
+        recommended = 'rrsp_builder';
+        explanation = 'This strategy maximizes your RRSP contribution room, giving you more flexibility for retirement savings.';
+    } else if (selectedGoals.includes('maximize_cpp') && !selectedGoals.includes('maximize_rrsp')) {
+        recommended = 'cpp_maximizer';
+        explanation = 'This strategy maximizes your CPP contributions, building stronger retirement benefits.';
+    } else if (selectedGoals.length > 1) {
+        recommended = 'balanced';
+        explanation = 'This balanced approach considers all your goals and provides a good mix of tax efficiency, RRSP room, and CPP benefits.';
+    } else {
+        recommended = 'balanced';
+        explanation = 'This balanced approach provides a good mix of all benefits.';
+    }
+
+    return {
+        options,
+        recommended,
+        explanation,
     };
 }

@@ -196,7 +196,7 @@ const Dividends: React.FC = () => {
         payment_date: '',
         status: 'declared' as 'declared' | 'paid',
         notes: '',
-        dividend_type: 'non_eligible' as 'eligible' | 'non_eligible',
+        dividend_type: (user?.company?.default_dividend_type || 'non_eligible') as 'eligible' | 'non_eligible',
         fiscal_year: new Date().getFullYear(),
     });
 
@@ -343,7 +343,7 @@ const Dividends: React.FC = () => {
             payment_date: '',
             status: 'declared',
             notes: '',
-            dividend_type: 'non_eligible',
+            dividend_type: (user?.company?.default_dividend_type || 'non_eligible') as 'eligible' | 'non_eligible',
             fiscal_year: new Date().getFullYear(),
         });
         setRecipients([]);

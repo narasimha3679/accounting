@@ -51,6 +51,7 @@ const TaxSettings: React.FC = () => {
                 hst_filing_frequency: company.hst_filing_frequency || 'annual',
                 small_business_rate: company.small_business_rate,
                 hst_rate: company.hst_rate,
+                default_dividend_type: company.default_dividend_type || 'non_eligible',
             });
 
             setCompany(updatedCompany);
@@ -194,6 +195,29 @@ const TaxSettings: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Default Dividend Type */}
+                    <div>
+                        <label htmlFor="default_dividend_type" className="block text-sm font-medium text-white mb-2">
+                            Default Dividend Type
+                            <HelpIcon
+                                content="Most small businesses use non-eligible dividends. Eligible dividends are typically from public corporations. This default will be used when creating new dividends."
+                                size="sm"
+                            />
+                        </label>
+                        <select
+                            id="default_dividend_type"
+                            value={company.default_dividend_type || 'non_eligible'}
+                            onChange={(e) => handleInputChange('default_dividend_type', e.target.value as 'eligible' | 'non_eligible')}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                            <option value="non_eligible">Non-Eligible (CCPC - Most Small Businesses)</option>
+                            <option value="eligible">Eligible (Public Corporations)</option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-muted">
+                            This setting will be used as the default when creating new dividends throughout the platform.
+                        </p>
                     </div>
                 </div>
             </Card>
