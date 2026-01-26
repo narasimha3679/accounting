@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Info } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
@@ -19,10 +19,7 @@ export const SafeToSpendWidget: React.FC<SafeToSpendProps> = ({
     availableCash,
     upcomingPayroll = 0
 }) => {
-    // const { currentCompany } = useCurrentCompany(); // No longer needed for balance
-    // const [isEditing, setIsEditing] = useState(false); // Removed manual edit
-    // const [balanceInput, setBalanceInput] = useState(''); // Removed manual edit
-    // const [isSaving, setIsSaving] = useState(false); // Removed manual edit
+    const [tooltipOpen, setTooltipOpen] = useState(false);
 
     // Use calculated available cash instead of manual bank balance
     const bankBalance = availableCash;
@@ -55,9 +52,16 @@ export const SafeToSpendWidget: React.FC<SafeToSpendProps> = ({
                             <h2 className="text-sm uppercase tracking-wider font-semibold text-muted-foreground">
                                 Safe to Spend
                             </h2>
-                            <Tooltip>
+                            <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen} delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setTooltipOpen(!tooltipOpen)}
+                                        className="inline-flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                                        aria-label="Show calculation details"
+                                    >
+                                        <Info className="w-4 h-4 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+                                    </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" align="start" className="w-64 p-3 bg-popover border border-border rounded-lg shadow-xl z-50 text-xs">
                                     <p className="font-semibold mb-1">How is this calculated?</p>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { DollarSign, Wallet, TrendingUp, Briefcase, Receipt, Info, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import Card from '../ui/Card';
 import { useQuery } from '@tanstack/react-query';
@@ -28,15 +28,6 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
     const [otherPersonalIncome, setOtherPersonalIncome] = useState<number>(0);
     const [selectedProvince, setSelectedProvince] = useState<string>(province);
     const [dividendType, setDividendType] = useState<'eligible' | 'non_eligible'>('non_eligible');
-
-    // Initial default to 50% capacity or $5k
-    useEffect(() => {
-        if (maxWithdrawal > 0 && amount === 0) {
-            const initialAmount = Math.min(maxWithdrawal, 5000);
-            setAmount(initialAmount);
-            setOptimizeAmount(initialAmount);
-        }
-    }, [maxWithdrawal]);
 
     // Debounced optimizer call
     const debouncedOptimize = useDebouncedCallback((value: number) => {
@@ -111,6 +102,12 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
 
     const bestOption = getBestOption();
 
+    // Helper: Get recommended option types from breakdown
+    const recommendedTypes = useMemo(() => {
+        if (!optimization?.recommendation?.breakdown) return [];
+        return optimization.recommendation.breakdown.map(item => item.type);
+    }, [optimization]);
+
     return (
         <Card className="p-6 overflow-visible">
             <div className="flex justify-between items-center mb-6">
@@ -127,7 +124,7 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                     onClick={() => setShowDetails(!showDetails)}
                     className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                 >
-                    {showDetails ? 'Simple' : 'Detailed'}
+                    {showDetails ? 'Simplify' : 'Expand for Details'}
                     {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
             </div>
@@ -276,8 +273,96 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                 </div>
             )}
 
-            {/* 3-Way Comparison Cards */}
-            {optimization && !isLoading && (
+            {/* Simple View - Only Recommended Options */}
+            {!showDetails && optimization && !isLoading && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        {/* Reimbursement Card - Only if in recommendation */}
+                        {recommendedTypes.includes('reimbursement') && optimization.options.reimbursement.available && (
+                            <div className="rounded-xl p-4 border bg-muted/20 border-border/50">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Receipt className="w-4 h-4 text-emerald-500" />
+                                    <span className="text-sm font-semibold">Reimburse</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-1">Amount</div>
+                                <div className="text-lg font-bold mb-2">{formatCurrency(optimization.options.reimbursement.amount)}</div>
+                                <div className="text-xs text-muted-foreground mb-1">You keep</div>
+                                <div className="text-xl font-bold text-emerald-600">{formatCurrency(optimization.options.reimbursement.netInPocket)}</div>
+                                <div className="text-xs text-emerald-600 font-semibold">(100% tax-free)</div>
+                            </div>
+                        )}
+
+                        {/* Dividend Card - Only if in recommendation */}
+                        {recommendedTypes.includes('dividend') && (
+                            <div className="rounded-xl p-4 border bg-muted/20 border-border/50">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <TrendingUp className="w-4 h-4 text-amber-500" />
+                                    <span className="text-sm font-semibold">Dividend</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-1">Dividend Amount</div>
+                                <div className="text-lg font-bold mb-2">{formatCurrency(optimization.options.dividend.amount)}</div>
+                                <div className="text-xs text-muted-foreground mb-1">You keep</div>
+                                <div className="text-xl font-bold text-amber-600">{formatCurrency(optimization.options.dividend.netInPocket)}</div>
+                                <div className="text-xs text-amber-600 font-semibold">
+                                    ({formatPercent(optimization.options.dividend.trueEfficiency || optimization.options.dividend.efficiency)} true efficiency)
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Salary Card - Only if in recommendation */}
+                        {recommendedTypes.includes('salary') && (
+                            <div className="rounded-xl p-4 border bg-muted/20 border-border/50">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Briefcase className="w-4 h-4 text-blue-500" />
+                                    <span className="text-sm font-semibold">Salary</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-1">Corp Cost</div>
+                                <div className="text-lg font-bold mb-2">{formatCurrency(optimization.options.salary.corporateCost)}</div>
+                                <div className="text-xs text-muted-foreground mb-1">You keep</div>
+                                <div className="text-xl font-bold text-blue-600">{formatCurrency(optimization.options.salary.netInPocket)}</div>
+                                <div className="text-xs text-blue-600 font-semibold">({formatPercent(optimization.options.salary.efficiency)})</div>
+                                {optimization.options.salary.rrspRoomCreated > 0 && (
+                                    <div className="text-xs text-green-500 mt-1">+{formatCurrency(optimization.options.salary.rrspRoomCreated)} RRSP room</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Recommendation Banner */}
+                    <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20 mb-4">
+                        <div className="flex items-start gap-3">
+                            <Lightbulb className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                            <div>
+                                <div className="font-semibold text-sm mb-1">
+                                    Recommendation: {optimization.recommendation.strategy}
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                    {optimization.recommendation.explanation}
+                                </p>
+                                <div className="flex items-center gap-4 text-sm">
+                                    <div>
+                                        <span className="text-muted-foreground">Net in pocket: </span>
+                                        <span className="font-bold text-foreground">{formatCurrency(optimization.recommendation.totalNetInPocket)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">Efficiency: </span>
+                                        <span className="font-bold text-foreground">{optimization.recommendation.totalEfficiency}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Disclaimer */}
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                        <span>{optimization.disclaimer}</span>
+                    </div>
+                </>
+            )}
+
+            {/* Expanded View - All Options for Comparison */}
+            {showDetails && optimization && !isLoading && (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                         {/* Reimbursement Card */}
@@ -328,10 +413,13 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                             <div className="text-xs text-amber-600 font-semibold">
                                 ({formatPercent(optimization.options.dividend.trueEfficiency || optimization.options.dividend.efficiency)} true efficiency)
                             </div>
-                            {showDetails && (
-                                <div className="mt-2 pt-2 border-t border-border/30 text-xs text-muted-foreground space-y-1">
-                                    {optimization.options.dividend.grossCorpIncome > 0 && (
-                                        <>
+                            {/* Detailed Tax Breakdown */}
+                            <div className="mt-3 pt-3 border-t border-border/30 space-y-2">
+                                <div className="text-xs font-semibold text-foreground mb-2">Tax Breakdown</div>
+                                {optimization.options.dividend.grossCorpIncome > 0 && (
+                                    <>
+                                        <div className="text-xs text-muted-foreground mb-1 font-medium">Corporate Level</div>
+                                        <div className="space-y-1 text-xs text-muted-foreground">
                                             <div className="flex justify-between">
                                                 <span>Gross Corp Income</span>
                                                 <span>{formatCurrency(optimization.options.dividend.grossCorpIncome)}</span>
@@ -340,25 +428,47 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                                                 <span>Corp Tax (12.5%)</span>
                                                 <span className="text-red-400">-{formatCurrency(optimization.options.dividend.corporateTax)}</span>
                                             </div>
-                                            <div className="flex justify-between font-medium">
+                                            <div className="flex justify-between font-medium pt-1 border-t border-border/20">
                                                 <span>= Dividend Paid</span>
                                                 <span>{formatCurrency(optimization.options.dividend.amount)}</span>
                                             </div>
-                                            <div className="h-px bg-border/30 my-1" />
-                                        </>
-                                    )}
+                                        </div>
+                                        <div className="h-px bg-border/30 my-2" />
+                                    </>
+                                )}
+                                <div className="text-xs text-muted-foreground mb-1 font-medium">Personal Level</div>
+                                <div className="space-y-1 text-xs text-muted-foreground">
                                     <div className="flex justify-between">
-                                        <span>Personal Tax</span>
+                                        <span>Grossed-Up Amount</span>
+                                        <span>{formatCurrency(optimization.options.dividend.grossedUp)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Federal Tax</span>
+                                        <span className="text-red-400">-{formatCurrency(optimization.options.dividend.netFederalTax)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Provincial Tax</span>
+                                        <span className="text-red-400">-{formatCurrency(optimization.options.dividend.netProvincialTax)}</span>
+                                    </div>
+                                    {optimization.options.dividend.ontarioSurtax > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Ontario Surtax</span>
+                                            <span className="text-red-400">-{formatCurrency(optimization.options.dividend.ontarioSurtax)}</span>
+                                        </div>
+                                    )}
+                                    <div className="h-px bg-border/30 my-1" />
+                                    <div className="flex justify-between font-semibold pt-1 text-foreground">
+                                        <span>Total Personal Tax</span>
                                         <span className="text-red-400">-{formatCurrency(optimization.options.dividend.netTax)}</span>
                                     </div>
                                     {optimization.options.dividend.totalTax > 0 && (
-                                        <div className="flex justify-between font-medium pt-1 border-t border-border/20">
-                                            <span>Total Tax Paid</span>
+                                        <div className="flex justify-between font-semibold pt-1 border-t border-border/20 text-foreground">
+                                            <span>Total Tax (Corp + Personal)</span>
                                             <span className="text-red-400">-{formatCurrency(optimization.options.dividend.totalTax)}</span>
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         {/* Salary Card */}
@@ -385,12 +495,15 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                             {optimization.options.salary.rrspRoomCreated > 0 && (
                                 <div className="text-xs text-green-500 mt-1">+{formatCurrency(optimization.options.salary.rrspRoomCreated)} RRSP room</div>
                             )}
-                            {showDetails && (
-                                <div className="mt-2 pt-2 border-t border-border/30 text-xs text-muted-foreground space-y-1">
+                            {/* Detailed Tax Breakdown */}
+                            <div className="mt-3 pt-3 border-t border-border/30 space-y-2">
+                                <div className="text-xs font-semibold text-foreground mb-2">Tax Breakdown</div>
+                                <div className="space-y-1 text-xs text-muted-foreground">
                                     <div className="flex justify-between">
-                                        <span>Gross</span>
+                                        <span>Gross Salary</span>
                                         <span>{formatCurrency(optimization.options.salary.grossSalary)}</span>
                                     </div>
+                                    <div className="h-px bg-border/30 my-1" />
                                     <div className="flex justify-between">
                                         <span>CPP</span>
                                         <span className="text-red-400">-{formatCurrency(optimization.options.salary.employeeCpp)}</span>
@@ -400,16 +513,37 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                                         <span className="text-red-400">-{formatCurrency(optimization.options.salary.employeeEi)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Tax</span>
-                                        <span className="text-red-400">-{formatCurrency(optimization.options.salary.federalTax + optimization.options.salary.provincialTax)}</span>
+                                        <span>Federal Tax</span>
+                                        <span className="text-red-400">-{formatCurrency(optimization.options.salary.federalTax)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Provincial Tax</span>
+                                        <span className="text-red-400">-{formatCurrency(optimization.options.salary.provincialTax)}</span>
+                                    </div>
+                                    {optimization.options.salary.ontarioSurtax > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Ontario Surtax</span>
+                                            <span className="text-red-400">-{formatCurrency(optimization.options.salary.ontarioSurtax)}</span>
+                                        </div>
+                                    )}
+                                    {optimization.options.salary.healthPremium > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Health Premium</span>
+                                            <span className="text-red-400">-{formatCurrency(optimization.options.salary.healthPremium)}</span>
+                                        </div>
+                                    )}
+                                    <div className="h-px bg-border/30 my-1" />
+                                    <div className="flex justify-between font-semibold pt-1 text-foreground">
+                                        <span>Total Deductions</span>
+                                        <span className="text-red-400">-{formatCurrency(optimization.options.salary.totalDeductions)}</span>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Recommendation Banner */}
-                    <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20">
+                    <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20 mb-4">
                         <div className="flex items-start gap-3">
                             <Lightbulb className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                             <div>
@@ -434,7 +568,7 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                     </div>
 
                     {/* Disclaimer */}
-                    <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <Info className="w-3 h-3 shrink-0 mt-0.5" />
                         <span>{optimization.disclaimer}</span>
                     </div>

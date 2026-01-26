@@ -32,7 +32,7 @@ import BenefitsSettingsPage from './pages/settings/BenefitsSettingsPage';
 import NotificationSettings from './pages/settings/NotificationSettings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
-import SalaryDividendOptimizer from './pages/SalaryDividendOptimizer';
+import CompensationStrategy from './pages/CompensationStrategy';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -339,10 +339,10 @@ function App() {
                     }
                   />
                   <Route
-                    path="/salary-dividend-optimizer"
+                    path="/compensation-strategy"
                     element={
                       <ProtectedRoute>
-                        <SalaryDividendOptimizer />
+                        <CompensationStrategy />
                       </ProtectedRoute>
                     }
                   />
