@@ -32,7 +32,6 @@ import BenefitsSettingsPage from './pages/settings/BenefitsSettingsPage';
 import NotificationSettings from './pages/settings/NotificationSettings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
-import CompensationStrategy from './pages/CompensationStrategy';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -335,14 +334,6 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <TaxCalculator />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/compensation-strategy"
-                    element={
-                      <ProtectedRoute>
-                        <CompensationStrategy />
                       </ProtectedRoute>
                     }
                   />
