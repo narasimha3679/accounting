@@ -8,6 +8,33 @@ Build a **sophisticated, accurate withdrawal optimization engine** that helps Ca
 
 ---
 
+## Archived Strategy Planner Experiment (Branch: `strategy-planner-experiment`)
+
+An initial implementation of the **Compensation Strategy planner** and enhanced Pay Myself Optimizer has been moved off `main` into a dedicated branch so we can revisit it later without blocking current work.
+
+- **Branch name**: `strategy-planner-experiment`
+- **Key areas changed on that branch**:
+  - `frontend/src/pages/CompensationStrategy.tsx` – added edit/delete flows and wired the page to the optimizer.
+  - `frontend/src/components/compensation/PayMyselfOptimizer.tsx` – extended to support editing an existing strategy and improved UX.
+  - `frontend/src/components/dashboard/PayMyselfSlider.tsx` + `frontend/src/lib/payMyselfOptimizer.ts` – moved optimization logic client-side.
+  - `backend/src/routes/compensationStrategyRoutes.js` + `backend/src/services/compensationStrategyService.js` – added a DELETE endpoint and delete logic for active strategies.
+  - `supabase/migrations/012_ensure_tax_tables_public_read.sql` – migration to expose tax tables needed by the optimizer.
+
+### How to revive the experiment later
+
+1. **Checkout the branch**:
+   - `git checkout strategy-planner-experiment`
+2. **Review and update dependencies**:
+   - Confirm Supabase tax tables and RLS policies match the expectations in this document.
+3. **Reintegrate into main** (when ready):
+   - `git checkout main`
+   - `git merge strategy-planner-experiment`
+   - Resolve any conflicts in the files listed above and re-run the end-to-end flow on `/compensation-strategy`.
+
+Until then, `main` only contains the baseline Pay Myself Slider and the design/architecture notes in this file.
+
+---
+
 ## Problem Statement
 Owner-managers of CCPCs face a complex decision when withdrawing money:
 1. **Reimbursements** - Tax-free but limited to actual expenses owed
