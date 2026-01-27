@@ -58,24 +58,13 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
     // Combine platform YTD + user-entered other income for total YTD
     const totalYtdIncome = (platformYtd?.total || 0) + otherPersonalIncome;
 
-    // Get current fiscal year
+    // Get current fiscal year (for tax year display only)
     const fiscalYear = useMemo(() => {
         if (user?.company?.fiscal_year_end) {
             return getFiscalYear(new Date(), user.company.fiscal_year_end);
         }
         return taxYear;
     }, [user?.company?.fiscal_year_end, taxYear]);
-
-    // Fetch strategy recommendation
-    const { data: strategyRec } = useQuery({
-        queryKey: ['withdrawalRecommendation', user?.company_id, fiscalYear, amount],
-        queryFn: async () => {
-            if (!user?.company_id || amount <= 0) return null;
-            return api.getWithdrawalRecommendation(user.company_id, fiscalYear, amount);
-        },
-        enabled: !!user?.company_id && amount > 0,
-        staleTime: 60000, // Cache for 1 minute
-    });
 
     // Fetch optimization data from backend
     const { data: optimization, isLoading, error } = useQuery({
@@ -150,31 +139,6 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                     {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
             </div>
-
-            {/* Strategy Recommendation Banner */}
-            {strategyRec?.hasStrategy && (
-                <div className="mb-4 bg-primary/10 rounded-lg p-3 border border-primary/20">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                        <Target className="w-4 h-4" />
-                        Strategy Recommendation
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        {strategyRec.message}
-                    </p>
-                    {strategyRec.recommendedType && strategyRec.recommendedType !== 'complete' && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Recommended type: <span className="font-semibold capitalize">
-                                {strategyRec.recommendedType.replace('_', ' ')}
-                            </span>
-                            {strategyRec.suggestedAmount && strategyRec.suggestedAmount < amount && (
-                                <span className="ml-2">
-                                    (Suggested: {formatCurrency(strategyRec.suggestedAmount)})
-                                </span>
-                            )}
-                        </p>
-                    )}
-                </div>
-            )}
 
             {/* Slider Section */}
             <div className="mb-6">

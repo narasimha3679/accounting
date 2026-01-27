@@ -21,7 +21,6 @@ import {
     BarChart,
     FileCheck,
     User,
-    TrendingDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatures } from '../contexts/FeatureContext';
