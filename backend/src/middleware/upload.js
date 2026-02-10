@@ -10,10 +10,17 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024, // 5MB limit
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        const fileExtension = '.' + file.originalname.split('.').pop()?.toLowerCase();
+
+        const isValidMimeType = allowedMimeTypes.includes(file.mimetype);
+        const isValidExtension = allowedExtensions.includes(fileExtension);
+
+        if (isValidMimeType && isValidExtension) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed!'), false);
+            cb(new Error('Only image files (.jpg, .jpeg, .png, .gif, .webp) are allowed!'), false);
         }
     },
 });
@@ -36,14 +43,14 @@ const bankStatementUpload = multer({
         const allowedExtensions = ['.csv', '.pdf', '.ofx', '.qfx'];
         const fileExtension = '.' + file.originalname.split('.').pop()?.toLowerCase();
 
-        // Check MIME type or file extension
+        // Check both MIME type AND file extension for security
         const isValidMimeType = allowedMimeTypes.includes(file.mimetype);
         const isValidExtension = allowedExtensions.includes(fileExtension);
 
-        if (isValidMimeType || isValidExtension) {
+        if (isValidMimeType && isValidExtension) {
             cb(null, true);
         } else {
-            cb(new Error(`Only CSV, PDF, OFX, or QFX files are allowed! Received: ${file.mimetype || fileExtension}`), false);
+            cb(new Error(`Only CSV, PDF, OFX, or QFX files are allowed! Both MIME type and extension must be valid. Received: ${file.mimetype} (${fileExtension})`), false);
         }
     },
 });
