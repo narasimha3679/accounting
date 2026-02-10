@@ -1,7 +1,6 @@
 const model = require('../config/gemini');
 
 const analyzeReceipt = async (imageBuffer, mimeType, categories = []) => {
-    console.log('Analyzing receipt with categories:', categories);
     try {
         const prompt = `
       Analyze this image of a receipt or invoice. 
