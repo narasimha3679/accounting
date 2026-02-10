@@ -3,6 +3,12 @@ const pdfParse = require('pdf-parse');
 const { ofx } = require('ofx');
 const model = require('../config/gemini');
 
+// Common date formats for bank statements: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY
+const DATE_FORMATS = [
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/, // YYYY-MM-DD or YYYY/MM/DD
+    /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/, // MM/DD/YYYY or DD/MM/YYYY
+];
+
 /**
  * Parse bank statement from various formats
  * @param {Buffer} fileBuffer - File buffer
@@ -121,13 +127,7 @@ const findField = (row, possibleNames) => {
 const parseDate = (dateStr) => {
     if (!dateStr) return null;
 
-    // Common formats: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, DD-MM-YYYY
-    const formats = [
-        /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/, // YYYY-MM-DD or YYYY/MM/DD
-        /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/, // MM/DD/YYYY or DD/MM/YYYY
-    ];
-
-    for (const format of formats) {
+    for (const format of DATE_FORMATS) {
         const match = dateStr.match(format);
         if (match) {
             let year, month, day;
