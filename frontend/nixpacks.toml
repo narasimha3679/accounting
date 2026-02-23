@@ -1,0 +1,4 @@
+# Pin Node to 22.13+ so Vite 7 / @vitejs/plugin-react 5 (require >=22.12.0) build correctly.
+# Default Nixpacks Node 22 yields 22.11.0 which fails in Coolify.
+[phases.setup]
+nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
