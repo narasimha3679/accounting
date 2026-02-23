@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { DollarSign, Wallet, TrendingUp, Briefcase, Receipt, Info, ChevronDown, ChevronUp, Lightbulb, Target } from 'lucide-react';
+import { DollarSign, Wallet, TrendingUp, Briefcase, Receipt, Info, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import Card from '../ui/Card';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 import { useDebouncedCallback } from 'use-debounce';
 import { useAuth } from '../../contexts/AuthContext';
-import { getFiscalYear } from '../../lib/fiscalYear';
 
 interface PayMyselfSliderProps {
     availableDividends: number;
@@ -57,14 +56,6 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
 
     // Combine platform YTD + user-entered other income for total YTD
     const totalYtdIncome = (platformYtd?.total || 0) + otherPersonalIncome;
-
-    // Get current fiscal year (for tax year display only)
-    const fiscalYear = useMemo(() => {
-        if (user?.company?.fiscal_year_end) {
-            return getFiscalYear(new Date(), user.company.fiscal_year_end);
-        }
-        return taxYear;
-    }, [user?.company?.fiscal_year_end, taxYear]);
 
     // Fetch optimization data from backend
     const { data: optimization, isLoading, error } = useQuery({
