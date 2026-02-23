@@ -19,7 +19,7 @@ export const Footer = () => {
   return (
     <footer className="bg-charcoal border-t border-white/5 pt-16 pb-8" role="contentinfo">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
           <div className="md:col-span-2">
             <Link to="/" className="mb-6 inline-block" aria-label="Cashual home">
               <Logo variant="icon-text" size="md" />
@@ -75,8 +75,17 @@ export const Footer = () => {
           <div>
             <h4 className="text-white font-semibold mb-6">Support</h4>
             <ul className="space-y-4" role="list">
-              <li><a href="mailto:support@cashual.app" className="text-slate-400 hover:text-neon-emerald transition-colors">support@cashual.app</a></li>
+              <li><a href="mailto:support@cashual.org" className="text-slate-400 hover:text-neon-emerald transition-colors">support@cashual.org</a></li>
               <li><a href="#faq" onClick={(e) => handleAnchorClick(e, '#faq')} className="text-slate-400 hover:text-neon-emerald transition-colors">FAQ</a></li>
+            </ul>
+
+            <h4 className="text-white font-semibold mb-6 mt-10">Our Products</h4>
+            <ul className="space-y-4" role="list">
+              <li><a href="https://suparesume.online/" target="_blank" rel="noopener" className="text-slate-400 hover:text-neon-emerald transition-colors">Free Resume Builder</a></li>
+              <li><a href="https://suparesume.online/create-resume" target="_blank" rel="noopener" className="text-slate-400 hover:text-neon-emerald transition-colors">AI Resume Templates</a></li>
+              <li><a href="https://suparesume.online/improve-resume" target="_blank" rel="noopener" className="text-slate-400 hover:text-neon-emerald transition-colors">Resume Improvement Tool</a></li>
+              <li><a href="https://suparesume.online/tailor-resume" target="_blank" rel="noopener" className="text-slate-400 hover:text-neon-emerald transition-colors">Resume Tailoring</a></li>
+              <li><a href="https://suparesume.online/blog/what-is-suparesume" target="_blank" rel="noopener" className="text-slate-400 hover:text-neon-emerald transition-colors">Resume Building Tips</a></li>
             </ul>
           </div>
         </div>

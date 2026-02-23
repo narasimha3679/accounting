@@ -9,6 +9,7 @@ import { HowItWorks } from '../components/landing/HowItWorks';
 import { Pricing } from '../components/landing/Pricing';
 import { Testimonials } from '../components/landing/Testimonials';
 import { FAQ } from '../components/landing/FAQ';
+import { SupaResumePromo } from '../components/landing/SupaResumePromo';
 import { Footer } from '../components/landing/Footer';
 import { BackToTop } from '../components/landing/BackToTop';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -47,6 +48,7 @@ const LandingPage = () => {
           <Pricing />
           <Testimonials />
           <FAQ />
+          <SupaResumePromo />
         </main>
         <Footer />
         <BackToTop />

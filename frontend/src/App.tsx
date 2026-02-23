@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FeatureProvider } from './contexts/FeatureContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -50,6 +51,7 @@ import EmployeeInfoPage from './pages/EmployeeInfoPage';
 import EmployeeTD1Page from './pages/EmployeeTD1Page';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import ResumeBuilderPromo from './pages/ResumeBuilderPromo';
 import AcceptInvitation from './pages/AcceptInvitation';
 import CompanyMembers from './pages/CompanyMembers';
 import ScrollToTop from './components/ScrollToTop';
@@ -156,6 +158,7 @@ const AuthOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 function App() {
   return (
     <ErrorBoundary>
+      <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <FeatureProvider>
@@ -169,6 +172,7 @@ function App() {
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/resume-builder" element={<ResumeBuilderPromo />} />
                   <Route
                     path="/onboarding/company"
                     element={
@@ -439,6 +443,7 @@ function App() {
           </FeatureProvider>
         </AuthProvider>
       </QueryClientProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   );
 }

@@ -1,5 +1,5 @@
 # robots.txt for Cashual
-# https://cashual.app
+# https://cashual.org
 
 User-agent: *
 Allow: /
@@ -9,4 +9,4 @@ Disallow: /admin/
 Disallow: /api/
 
 # Sitemap location
-Sitemap: https://cashual.app/sitemap.xml
+Sitemap: https://cashual.org/sitemap.xml
