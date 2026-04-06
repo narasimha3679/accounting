@@ -7,7 +7,4 @@ node_modules
 PRICING_SUMMARY.md
 frontend/public/OG_IMAGE_README.md
 MARKETING_STRATEGY.md
-/backend/node_modules
-/backend/dist
-/backend/.env
 /analysis/

@@ -1,75 +1,63 @@
 # Cursor Rules for Corporate Accounting Project
 
-## Database Management
+## Architecture (source of truth)
 
-- **Supabase Project ID**: `lxuvaxqkmwwoabyfokjd`
+- **Frontend**: React 18 + TypeScript + Vite (`frontend/`). Uses a **supabase-shaped HTTP client** (`frontend/src/lib/goSupabase.ts` + `frontend/src/lib/supabaseClient.ts`) that talks to the **Go API** only. There is **no** browser access to Postgres and **no** Supabase client in production code paths.
+- **API**: Go service in `api/` — Chi router, `pgx` pool, JWT auth, generic `/v1/data/*` for table CRUD with server-side authorization, domain routes under `/api/*`, `/v1/auth/*`, `/v1/storage/*` (Backblaze B2 via S3-compatible API when configured).
+- **Database**: PostgreSQL (e.g. Coolify-managed). Schema changes are applied with **golang-migrate** migrations in `api/migrations/`. Initial load from Supabase is a **one-time** `pg_dump` / restore; ongoing changes are migrations in-repo.
+- **Files**: Backblaze B2 (S3 API). Presigned upload/download/delete via `/v1/storage/*` when `B2_*` env vars are set.
+- **Hosting**: Coolify for UI + API + managed Postgres (TLS and secrets in Coolify).
 
-This project uses **Supabase MCP** for all database operations and reference. When working with the database:
+See `docs/ARCHITECTURE.md` for request flow, env vars, and where authorization lives.
 
-- **Always use Supabase MCP tools** instead of local SQL files:
-  - `mcp_supabase_list_tables` - View database schema
-  - `mcp_supabase_apply_migration` - Apply schema changes
-  - `mcp_supabase_execute_sql` - Execute queries
-  - `mcp_supabase_get_advisors` - Check security/performance issues
-  - `mcp_supabase_search_docs` - Search Supabase documentation
-  - `mcp_supabase_list_migrations` - View migration history
+## Database work (agents and humans)
 
-- **Do not create or reference local SQL files** - all schema information is managed through the Supabase MCP connection.
+- **Do not** assume Supabase MCP or hosted Supabase for this project’s runtime.
+- For **local or hosted Postgres** you manage: use `psql`, Coolify SQL, or your migration workflow (`api/migrations/` + `RUN_MIGRATIONS`).
+- **`docs/migrations/SUPABASE_TO_COOLIFY.md`** — dump/restore checklist from Supabase.
+- **`docs/RLS_AUTHORIZATION_MAP.md`** — mapping former RLS ideas to Go checks (living document).
 
-- When making database changes:
-  1. Use `mcp_supabase_apply_migration` for DDL operations (CREATE, ALTER, DROP)
-  2. Use `mcp_supabase_execute_sql` for data queries and DML operations
-  3. Always check for security advisories after schema changes: `mcp_supabase_get_advisors type=security`
+## Frontend ↔ API
 
-## Project Structure
+- Base URL: `VITE_API_URL` or `VITE_BACKEND_URL` (default `http://localhost:8080`).
+- Auth tokens: `ca_access_token` / `ca_refresh_token` in `localStorage`.
+- **Nested PostgREST selects** (e.g. `company:companies(*)`) are **not** implemented by the generic Go data layer. Prefer `/v1/auth/me`, dedicated `/api/*` handlers, or flat queries + follow-up requests until embeds are added.
 
-- Frontend: React 18 + TypeScript + Vite
-- Primary Backend: Supabase (PostgreSQL, Auth, Storage, RLS)
-  - **Most operations**: Direct Supabase client calls from frontend (RLS handles security)
-  - **Read operations**: Direct Supabase queries with RLS policies
-  - **Write operations**: Direct Supabase mutations with RLS policies
-- Node.js/Express API server: **ONLY for operations that would require Edge Functions**
-  - **Use Node.js backend ONLY when**: Server-side logic needed (email sending, complex processing, external API calls)
-  - **Examples**: Email invitations, PDF generation, OCR processing, external integrations
-  - **Do NOT use Node.js backend for**: Simple CRUD operations (use Supabase directly)
-  - Backend URL configured via `VITE_BACKEND_URL` environment variable
-- Database schema is managed via Supabase MCP, not local files
+## Auth and SQL golden rules (for agents)
 
-## Code Style
+- **Primary auth ownership**: auth stays in the Go API (`api/`), not a frontend SDK.
+- **Use proven libs first**:
+  - Keep JWT on `github.com/golang-jwt/jwt/v5`.
+  - Keep password hashing on `golang.org/x/crypto/bcrypt`.
+  - Keep DB access on `pgx` + `pgxpool`.
+  - Keep schema evolution on `golang-migrate` with SQL files in `api/migrations/`.
+- **Do not adopt `better-auth` for backend runtime** in this repo. It is TypeScript-oriented and does not match our Go service architecture.
+- **Do not make `gorm` the default** for core data/auth paths. Our default is explicit SQL with `pgx`, and `sqlc` for typed query generation.
+- **`gorm` exception policy**: only use `gorm` in isolated modules when there is a clear, documented benefit and no risk to authorization correctness or query performance.
+- **Mandatory auth robustness controls** for all auth changes:
+  - Refresh token rotation with server-side session state and reuse detection.
+  - Revocation support (logout, password change, admin/session invalidation).
+  - Strict JWT validation (`iss`, `aud`, `exp`, `nbf`, token type, clock skew window).
+  - Rate limiting and brute-force protections on auth endpoints.
+  - Audit events for login, refresh, logout, password change, lockout, and revocation.
+- **Mandatory SQL robustness controls**:
+  - Use parameterized SQL only; never interpolate untrusted values into SQL.
+  - Keep dynamic query surfaces allowlisted (tables/columns/operators).
+  - Reject invalid filter/order/column inputs explicitly; do not silently ignore invalid predicates.
+  - Prefer transactions for multi-step writes that must be atomic.
+  - Keep authorization checks in server-side Go code and align with `docs/RLS_AUTHORIZATION_MAP.md`.
 
-- Use TypeScript for all new code
-- Follow React best practices (hooks, functional components)
-- Use TanStack Query for data fetching
-- Supabase client is configured in `frontend/src/lib/supabaseClient.ts`
+- Full implementation guidance is in `docs/AUTH_SQL_AGENT_PLAYBOOK.md`.
 
-## Design System & UI Guidelines
+## Code style
 
-**CRITICAL: Always follow the design system defined in `frontend/DESIGN_SYSTEM.md`**
+- TypeScript for all new frontend code; follow `frontend/DESIGN_SYSTEM.md` for UI (semantic Tailwind tokens, shared components).
+- Go: keep handlers thin; authorization and SQL in internal packages (`internal/data`, `internal/middleware`, etc.).
 
-### Core Principles
-- **Use semantic colors**: Always use semantic color variables (e.g., `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`) instead of hardcoded hex values or arbitrary Tailwind colors
-- **Component-based**: Use pre-built UI components from `src/components/ui/`:
-  - `Button` - Use instead of `<button>` with custom classes
-  - `Card` - Use for content containers
-  - `StatCard` - Use for displaying metrics
-- **Dark mode support**: All components must work in both light and dark modes using Tailwind's `dark:` modifier
-- **Standard spacing**: Use standard Tailwind spacing (e.g., `p-4`, `p-6`, `gap-4`) instead of custom utility classes
+## Design system (UI)
 
-### Color Usage Rules
-- ✅ **DO**: Use `bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `bg-primary`, `text-primary-foreground`, `bg-destructive`, `text-destructive-foreground`, etc.
-- ❌ **DON'T**: Use hardcoded colors like `bg-gray-50`, `text-gray-600`, `bg-blue-500`, `text-red-700`, etc. (unless absolutely necessary for data visualization)
+**CRITICAL: Always follow `frontend/DESIGN_SYSTEM.md`.**
 
-### Input Fields
-- Use the `.input` class defined in `frontend/src/index.css` for all input fields
-- Labels should use `text-foreground` for primary labels and `text-muted-foreground` for secondary text
-
-### Typography
-- Headings: Use `text-3xl font-bold tracking-tight` for H1, `text-2xl font-semibold tracking-tight` for H2, `text-xl font-semibold tracking-tight` for H3
-- Body text: Use `text-foreground` for primary content, `text-muted-foreground` for secondary content
-
-### Before Creating New Components
-1. Check if a similar component exists in `src/components/ui/`
-2. Review `frontend/DESIGN_SYSTEM.md` for patterns and examples
-3. Ensure all colors use semantic variables
-4. Test in both light and dark modes
-5. Ensure focus states are properly implemented (`focus-visible:ring-2 focus-visible:ring-ring`)
+- Use semantic colors (`bg-background`, `text-foreground`, `bg-card`, …), not arbitrary grays/blues.
+- Use components from `src/components/ui/` (`Button`, `Card`, `StatCard`, …).
+- Support light and dark mode; use `.input` from `frontend/src/index.css` for inputs.

@@ -54,13 +54,9 @@ const AcceptInvitation: React.FC = () => {
                     return;
                 }
 
-                // Check user_companies for pending invitation
                 const { data: membership, error: membershipError } = await supabase
                     .from('user_companies')
-                    .select(`
-                        *,
-                        company:companies (id, name)
-                    `)
+                    .select('*')
                     .eq('invite_token', inviteToken)
                     .eq('user_id', profile.id)
                     .eq('invite_status', 'pending')
@@ -88,9 +84,13 @@ const AcceptInvitation: React.FC = () => {
                         email: pendingInvite.email,
                     });
                 } else {
-                    const company = Array.isArray(membership.company) ? membership.company[0] : membership.company;
+                    const { data: companyRow } = await supabase
+                        .from('companies')
+                        .select('id, name')
+                        .eq('id', membership.company_id)
+                        .maybeSingle();
                     setInvitationData({
-                        company_name: company?.name || 'Unknown Company',
+                        company_name: companyRow?.name || 'Unknown Company',
                         role: membership.role,
                         email: user?.email,
                     });

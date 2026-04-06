@@ -15,12 +15,9 @@
         "postgresql",
         "contracting",
         "business",
-        "supabase",
         "react"
     ],
     "author": "Your Name",
     "license": "MIT",
-    "devDependencies": {
-        "supabase": "^2.72.8"
-    }
+    "devDependencies": {}
 }

@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Scan, Loader2, Camera, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { ExtractedReceiptData } from '../lib/receiptParser';
 import Button from './ui/Button';
 import { cn } from '../lib/utils';
+import { getBackendFeatures } from '../lib/features';
 
 
 interface ReceiptScannerProps {
@@ -23,8 +24,15 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     const [isScanning, setIsScanning] = useState(false);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const [ocrAvailable, setOcrAvailable] = useState<boolean | null>(null);
 
     const { session } = useAuth();
+
+    useEffect(() => {
+        getBackendFeatures()
+            .then((f) => setOcrAvailable(f.ocr))
+            .catch(() => setOcrAvailable(false));
+    }, []);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -34,6 +42,10 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     };
 
     const processFile = async (file: File) => {
+        if (ocrAvailable === false) {
+            setError('Receipt scanning is not enabled on this backend yet.');
+            return;
+        }
         setIsScanning(true);
         setProgress(10); // Start progress
         setError(null);
@@ -46,7 +58,9 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             }
 
             // Use backend server URL from environment variable
-            const BACKEND_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/ocr/analyze`;
+            const API_BASE =
+                import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+            const BACKEND_URL = `${API_BASE}/api/ocr/analyze`;
 
             const response = await fetch(BACKEND_URL, {
                 method: 'POST',
@@ -57,6 +71,9 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             });
 
             if (!response.ok) {
+                if (response.status === 501 || response.status === 503) {
+                    throw new Error('Receipt scanning is currently disabled on this environment.');
+                }
                 throw new Error('Server failed to process image');
             }
 
@@ -154,7 +171,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                 type="button"
                 variant="secondary"
                 onClick={triggerFileSelect}
-                disabled={isScanning}
+                disabled={isScanning || ocrAvailable === false}
                 className="w-full sm:w-auto relative overflow-hidden"
                 icon={isScanning ? undefined : Scan}
             >
@@ -168,7 +185,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                         />
                     </div>
                 ) : (
-                    "Scan Receipt"
+                    ocrAvailable === false ? 'Scan Unavailable' : 'Scan Receipt'
                 )}
             </Button>
 

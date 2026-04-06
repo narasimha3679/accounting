@@ -17,6 +17,7 @@ export const createMockSupabaseClient = () => ({
     onAuthStateChange: vi.fn(() => ({
       data: { subscription: { unsubscribe: vi.fn() } },
     })),
+    getMe: vi.fn().mockResolvedValue({ data: null, error: null }),
   },
   from: vi.fn(() => ({
     select: vi.fn().mockReturnThis(),

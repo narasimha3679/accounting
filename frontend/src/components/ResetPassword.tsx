@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { setTokens } from '../lib/goSupabase';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
@@ -22,74 +23,38 @@ const ResetPassword: React.FC = () => {
 
     useEffect(() => {
         const checkRecoveryState = async () => {
-            // Check if there's a hash in the URL (password reset link)
             const hash = window.location.hash;
-            const hasHash = hash.length > 1; // More than just '#'
-            
-            if (hasHash) {
-                // Parse hash parameters
+            if (hash.length > 1) {
                 const hashParams = new URLSearchParams(hash.substring(1));
-                const type = hashParams.get('type');
                 const accessToken = hashParams.get('access_token');
-                const tokenHash = hashParams.get('token_hash');
-                
-                // Check if this is a recovery link
-                if (type === 'recovery' || hash.includes('recovery') || accessToken || tokenHash) {
-                    // If we have a token_hash, we might need to verify it manually
-                    if (tokenHash && type === 'recovery') {
-                        try {
-                            const { error: verifyError } = await supabase.auth.verifyOtp({
-                                type: 'recovery',
-                                token_hash: tokenHash,
-                            });
-                            
-                            if (verifyError) {
-                                setIsChecking(false);
-                                setError('Invalid or expired reset link. Please request a new password reset.');
-                                return;
-                            }
-                        } catch (err) {
-                            console.error('Error verifying recovery token:', err);
-                        }
-                    }
-                    
-                    // Wait a moment for Supabase to process the hash
-                    setTimeout(async () => {
-                        // Check if we have a session (Supabase should have processed the hash)
-                        const { data: { session } } = await supabase.auth.getSession();
-                        
-                        if (session || isPasswordRecovery) {
-                            setCanReset(true);
-                            setIsChecking(false);
-                        } else {
-                            // If no session after processing, the token might be invalid
-                            setIsChecking(false);
-                            setError('Invalid or expired reset link. Please request a new password reset.');
-                        }
-                    }, 1500);
-                } else {
-                    setIsChecking(false);
-                    navigate('/login');
-                }
-            } else {
-                // No hash or empty hash - check if we're already in recovery mode
-                const { data: { session } } = await supabase.auth.getSession();
-                if (isPasswordRecovery || session) {
-                    setCanReset(true);
-                    setIsChecking(false);
-                } else {
-                    setIsChecking(false);
-                    setError('No password reset token found. Please request a new password reset link.');
+                const refreshToken = hashParams.get('refresh_token');
+                if (accessToken) {
+                    setTokens(accessToken, refreshToken || undefined);
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
                 }
             }
+
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            if (session || isPasswordRecovery) {
+                setCanReset(true);
+            } else if (hash.length > 1) {
+                setError(
+                    'Invalid or expired reset link. Ask your admin to resend a reset, or use a link that includes access_token in the hash.',
+                );
+            } else {
+                setError('No password reset token found. Please request a new password reset link.');
+            }
+            setIsChecking(false);
         };
-        
-        checkRecoveryState();
-    }, [isPasswordRecovery, navigate]);
+
+        void checkRecoveryState();
+    }, [isPasswordRecovery]);
 
     const validatePassword = (value: string) => {
-        if (value.length > 0 && value.length < 6) {
-            return 'Password must be at least 6 characters long';
+        if (value.length > 0 && value.length < 8) {
+            return 'Password must be at least 8 characters long';
         }
         return '';
     };

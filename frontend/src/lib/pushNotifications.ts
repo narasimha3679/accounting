@@ -3,6 +3,7 @@
  */
 
 import api from './api';
+import { getBackendFeatures } from './features';
 
 export type PushSubscriptionStatus = 'subscribed' | 'not-subscribed' | 'not-supported' | 'denied';
 
@@ -71,6 +72,10 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
  * Subscribe to push notifications
  */
 export async function subscribeToPush(): Promise<PushSubscription | null> {
+  const features = await getBackendFeatures();
+  if (!features.push_notifications) {
+    throw new Error('Push notifications are not enabled on this backend.');
+  }
   if (!isPushSupported()) {
     throw new Error('Push notifications are not supported in this browser');
   }

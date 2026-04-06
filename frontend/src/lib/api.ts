@@ -3,8 +3,8 @@ import { getFiscalYear, isDateInFiscalYear, getFiscalYearRange } from './fiscalY
 import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
 import type { BusinessType, EnabledFeatures } from './featureConfig';
 
-// Backend server URL - defaults to localhost in development
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+// Go API base URL (same as VITE_API_URL / VITE_BACKEND_URL)
+const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
 export interface User {
     id: number;
@@ -958,7 +958,8 @@ class SupabaseApi {
             order: { column: 'created_at', ascending: false },
             modify: (query) => {
                 if (params?.search) {
-                    query = query.or(`name.ilike.%${params.search}%,business_number.ilike.%${params.search}%`);
+                    const s = `%${params.search}%`;
+                    query = query.ilike('name', s);
                 }
                 return query;
             },

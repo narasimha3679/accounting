@@ -16,6 +16,7 @@ import ReceiptScanner from '../components/ReceiptScanner';
 import { type ExtractedReceiptData } from '../lib/receiptParser';
 import ExpenseEntrySelector, { type EntryMethod } from '../components/ExpenseEntrySelector';
 import BankStatementReview, { type ParsedTransaction } from '../components/BankStatementReview';
+import { getBackendFeatures } from '../lib/features';
 
 const Expenses: React.FC = () => {
     const { user, session } = useAuth();
@@ -34,6 +35,7 @@ const Expenses: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [bankStatementTransactions, setBankStatementTransactions] = useState<ParsedTransaction[]>([]);
     const [isProcessingStatement, setIsProcessingStatement] = useState(false);
+    const [bankUploadAvailable, setBankUploadAvailable] = useState<boolean | null>(null);
     const [timePeriod, setTimePeriod] = useState<'month' | 'year'>(() => {
         // Load saved preference on component mount
         const preferences = loadDashboardPreferences();
@@ -72,6 +74,12 @@ const Expenses: React.FC = () => {
     };
 
     const { startDate, endDate } = getDateRange();
+
+    useEffect(() => {
+        getBackendFeatures()
+            .then((f) => setBankUploadAvailable(f.bank_statements))
+            .catch(() => setBankUploadAvailable(false));
+    }, []);
 
     // Fetch expenses
     const { data: expenses, isLoading } = useQuery({
@@ -167,6 +175,10 @@ const Expenses: React.FC = () => {
 
     // Handler for bank statement upload
     const handleBankStatementUpload = async (file: File) => {
+        if (bankUploadAvailable === false) {
+            alert('Bank statement upload is not enabled on this backend yet.');
+            return;
+        }
         setIsProcessingStatement(true);
         try {
             const formData = new FormData();
@@ -186,7 +198,9 @@ const Expenses: React.FC = () => {
                 }))));
             }
 
-            const BACKEND_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/bank-statements/process`;
+            const API_BASE =
+                import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+            const BACKEND_URL = `${API_BASE}/api/bank-statements/process`;
 
             const response = await fetch(BACKEND_URL, {
                 method: 'POST',
@@ -197,6 +211,9 @@ const Expenses: React.FC = () => {
             });
 
             if (!response.ok) {
+                if (response.status === 501 || response.status === 503) {
+                    throw new Error('Bank statement processing is currently disabled on this environment.');
+                }
                 const error = await response.json();
                 throw new Error(error.error || 'Failed to process bank statement');
             }
@@ -600,6 +617,10 @@ const Expenses: React.FC = () => {
                             // Receipt scanner is already integrated in ExpenseModal
                             setShowCreateModal(true);
                         } else if (method === 'upload') {
+                            if (bankUploadAvailable === false) {
+                                alert('Bank statement upload is not available yet.');
+                                return;
+                            }
                             // Trigger file input for bank statement
                             const input = document.createElement('input');
                             input.type = 'file';

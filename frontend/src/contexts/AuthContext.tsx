@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { Session } from '@supabase/supabase-js';
 import type { User, Employee, CompanyMembership } from '../lib/api';
 import { supabase } from '../lib/supabaseClient';
+import type { AppSession } from '../lib/goSupabase';
 
 interface AuthContextType {
     user: User | null;
@@ -15,7 +15,7 @@ interface AuthContextType {
     isLoading: boolean;
     isAuthenticated: boolean;
     isPasswordRecovery: boolean;
-    session: Session | null;
+    session: AppSession | null;
 }
 
 interface ProfileRow {
@@ -23,7 +23,7 @@ interface ProfileRow {
     auth_user_id: string;
     email: string;
     full_name: string | null;
-    role: 'admin' | 'owner' | 'accountant' | 'viewer';
+    role: 'admin' | 'owner' | 'accountant' | 'viewer' | 'manager';
     company_id: number | null;
     created_at: string;
     updated_at: string;
@@ -66,11 +66,12 @@ const mapProfileToUser = (profile: ProfileRow | null, companies?: CompanyMembers
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [session, setSession] = useState<Session | null>(null); // State for session
+    const [session, setSession] = useState<AppSession | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
     const loadProfile = async () => {
+        try {
         const { data: sessionData } = await supabase.auth.getSession();
         const sessionUser = sessionData.session?.user;
         if (!sessionUser) {
@@ -78,53 +79,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        // First check if user is an employee
-        const { data: employeeData, error: employeeError } = await supabase
-            .from('employees')
-            .select(`
-                id,
-                company_id,
-                auth_user_id,
-                employee_id,
-                first_name,
-                last_name,
-                email,
-                phone,
-                position,
-                hire_date,
-                status,
-                address,
-                created_at,
-                updated_at,
-                company:companies (
-                    id,
-                    name,
-                    business_number,
-                    hst_number,
-                    hst_registered,
-                    fiscal_year_end,
-                    small_business_rate,
-                    hst_rate,
-                    business_type,
-                    enabled_features,
-                    created_at,
-                    updated_at
-                )
-            `)
-            .eq('auth_user_id', sessionUser.id)
-            .maybeSingle<Employee>();
+        const meResult = await supabase.auth.getMe();
+        if (meResult.error || !meResult.data) {
+            console.warn('Failed to load /v1/auth/me', meResult.error);
+            const fallback: User = {
+                id: 0,
+                email: sessionUser.email ?? '',
+                name: '',
+                role: 'viewer',
+                company_id: 0,
+                company: undefined,
+                isEmployee: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            setUser(fallback);
+            return;
+        }
 
-        if (!employeeError && employeeData) {
-            // User is an employee
+        const me = meResult.data as {
+            kind: string;
+            employee?: Employee;
+            company?: Employee['company'];
+            profile?: ProfileRow;
+            memberships?: unknown[];
+        };
+
+        if (me.kind === 'employee' && me.employee) {
+            const employeeData = me.employee;
+            const c = me.company;
             const employeeUser: User = {
                 id: employeeData.id,
                 email: employeeData.email,
                 name: `${employeeData.first_name} ${employeeData.last_name}`,
                 role: 'employee',
                 company_id: employeeData.company_id,
-                company: employeeData.company ?? undefined,
+                company: c ?? undefined,
                 isEmployee: true,
-                employee: employeeData,
+                employee: { ...employeeData, company: c },
                 created_at: employeeData.created_at,
                 updated_at: employeeData.updated_at,
             };
@@ -132,60 +124,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        // Check if user is a company user (profile)
-        const { data, error } = await supabase
-            .from('profiles')
-            .select(`
-                id,
-                auth_user_id,
-                email,
-                full_name,
-                role,
-                company_id,
-                created_at,
-                updated_at,
-                company:companies (
-                    id,
-                    name,
-                    business_number,
-                    hst_number,
-                    hst_registered,
-                    fiscal_year_end,
-                    small_business_rate,
-                    hst_rate,
-                    business_type,
-                    enabled_features,
-                    created_at,
-                    updated_at
-                )
-            `)
-            .eq('auth_user_id', sessionUser.id)
-            .maybeSingle<ProfileRow>();
-
-        if (error) {
-            // If profile lookup fails due to RLS or missing row, fall back to basic auth user info
-            console.warn('Failed to load profile, falling back to auth user only', error);
-            const fallback: User = {
-                id: 0,
-                email: sessionUser.email ?? '',
-                name: (sessionUser.user_metadata as any)?.full_name ?? '',
-                role: 'viewer',
-                company_id: 0,
-                company: undefined,
-                isEmployee: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            };
-            setUser(fallback);
-            return;
-        }
-
+        const data = me.profile;
         if (!data) {
-            // No profile row yet – still allow using the bare auth user
             const fallback: User = {
                 id: 0,
                 email: sessionUser.email ?? '',
-                name: (sessionUser.user_metadata as any)?.full_name ?? '',
+                name: '',
                 role: 'viewer',
                 company_id: 0,
                 company: undefined,
@@ -197,31 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        // Load user's company memberships from user_companies table
-        const { data: memberships, error: membershipError } = await supabase
-            .from('user_companies')
-            .select(`
-                id,
-                user_id,
-                company_id,
-                role,
-                permissions,
-                is_primary,
-                invite_status,
-                created_at,
-                updated_at,
-                company:companies (*)
-            `)
-            .eq('user_id', data.id)
-            .eq('invite_status', 'accepted')
-            .order('is_primary', { ascending: false });
-
-        if (membershipError) {
-            console.warn('Failed to load company memberships', membershipError);
-        }
-
-        // Transform memberships to match CompanyMembership interface
-        const companies: CompanyMembership[] = (memberships ?? []).map((m: any) => ({
+        const companies: CompanyMembership[] = (me.memberships ?? []).map((m: any) => ({
             id: m.id,
             user_id: m.user_id,
             company_id: m.company_id,
@@ -234,12 +154,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             company: Array.isArray(m.company) ? m.company[0] : m.company,
         }));
 
-        // Check for stored company preference
         const storedCompanyId = localStorage.getItem('selectedCompanyId');
         if (storedCompanyId && companies.length > 0) {
-            const storedMembership = companies.find(c => c.company_id === parseInt(storedCompanyId));
+            const storedMembership = companies.find(c => c.company_id === parseInt(storedCompanyId, 10));
             if (storedMembership) {
-                // Move stored preference to be treated as "primary" for this session
                 const idx = companies.indexOf(storedMembership);
                 if (idx > 0) {
                     companies.splice(idx, 1);
@@ -252,6 +170,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mapped) {
             setUser({ ...mapped, isEmployee: false });
         }
+        } finally {
+            const { data: sd } = await supabase.auth.getSession();
+            setSession(sd.session ?? null);
+        }
     };
 
     useEffect(() => {
@@ -263,16 +185,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setIsLoading(false);
             });
 
-        const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: listener } = supabase.auth.onAuthStateChange((event, sess) => {
             if (event === 'PASSWORD_RECOVERY') {
                 setIsPasswordRecovery(true);
             } else {
                 setIsPasswordRecovery(false);
             }
 
-            setSession(session); // Update session state
+            setSession(sess);
 
-            if (session?.user) {
+            if (sess?.user) {
                 loadProfile().catch((error) => {
                     console.error('Error refreshing profile', error);
                     setUser(null);
@@ -289,10 +211,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
             throw error;
         }
+        setSession(data.session ?? null);
         await loadProfile();
     };
 
@@ -305,33 +228,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             },
         });
 
-        if (error || !data.user) {
+        if (error || !data.session) {
             throw error ?? new Error('Registration failed');
         }
 
-        // Best-effort profile creation – don't block signup if this fails due to RLS
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert(
-                {
-                    auth_user_id: data.user.id,
-                    email,
-                    full_name: name,
-                    role: 'viewer',
-                },
-                { onConflict: 'auth_user_id' }
-            );
-
-        if (profileError) {
-            console.error('Profile upsert failed after signup:', profileError);
-            // Still continue, but log the error for debugging
-        }
-
+        setSession(data.session);
         await loadProfile();
     };
 
     const logout = async () => {
         await supabase.auth.signOut();
+        setSession(null);
         setUser(null);
     };
 

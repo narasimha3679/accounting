@@ -36,11 +36,11 @@ registerRoute(
   navigationHandler
 );
 
-// Cache Supabase API requests
+// Cache Go API requests
 registerRoute(
-  ({ url }) => url.hostname.includes('.supabase.co'),
+  ({ url }) => url.pathname.startsWith('/v1/') || url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'supabase-api-cache',
+    cacheName: 'go-api-cache',
     plugins: [
       new CacheableResponsePlugin({
         statuses: [0, 200],
