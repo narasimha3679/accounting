@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type IncomeEntry, type Client } from '../lib/api';
 import { Plus, Edit, Trash2, DollarSign, X } from 'lucide-react';
@@ -12,14 +12,53 @@ const Income: React.FC = () => {
     const queryClient = useQueryClient();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingIncome, setEditingIncome] = useState<IncomeEntry | null>(null);
+    const [selectedYear, setSelectedYear] = useState<'all' | number>('all');
 
-    // Fetch income entries
-    const { data: incomeEntries, isLoading } = useQuery({
-        queryKey: ['income_entries', user?.company_id],
+    // Distinct calendar years for filter (from recent entries; same cap as list)
+    const { data: incomeYearSeed } = useQuery({
+        queryKey: ['income_entries_year_options', user?.company_id],
         queryFn: async () => {
             const result = await api.getIncomeEntries({
                 company_id: user?.company_id,
-                limit: 1000
+                limit: 1000,
+            });
+            return result.data;
+        },
+        enabled: !!user?.company_id,
+    });
+
+    const yearOptions = useMemo(() => {
+        const years = new Set<number>();
+        incomeYearSeed?.forEach((entry) => {
+            years.add(new Date(entry.income_date).getFullYear());
+        });
+        if (years.size === 0) {
+            years.add(new Date().getFullYear());
+        }
+        return Array.from(years).sort((a, b) => b - a);
+    }, [incomeYearSeed]);
+
+    const startDate =
+        selectedYear === 'all' ? undefined : `${selectedYear}-01-01`;
+    const endDate =
+        selectedYear === 'all' ? undefined : `${selectedYear}-12-31`;
+
+    // Fetch income entries (optional calendar-year range)
+    const { data: incomeEntries, isLoading } = useQuery({
+        queryKey: [
+            'income_entries',
+            user?.company_id,
+            selectedYear,
+            startDate ?? 'all',
+            endDate ?? 'all',
+        ],
+        queryFn: async () => {
+            const result = await api.getIncomeEntries({
+                company_id: user?.company_id,
+                limit: 1000,
+                ...(startDate && endDate
+                    ? { start_date: startDate, end_date: endDate }
+                    : {}),
             });
             return result.data;
         },
@@ -55,6 +94,9 @@ const Income: React.FC = () => {
             try {
                 await api.deleteIncomeEntry(id);
                 queryClient.invalidateQueries({ queryKey: ['income_entries'] });
+                queryClient.invalidateQueries({
+                    queryKey: ['income_entries_year_options'],
+                });
             } catch (error) {
                 console.error('Error deleting income entry:', error);
             }
@@ -94,13 +136,36 @@ const Income: React.FC = () => {
                     <h1 className="text-3xl font-bold tracking-tight text-white">Income Entries</h1>
                     <p className="text-slate-muted mt-2">Track income from clients, capital contributions, and other sources</p>
                 </div>
-                <Button
-                    onClick={() => setShowCreateModal(true)}
-                    icon={Plus}
-                    className="w-full sm:w-auto"
-                >
-                    Add Income Entry
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full sm:w-auto">
+                    <div className="flex flex-col gap-1.5 sm:min-w-[140px]">
+                        <label htmlFor="income-year-filter" className="text-sm font-medium text-foreground">
+                            Year
+                        </label>
+                        <select
+                            id="income-year-filter"
+                            value={selectedYear === 'all' ? 'all' : String(selectedYear)}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setSelectedYear(v === 'all' ? 'all' : parseInt(v, 10));
+                            }}
+                            className="input bg-card text-foreground"
+                        >
+                            <option value="all">All</option>
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <Button
+                        onClick={() => setShowCreateModal(true)}
+                        icon={Plus}
+                        className="w-full sm:w-auto"
+                    >
+                        Add Income Entry
+                    </Button>
+                </div>
             </div>
 
             {/* Income Entries Table */}
@@ -183,6 +248,9 @@ const Income: React.FC = () => {
                     }}
                     onSave={() => {
                         queryClient.invalidateQueries({ queryKey: ['income_entries'] });
+                        queryClient.invalidateQueries({
+                            queryKey: ['income_entries_year_options'],
+                        });
                         setShowCreateModal(false);
                         setEditingIncome(null);
                     }}
@@ -240,13 +308,20 @@ const IncomeModal: React.FC<IncomeModalProps> = ({ income, clients, onClose, onS
         setError('');
 
         try {
+            const companyId = user?.company_id;
+            if (companyId === undefined) {
+                setError('Company information is not available.');
+                setIsLoading(false);
+                return;
+            }
+
             const incomeData = {
                 description: formData.description,
                 amount: formData.amount,
                 income_type: formData.income_type,
                 client_id: formData.client_id ? (typeof formData.client_id === 'string' ? parseInt(formData.client_id) : formData.client_id) : undefined,
                 income_date: formData.income_date,
-                company_id: user?.company_id!,
+                company_id: companyId,
                 hst_amount: hstAmount,
             };
 

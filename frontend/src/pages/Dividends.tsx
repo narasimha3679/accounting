@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type Dividend, type DividendRecipient } from '../lib/api';
 import Button from '../components/ui/Button';
@@ -178,18 +179,15 @@ const DividendTableRow: React.FC<{
 
 const Dividends: React.FC = () => {
     const { user } = useAuth();
-    const [dividends, setDividends] = useState<Dividend[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [showModal, setShowModal] = useState(false);
     const [editingDividend, setEditingDividend] = useState<Dividend | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
+    const [yearFilter, setYearFilter] = useState<'all' | number>('all');
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [total, setTotal] = useState(0);
     const [selectedFiscalYear, setSelectedFiscalYear] = useState<number>(new Date().getFullYear());
 
-    // Form state
     const [formData, setFormData] = useState({
         amount: '',
         declaration_date: '',
@@ -200,35 +198,84 @@ const Dividends: React.FC = () => {
         fiscal_year: new Date().getFullYear(),
     });
 
-    // Recipient management
     const [recipients, setRecipients] = useState<DividendRecipient[]>([]);
     const [showRecipientModal, setShowRecipientModal] = useState(false);
     const [editingRecipient, setEditingRecipient] = useState<DividendRecipient | null>(null);
     const [loadingRecipients, setLoadingRecipients] = useState(false);
 
-    useEffect(() => {
-        if (user) {
-            loadDividends();
+    const yearDates = useMemo(() => {
+        if (yearFilter === 'all') {
+            return { start: undefined as string | undefined, end: undefined as string | undefined };
         }
-    }, [user, currentPage, statusFilter]);
+        return {
+            start: `${yearFilter}-01-01`,
+            end: `${yearFilter}-12-31`,
+        };
+    }, [yearFilter]);
 
-    const loadDividends = async () => {
-        try {
-            setIsLoading(true);
-            const response = await api.getDividends({
+    const { data: dividendYearSeed } = useQuery({
+        queryKey: ['dividends_year_options', user?.company_id],
+        queryFn: async () => {
+            const r = await api.getDividends({
+                company_id: user?.company_id,
+                page: 1,
+                limit: 1000,
+            });
+            return r.data;
+        },
+        enabled: !!user?.company_id,
+    });
+
+    const yearOptions = useMemo(() => {
+        const years = new Set<number>();
+        dividendYearSeed?.forEach((d) => {
+            years.add(new Date(d.declaration_date).getFullYear());
+        });
+        if (years.size === 0) {
+            years.add(new Date().getFullYear());
+        }
+        return Array.from(years).sort((a, b) => b - a);
+    }, [dividendYearSeed]);
+
+    const {
+        data: dividendsPage,
+        isLoading,
+    } = useQuery({
+        queryKey: ['dividends', user?.company_id, currentPage, statusFilter, yearFilter],
+        queryFn: async () =>
+            api.getDividends({
                 company_id: user?.company_id,
                 page: currentPage,
                 limit: 10,
                 status: statusFilter || undefined,
-            });
-            setDividends(response.data);
-            setTotalPages(response.totalPages);
-            setTotal(response.total);
-        } catch (error) {
-            console.error('Error loading dividends:', error);
-        } finally {
-            setIsLoading(false);
-        }
+                start_date: yearDates.start,
+                end_date: yearDates.end,
+            }),
+        enabled: !!user?.company_id,
+    });
+
+    const dividends = dividendsPage?.data ?? [];
+    const totalPages = dividendsPage?.totalPages ?? 1;
+    const total = dividendsPage?.total ?? 0;
+
+    const { data: dividendsSummaryPage } = useQuery({
+        queryKey: ['dividends_summary', user?.company_id, statusFilter, yearFilter],
+        queryFn: async () =>
+            api.getDividends({
+                company_id: user?.company_id,
+                page: 1,
+                limit: 1000,
+                status: statusFilter || undefined,
+                start_date: yearDates.start,
+                end_date: yearDates.end,
+            }),
+        enabled: !!user?.company_id,
+    });
+
+    const invalidateDividendQueries = () => {
+        queryClient.invalidateQueries({ queryKey: ['dividends'] });
+        queryClient.invalidateQueries({ queryKey: ['dividends_summary'] });
+        queryClient.invalidateQueries({ queryKey: ['dividends_year_options'] });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -244,6 +291,12 @@ const Dividends: React.FC = () => {
         }
 
         try {
+            const companyId = user?.company_id;
+            if (companyId === undefined) {
+                alert('Company information is not available.');
+                return;
+            }
+
             // Calculate fiscal year from declaration date if not set
             let fiscalYear = formData.fiscal_year;
             if (formData.declaration_date && user?.company?.fiscal_year_end) {
@@ -258,7 +311,7 @@ const Dividends: React.FC = () => {
                 notes: formData.notes || undefined,
                 dividend_type: formData.dividend_type,
                 fiscal_year: fiscalYear,
-                company_id: user?.company_id!,
+                company_id: companyId,
             };
 
             let savedDividend: Dividend;
@@ -291,7 +344,7 @@ const Dividends: React.FC = () => {
             setEditingDividend(null);
             setRecipients([]);
             resetForm();
-            loadDividends();
+            invalidateDividendQueries();
         } catch (error) {
             console.error('Error saving dividend:', error);
             alert('Error saving dividend. Please try again.');
@@ -329,7 +382,7 @@ const Dividends: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this dividend?')) {
             try {
                 await api.deleteDividend(id);
-                loadDividends();
+                invalidateDividendQueries();
             } catch (error) {
                 console.error('Error deleting dividend:', error);
             }
@@ -575,9 +628,24 @@ const Dividends: React.FC = () => {
         dividend.amount.toString().includes(searchTerm)
     );
 
-    const totalDividends = dividends.reduce((sum, dividend) => sum + dividend.amount, 0);
-    const paidDividends = dividends.filter(d => d.status === 'paid').reduce((sum, dividend) => sum + dividend.amount, 0);
-    const declaredDividends = dividends.filter(d => d.status === 'declared').reduce((sum, dividend) => sum + dividend.amount, 0);
+    const filteredForSummary = useMemo(() => {
+        const rows = dividendsSummaryPage?.data ?? [];
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return rows;
+        return rows.filter(
+            (dividend) =>
+                dividend.notes?.toLowerCase().includes(term) ||
+                dividend.amount.toString().includes(searchTerm)
+        );
+    }, [dividendsSummaryPage, searchTerm]);
+
+    const totalDividends = filteredForSummary.reduce((sum, dividend) => sum + dividend.amount, 0);
+    const paidDividends = filteredForSummary
+        .filter((d) => d.status === 'paid')
+        .reduce((sum, dividend) => sum + dividend.amount, 0);
+    const declaredDividends = filteredForSummary
+        .filter((d) => d.status === 'declared')
+        .reduce((sum, dividend) => sum + dividend.amount, 0);
 
     if (isLoading) {
         return (
@@ -677,10 +745,39 @@ const Dividends: React.FC = () => {
                         </div>
                     </div>
                     <div className="sm:w-48">
+                        <label htmlFor="dividend-year-filter" className="text-sm font-medium text-foreground mb-1 block">
+                            Year
+                        </label>
                         <select
+                            id="dividend-year-filter"
+                            value={yearFilter === 'all' ? 'all' : String(yearFilter)}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setYearFilter(v === 'all' ? 'all' : parseInt(v, 10));
+                                setCurrentPage(1);
+                            }}
+                            className="input bg-card text-foreground"
+                        >
+                            <option value="all">All</option>
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="sm:w-48">
+                        <label htmlFor="dividend-status-filter" className="text-sm font-medium text-foreground mb-1 block">
+                            Status
+                        </label>
+                        <select
+                            id="dividend-status-filter"
                             value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="input bg-card text-foreground"
                         >
                             <option value="">All Status</option>
                             <option value="declared">Declared</option>
@@ -731,9 +828,11 @@ const Dividends: React.FC = () => {
                         <DollarSign className="mx-auto h-12 w-12 text-slate-muted" />
                         <h3 className="mt-2 text-sm font-medium text-white">No dividends found</h3>
                         <p className="mt-1 text-sm text-slate-muted">
-                            {searchTerm || statusFilter ? 'Try adjusting your search or filter criteria.' : 'Get started by adding your first dividend.'}
+                            {searchTerm || statusFilter || yearFilter !== 'all'
+                                ? 'Try adjusting your search or filter criteria.'
+                                : 'Get started by adding your first dividend.'}
                         </p>
-                        {!searchTerm && !statusFilter && (
+                        {!searchTerm && !statusFilter && yearFilter === 'all' && (
                             <div className="mt-6">
                                 <Button
                                     onClick={openModal}
