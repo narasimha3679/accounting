@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type IncomeEntry, type Client } from '../lib/api';
-import { Plus, Edit, Trash2, DollarSign, X } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, X, Receipt, Landmark } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import StatCard from '../components/ui/StatCard';
 import { cn, formatLocalDate } from '../lib/utils';
 
 const Income: React.FC = () => {
@@ -77,6 +78,16 @@ const Income: React.FC = () => {
         },
         enabled: !!user?.company_id,
     });
+
+    const summary = useMemo(() => {
+        const rows = incomeEntries ?? [];
+        return {
+            totalAmount: rows.reduce((s, e) => s + e.amount, 0),
+            totalHst: rows.reduce((s, e) => s + e.hst_amount, 0),
+            totalWithHst: rows.reduce((s, e) => s + e.total, 0),
+            entryCount: rows.length,
+        };
+    }, [incomeEntries]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -166,6 +177,34 @@ const Income: React.FC = () => {
                         Add Income Entry
                     </Button>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <StatCard
+                    title="Total income (base)"
+                    value={formatCurrency(summary.totalAmount)}
+                    subtitle={
+                        selectedYear === 'all'
+                            ? `${summary.entryCount} ${summary.entryCount === 1 ? 'entry' : 'entries'} (all years)`
+                            : `${summary.entryCount} ${summary.entryCount === 1 ? 'entry' : 'entries'} in ${selectedYear}`
+                    }
+                    icon={DollarSign}
+                    gradient="blue"
+                />
+                <StatCard
+                    title="Total HST"
+                    value={formatCurrency(summary.totalHst)}
+                    subtitle="Collected on client income"
+                    icon={Receipt}
+                    gradient="emerald"
+                />
+                <StatCard
+                    title="Total (with HST)"
+                    value={formatCurrency(summary.totalWithHst)}
+                    subtitle="Amount plus HST"
+                    icon={Landmark}
+                    gradient="purple"
+                />
             </div>
 
             {/* Income Entries Table */}
