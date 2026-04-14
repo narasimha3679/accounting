@@ -11,6 +11,7 @@ interface AuthContextType {
     refreshUser: () => Promise<void>;
     switchCompany: (companyId: number) => Promise<void>;
     resetPasswordForEmail: (email: string) => Promise<void>;
+    resetPasswordWithToken: (token: string, newPassword: string) => Promise<void>;
     updatePassword: (newPassword: string) => Promise<void>;
     isLoading: boolean;
     isAuthenticated: boolean;
@@ -256,6 +257,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const resetPasswordWithToken = async (token: string, newPassword: string) => {
+        const { error } = await supabase.auth.resetPasswordWithToken(token, newPassword);
+        if (error) {
+            throw error;
+        }
+        setIsPasswordRecovery(false);
+    };
+
     const updatePassword = async (newPassword: string) => {
         const { error } = await supabase.auth.updateUser({
             password: newPassword,
@@ -298,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshUser,
         switchCompany,
         resetPasswordForEmail,
+        resetPasswordWithToken,
         updatePassword,
         isLoading,
         isAuthenticated: !!user,

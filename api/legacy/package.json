@@ -1,7 +1,4 @@
 {
   "name": "accounting-legacy-optimizer",
-  "private": true,
-  "dependencies": {
-    "@supabase/supabase-js": "^2.91.1"
-  }
+  "private": true
 }

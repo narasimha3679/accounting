@@ -1285,6 +1285,33 @@ class SupabaseApi {
         }
     }
 
+    async getInvitationPreview(inviteToken: string): Promise<{
+        company_name: string;
+        role: string;
+        email: string;
+    }> {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(
+            `${BACKEND_URL}/api/company-members/invitation-preview?token=${encodeURIComponent(inviteToken)}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to load invitation');
+        }
+
+        return response.json();
+    }
+
     async getPendingInvitations(companyId: number): Promise<Array<{
         id: number;
         email: string;

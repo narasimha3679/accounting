@@ -72,7 +72,7 @@ export const PrivacyPolicy = () => {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">7. Third-Party Services</h2>
             <p className="text-slate-300 leading-relaxed">
-              We use third-party services (such as Supabase for data storage and authentication) that may have access to your information. These services are bound by their own privacy policies and security standards.
+              We use third-party services such as managed PostgreSQL hosting, object storage providers, and email delivery services that may process data on our behalf. These providers are contractually bound by their own privacy and security obligations.
             </p>
           </section>
 

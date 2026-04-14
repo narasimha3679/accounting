@@ -20,11 +20,13 @@ flowchart LR
 | Area | Path | Notes |
 |------|------|--------|
 | Health | `GET /healthz`, `/health`, `/ready` | `/ready` pings DB |
-| Auth | `POST /v1/auth/register`, `/login`, `/refresh` | bcrypt + JWT pair |
+| Auth | `POST /v1/auth/register`, `/login`, `/refresh`, `/forgot-password`, `/reset-password` | bcrypt + JWT pair + email-based reset |
 | Auth (protected) | `GET /v1/auth/me`, `POST /v1/auth/update-password` | Session user + memberships or employee |
 | Data | `POST /v1/data/{select,insert,update,delete,upsert}` | Table allowlists + scope rules in `internal/data` |
 | Storage | `POST /v1/storage/presign-upload`, `presign-download`, `delete` | Disabled (503) if B2 env missing |
 | Legacy parity | `/api/pay-myself`, `/api/company-members`, `/api/employees`, … | Ported from former Node service |
+
+Current controlled cutover disables unported routes (`/api/ocr/*`, `/api/bank-statements/*`) and advertises those capabilities as unavailable from `/v1/features`. Frontend components consume these flags and gracefully disable unsupported workflows.
 
 ## Configuration (12-factor)
 
@@ -58,8 +60,8 @@ The auth system remains in-app in the Go API and is hardened incrementally with 
 1. Keep JWT signing/parsing on `github.com/golang-jwt/jwt/v5` and password hashing on `bcrypt`.
 2. Add server-side refresh session persistence in Postgres (token family, rotation, revocation, reuse detection).
 3. Enforce strict claim validation (`iss`, `aud`, `exp`, `nbf`, `iat`, `jti`, token type).
-4. Add endpoint-level rate limits and brute-force protections for auth routes.
-5. Emit audit events for login/refresh/logout/password-change/revocation.
+4. Keep endpoint-level rate limits and brute-force protections for auth routes (shared DB state in `auth_rate_limits`).
+5. Emit audit events for login/refresh/logout/password-change/revocation, including request metadata.
 
 Design decision references:
 

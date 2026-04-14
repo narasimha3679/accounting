@@ -1,5 +1,9 @@
 # Database Migrations for Multi-Owner Feature
 
+> Historical reference only: runtime schema changes now use `api/migrations/` with golang-migrate.
+> For active migration workflow, follow `docs/migrations/SUPABASE_TO_COOLIFY.md`.
+> For production cutover evidence, complete `docs/migrations/CUTOVER_VERIFICATION_CHECKLIST.md`.
+
 This directory contains SQL migration scripts for implementing the multi-owner company feature.
 
 ## Migration Order

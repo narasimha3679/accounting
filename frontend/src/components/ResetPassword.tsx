@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import { setTokens } from '../lib/goSupabase';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
@@ -18,38 +16,28 @@ const ResetPassword: React.FC = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [isChecking, setIsChecking] = useState(true);
     const [canReset, setCanReset] = useState(false);
-    const { updatePassword, isPasswordRecovery } = useAuth();
+    const [resetToken, setResetToken] = useState<string | null>(null);
+    const { updatePassword, resetPasswordWithToken, isPasswordRecovery } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
-        const checkRecoveryState = async () => {
-            const hash = window.location.hash;
-            if (hash.length > 1) {
-                const hashParams = new URLSearchParams(hash.substring(1));
-                const accessToken = hashParams.get('access_token');
-                const refreshToken = hashParams.get('refresh_token');
-                if (accessToken) {
-                    setTokens(accessToken, refreshToken || undefined);
-                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-                }
-            }
-
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            if (session || isPasswordRecovery) {
+        const checkRecoveryState = () => {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+            if (token) {
+                setResetToken(token);
                 setCanReset(true);
-            } else if (hash.length > 1) {
-                setError(
-                    'Invalid or expired reset link. Ask your admin to resend a reset, or use a link that includes access_token in the hash.',
-                );
+            } else if (isPasswordRecovery) {
+                setCanReset(true);
             } else {
-                setError('No password reset token found. Please request a new password reset link.');
+                setError(
+                    'Invalid or expired reset link. Ask your admin to resend a reset link.',
+                );
             }
             setIsChecking(false);
         };
 
-        void checkRecoveryState();
+        checkRecoveryState();
     }, [isPasswordRecovery]);
 
     const validatePassword = (value: string) => {
@@ -124,7 +112,11 @@ const ResetPassword: React.FC = () => {
         setIsLoading(true);
 
         try {
-            await updatePassword(password);
+            if (resetToken) {
+                await resetPasswordWithToken(resetToken, password);
+            } else {
+                await updatePassword(password);
+            }
             setIsSuccess(true);
             // Redirect to login after 3 seconds
             setTimeout(() => {

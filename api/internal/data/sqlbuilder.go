@@ -98,13 +98,13 @@ func scopeClause(tbl Table, u *appctx.User, argStart int) (sql string, args []an
 
 func itoa(i int) string { return strconv.Itoa(i) }
 
-func filterSQL(filters []Filter, start int) (string, []any, int) {
+func filterSQL(filters []Filter, start int) (string, []any, int, error) {
 	var b strings.Builder
 	var args []any
 	n := start
 	for _, f := range filters {
 		if err := validateIdent(f.Column); err != nil {
-			continue
+			return "", nil, start, err
 		}
 		col := "t." + f.Column
 		switch f.Op {
@@ -134,9 +134,11 @@ func filterSQL(filters []Filter, start int) (string, []any, int) {
 			b.WriteString(fmt.Sprintf(" AND %s %s $%d", col, op, n))
 			args = append(args, f.Value)
 			n++
+		default:
+			return "", nil, start, fmt.Errorf("invalid filter operator %q", f.Op)
 		}
 	}
-	return b.String(), args, n
+	return b.String(), args, n, nil
 }
 
 func orderSQL(orders []Order) string {

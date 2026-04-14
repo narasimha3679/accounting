@@ -63,7 +63,7 @@ VAPID_SUBJECT=mailto:support@cashual.org
 ```bash
 VITE_API_URL=https://api.cashual.org
 VITE_BACKEND_URL=https://api.cashual.org
-VITE_SUPABASE_STORAGE_BUCKET=expense-files
+VITE_STORAGE_BUCKET=expense-files
 VITE_VAPID_PUBLIC_KEY=<public-vapid-key>
 ```
 

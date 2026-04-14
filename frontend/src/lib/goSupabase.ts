@@ -723,7 +723,29 @@ export function createGoClient(apiBase: string) {
                 return { error: null };
             },
             async resetPasswordForEmail(_email: string, _opts?: { redirectTo?: string }) {
-                return { data: {}, error: { message: 'Password reset email is not configured on the Go API yet' } };
+                const res = await apiFetch(apiBase, '/v1/auth/forgot-password', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: _email,
+                        redirect_to: _opts?.redirectTo ?? '',
+                    }),
+                });
+                const j = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    return { data: {}, error: { message: j.detail || j.title || 'Password reset request failed' } };
+                }
+                return { data: {}, error: null };
+            },
+            async resetPasswordWithToken(token: string, password: string) {
+                const res = await apiFetch(apiBase, '/v1/auth/reset-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ token, password }),
+                });
+                const j = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    return { data: {}, error: { message: j.detail || j.title || 'Password reset failed' } };
+                }
+                return { data: {}, error: null };
             },
             async updateUser(attrs: { password?: string }) {
                 if (!attrs.password) {

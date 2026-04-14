@@ -5,14 +5,6 @@
  * Calculates accurate after-tax outcomes for Reimbursements, Dividends, and Salary/Bonus.
  */
 
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase client
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 /**
  * Round to 2 decimal places
  */
@@ -24,81 +16,12 @@ function round(value) {
  * Fetch all tax constants needed for calculations
  */
 async function fetchTaxConstants(taxYear, province = 'ON') {
-    if (process.env.TAX_DATA_PATH) {
-        const fs = require('fs');
-        return JSON.parse(fs.readFileSync(process.env.TAX_DATA_PATH, 'utf8'));
+    const dataPath = process.env.TAX_DATA_PATH;
+    if (!dataPath) {
+        throw new Error('TAX_DATA_PATH is required. The legacy optimizer now relies on Go-provided tax data only.');
     }
-    // Fetch federal tax constants (CPP, EI, basic personal amounts)
-    const { data: taxConstants, error: taxConstantsError } = await supabase
-        .from('tax_constants')
-        .select('*')
-        .eq('tax_year', taxYear)
-        .maybeSingle();
-
-    if (taxConstantsError) throw new Error(`Failed to fetch tax constants: ${taxConstantsError.message}`);
-
-    // Fetch federal tax brackets
-    const { data: federalBrackets, error: fedBracketsError } = await supabase
-        .from('tax_rates')
-        .select('min_income, max_income, rate')
-        .eq('tax_year', taxYear)
-        .eq('jurisdiction', 'federal')
-        .order('bracket_number', { ascending: true });
-
-    if (fedBracketsError) throw new Error(`Failed to fetch federal brackets: ${fedBracketsError.message}`);
-
-    // Fetch provincial tax brackets
-    const { data: provincialBrackets, error: provBracketsError } = await supabase
-        .from('tax_rates')
-        .select('min_income, max_income, rate')
-        .eq('tax_year', taxYear)
-        .eq('jurisdiction', province)
-        .order('bracket_number', { ascending: true });
-
-    if (provBracketsError) throw new Error(`Failed to fetch provincial brackets: ${provBracketsError.message}`);
-
-    // Fetch provincial tax constants (surtax thresholds)
-    const { data: provincialConstants, error: provConstantsError } = await supabase
-        .from('provincial_tax_constants')
-        .select('*')
-        .eq('tax_year', taxYear)
-        .eq('province', province)
-        .maybeSingle();
-
-    if (provConstantsError) throw new Error(`Failed to fetch provincial constants: ${provConstantsError.message}`);
-
-    // Fetch dividend tax constants
-    const { data: dividendConstants, error: divConstantsError } = await supabase
-        .from('dividend_tax_constants')
-        .select('*')
-        .eq('tax_year', taxYear)
-        .in('province', ['federal', province]);
-
-    if (divConstantsError) throw new Error(`Failed to fetch dividend constants: ${divConstantsError.message}`);
-
-    // Fetch Ontario Health Premium tiers (if Ontario)
-    let healthPremiumTiers = [];
-    if (province === 'ON') {
-        const { data: ohpData, error: ohpError } = await supabase
-            .from('ontario_health_premium')
-            .select('*')
-            .eq('tax_year', taxYear)
-            .order('min_income', { ascending: true });
-
-        if (ohpError) throw new Error(`Failed to fetch Ontario Health Premium: ${ohpError.message}`);
-        healthPremiumTiers = ohpData || [];
-    }
-
-    return {
-        taxConstants: taxConstants || {},
-        federalBrackets: federalBrackets || [],
-        provincialBrackets: provincialBrackets || [],
-        provincialConstants: provincialConstants || {},
-        dividendConstants: dividendConstants || [],
-        healthPremiumTiers,
-        province,
-        taxYear
-    };
+    const fs = require('fs');
+    return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 }
 
 /**

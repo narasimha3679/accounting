@@ -20,11 +20,15 @@
 
 6. **Storage**: Copy objects from the Supabase bucket to B2; keep `expense_files.storage_path` keys compatible (same relative key under the new bucket).
 
+7. **Verification**: Complete and archive `docs/migrations/CUTOVER_VERIFICATION_CHECKLIST.md`.
+
 ## Baseline and migration-chain policy
 
 - The Supabase dump/restore is treated as the **schema baseline** for existing production data.
 - In-repo migrations begin at:
   - `000001_app_users` (Go-owned auth user table)
   - `000002_auth_sessions` (refresh rotation, revocation, audit)
+  - `000003_password_reset_tokens` (forgot/reset password flow)
+  - `000004_auth_rate_limits` (shared auth lockout/rate-limit state)
 - All new schema changes must be appended in `api/migrations/` with increasing sequence numbers.
 - Legacy SQL in `supabase/migrations/` remains historical reference only and is not the runtime migration mechanism.

@@ -30,6 +30,59 @@ func isOwner(u *appctx.User, companyID int64) bool {
 }
 
 func Register(r chi.Router, pool *pgxpool.Pool, cfg *config.Config) {
+	r.Get("/invitation-preview", func(w http.ResponseWriter, r *http.Request) {
+		u, ok := appctx.UserFrom(r.Context())
+		if !ok || u.ProfileID == 0 {
+			httpx.ProblemJSON(w, http.StatusUnauthorized, "Unauthorized", "profile required", "auth")
+			return
+		}
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			httpx.ProblemJSON(w, http.StatusBadRequest, "Bad Request", "token required", "validation")
+			return
+		}
+
+		var companyName, role string
+		err := pool.QueryRow(r.Context(), `
+			SELECT c.name, uc.role
+			FROM user_companies uc
+			JOIN companies c ON c.id = uc.company_id
+			WHERE uc.invite_token = $1
+			  AND uc.user_id = $2
+			  AND uc.invite_status = 'pending'
+			LIMIT 1
+		`, token, u.ProfileID).Scan(&companyName, &role)
+		if err == nil {
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{
+				"company_name": companyName,
+				"role":         role,
+				"email":        u.Email,
+			})
+			return
+		}
+
+		err = pool.QueryRow(r.Context(), `
+			SELECT c.name, p.role
+			FROM pending_shareholder_invites p
+			JOIN companies c ON c.id = p.company_id
+			WHERE p.invite_token = $1
+			  AND p.claimed_at IS NULL
+			  AND p.expires_at > now()
+			  AND lower(p.email) = lower($2)
+			LIMIT 1
+		`, token, u.Email).Scan(&companyName, &role)
+		if err != nil {
+			httpx.ProblemJSON(w, http.StatusNotFound, "Not Found", "Invitation not found or has expired", "invite")
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{
+			"company_name": companyName,
+			"role":         role,
+			"email":        u.Email,
+		})
+	})
+
 	r.Post("/invite", func(w http.ResponseWriter, r *http.Request) {
 		u, ok := appctx.UserFrom(r.Context())
 		if !ok {

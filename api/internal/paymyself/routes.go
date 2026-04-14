@@ -3,6 +3,7 @@ package paymyself
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -15,6 +16,10 @@ import (
 
 func RegisterOptimize(r chi.Router, pool *pgxpool.Pool, legacyScript string) {
 	r.Post("/optimize", func(w http.ResponseWriter, r *http.Request) {
+		if err := optimizerRuntimeError(legacyScript); err != nil {
+			httpx.ProblemJSON(w, http.StatusServiceUnavailable, "Unavailable", err.Error(), "optimizer_unavailable")
+			return
+		}
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			httpx.ProblemJSON(w, http.StatusBadRequest, "Bad Request", "invalid json", "bad_request")
@@ -59,6 +64,16 @@ func RegisterOptimize(r chi.Router, pool *pgxpool.Pool, legacyScript string) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, string(out))
 	})
+}
+
+func optimizerRuntimeError(legacyScript string) error {
+	if _, err := exec.LookPath("node"); err != nil {
+		return errors.New("optimizer runtime unavailable: node is not installed")
+	}
+	if _, err := os.Stat(legacyScript); err != nil {
+		return errors.New("optimizer runtime unavailable: script file is missing")
+	}
+	return nil
 }
 
 func intFromAny(v any, def int) int {

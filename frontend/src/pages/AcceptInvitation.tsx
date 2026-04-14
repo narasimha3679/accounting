@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Building2, Mail, User, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
-import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -12,7 +11,7 @@ import Card from '../components/ui/Card';
 const AcceptInvitation: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const { user, refreshUser } = useAuth();
+    const { refreshUser } = useAuth();
     const queryClient = useQueryClient();
     const inviteToken = searchParams.get('token');
     
@@ -34,67 +33,8 @@ const AcceptInvitation: React.FC = () => {
             }
 
             try {
-                // Try to find the invitation in user_companies
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser) {
-                    setError('Please log in to accept this invitation.');
-                    setIsLoading(false);
-                    return;
-                }
-
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('auth_user_id', authUser.id)
-                    .single();
-
-                if (!profile) {
-                    setError('User profile not found.');
-                    setIsLoading(false);
-                    return;
-                }
-
-                const { data: membership, error: membershipError } = await supabase
-                    .from('user_companies')
-                    .select('*')
-                    .eq('invite_token', inviteToken)
-                    .eq('user_id', profile.id)
-                    .eq('invite_status', 'pending')
-                    .maybeSingle();
-
-                if (membershipError || !membership) {
-                    // Check pending_shareholder_invites table
-                    const { data: pendingInvite, error: pendingError } = await supabase
-                        .from('pending_shareholder_invites')
-                        .select('*')
-                        .eq('invite_token', inviteToken)
-                        .is('claimed_at', null)
-                        .gt('expires_at', new Date().toISOString())
-                        .maybeSingle();
-
-                    if (pendingError || !pendingInvite) {
-                        setError('Invitation not found or has expired.');
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    setInvitationData({
-                        company_name: 'Unknown Company', // Will need to fetch company name
-                        role: pendingInvite.role,
-                        email: pendingInvite.email,
-                    });
-                } else {
-                    const { data: companyRow } = await supabase
-                        .from('companies')
-                        .select('id, name')
-                        .eq('id', membership.company_id)
-                        .maybeSingle();
-                    setInvitationData({
-                        company_name: companyRow?.name || 'Unknown Company',
-                        role: membership.role,
-                        email: user?.email,
-                    });
-                }
+                const preview = await api.getInvitationPreview(inviteToken);
+                setInvitationData(preview);
             } catch (err: any) {
                 setError(err.message || 'Failed to load invitation details.');
             } finally {
@@ -103,7 +43,7 @@ const AcceptInvitation: React.FC = () => {
         };
 
         fetchInvitation();
-    }, [inviteToken, user]);
+    }, [inviteToken]);
 
     // Accept invitation mutation
     const acceptMutation = useMutation({

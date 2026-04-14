@@ -12,8 +12,8 @@ import (
 
 	"github.com/accounting/api/internal/auth"
 	"github.com/accounting/api/internal/companyhttp"
-	"github.com/accounting/api/internal/config"
 	"github.com/accounting/api/internal/compensationhttp"
+	"github.com/accounting/api/internal/config"
 	"github.com/accounting/api/internal/data"
 	"github.com/accounting/api/internal/employeehttp"
 	"github.com/accounting/api/internal/httpx"
@@ -82,10 +82,11 @@ func main() {
 	})
 	r.Get("/v1/features", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"ocr":               cfg.GeminiAPIKey != "",
-			"bank_statements":   false,
+			// Controlled cutover: OCR route is intentionally disabled until Go implementation lands.
+			"ocr":                false,
+			"bank_statements":    false,
 			"push_notifications": cfg.VAPIDPrivateKey != "" && cfg.VAPIDPublicKey != "",
-			"storage":           b2Configured(cfg),
+			"storage":            b2Configured(cfg),
 		})
 	})
 
@@ -93,6 +94,8 @@ func main() {
 		r.Post("/register", authSvc.RegisterHTTP)
 		r.Post("/login", authSvc.LoginHTTP)
 		r.Post("/refresh", authSvc.RefreshHTTP)
+		r.Post("/forgot-password", authSvc.ForgotPasswordHTTP)
+		r.Post("/reset-password", authSvc.ResetPasswordHTTP)
 		r.Group(func(r chi.Router) {
 			r.Use(authMW.Authenticate)
 			r.Get("/me", authSvc.MeHTTP)
@@ -127,15 +130,13 @@ func main() {
 
 	legacyScript := os.Getenv("OPTIMIZER_SCRIPT")
 	if legacyScript == "" {
-		legacyScript = "api/legacy/payMyselfOptimizer.js"
+		legacyScript = "legacy/payMyselfOptimizer.js"
 	}
 
 	r.Route("/api/pay-myself", func(r chi.Router) {
+		r.Use(authMW.Authenticate)
 		paymyself.RegisterOptimize(r, pool, legacyScript)
-		r.Group(func(r chi.Router) {
-			r.Use(authMW.Authenticate)
-			paymyself.RegisterYTD(r, pool)
-		})
+		paymyself.RegisterYTD(r, pool)
 	})
 
 	r.Route("/api/company-members", func(r chi.Router) {
@@ -160,7 +161,7 @@ func main() {
 
 	r.Route("/api/push-notifications", func(r chi.Router) {
 		r.Use(authMW.Authenticate)
-		pushhttp.Register(r, pool, cfg.VAPIDPrivateKey, cfg.VAPIDPublicKey)
+		pushhttp.Register(r, pool, cfg.VAPIDPrivateKey, cfg.VAPIDPublicKey, cfg.VAPIDSubject)
 	})
 
 	r.Route("/api/ocr", func(r chi.Router) {

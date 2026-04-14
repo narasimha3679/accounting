@@ -76,7 +76,11 @@ func (h *Handler) Select(w http.ResponseWriter, r *http.Request) {
 		cols = "t.*"
 	}
 	sc, sargs, n := scopeClause(tbl, u, 1)
-	fs, fargs, _ := filterSQL(body.Filters, n)
+	fs, fargs, _, err := filterSQL(body.Filters, n)
+	if err != nil {
+		httpx.ProblemJSON(w, http.StatusBadRequest, "Bad Request", err.Error(), "bad_filter")
+		return
+	}
 	allArgs := append(append([]any{}, sargs...), fargs...)
 	where := "(" + sc + ")" + fs
 	ord := orderSQL(body.Order)
@@ -245,7 +249,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc, sargs, n := scopeClause(tbl, u, 1)
-	fs, fargs, _ := filterSQL(body.Filters, n)
+	fs, fargs, _, err := filterSQL(body.Filters, n)
+	if err != nil {
+		httpx.ProblemJSON(w, http.StatusBadRequest, "Bad Request", err.Error(), "bad_filter")
+		return
+	}
 	all := append(append([]any{}, sargs...), fargs...)
 	setParts := make([]string, 0, len(body.Patch))
 	i := len(all) + 1
@@ -301,7 +309,11 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc, sargs, n := scopeClause(tbl, u, 1)
-	fs, fargs, _ := filterSQL(body.Filters, n)
+	fs, fargs, _, err := filterSQL(body.Filters, n)
+	if err != nil {
+		httpx.ProblemJSON(w, http.StatusBadRequest, "Bad Request", err.Error(), "bad_filter")
+		return
+	}
 	all := append(append([]any{}, sargs...), fargs...)
 	q := fmt.Sprintf("DELETE FROM %s WHERE (%s)%s", tbl.Name, sc, fs)
 	tag, err := h.pool.Exec(r.Context(), q, all...)

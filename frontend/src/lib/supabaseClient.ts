@@ -7,4 +7,8 @@ export const API_URL =
 export const supabase = createGoClient(API_URL);
 
 /** Bucket name for expense files (used with future /v1/storage); objects live in Backblaze B2. */
-export const SUPABASE_STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'expense-files';
+export const STORAGE_BUCKET =
+    import.meta.env.VITE_STORAGE_BUCKET || import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'expense-files';
+
+// Backward-compatible alias for older call sites.
+export const SUPABASE_STORAGE_BUCKET = STORAGE_BUCKET;
