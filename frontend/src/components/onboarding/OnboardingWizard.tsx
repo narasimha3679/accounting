@@ -72,7 +72,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             case 1:
                 return businessType !== null;
             case 2:
-                return name.trim() !== '' && businessNumber.trim() !== '' && province !== '' && fiscalYearEnd !== '';
+                return name.trim() !== '' && businessNumber.trim() !== '' && fiscalYearEnd !== '';
             case 3:
                 return shareholders.length >= 1; // At least current user
             case 4:
