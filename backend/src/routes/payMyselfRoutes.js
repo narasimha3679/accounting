@@ -1,7 +1,9 @@
 /**
  * Pay Myself Optimizer Routes
- * 
- * API endpoints for withdrawal optimization calculations
+ *
+ * DEPRECATED: Optimization and YTD income now run client-side via
+ * frontend/src/lib/payMyselfOptimizer.ts and direct Supabase reads.
+ * These routes remain temporarily for backward compatibility / health checks.
  */
 
 const express = require('express');
@@ -10,21 +12,14 @@ const { optimizeWithdrawal } = require('../services/payMyselfOptimizer');
 
 /**
  * POST /api/pay-myself/optimize
- * 
- * Calculate optimal withdrawal strategy
- * 
- * Request body:
- * {
- *   corporateCost: number,        // Total amount corporation will spend
- *   owedToOwner: number,          // From owner_payments balance
- *   province: string,             // Default from company settings, e.g. 'ON'
- *   taxYear: number,              // Default current year
- *   ytdPersonalIncome: number,    // Optional: for marginal rate accuracy
- *   dividendType: string          // 'eligible' or 'non_eligible' (default)
- * }
+ *
+ * @deprecated Use client-side optimizeWithdrawal() instead.
  */
 router.post('/optimize', async (req, res) => {
     try {
+        res.set('Deprecation', 'true');
+        res.set('Sunset', 'Sat, 01 Aug 2026 00:00:00 GMT');
+
         const {
             corporateCost,
             owedToOwner = 0,
@@ -34,7 +29,6 @@ router.post('/optimize', async (req, res) => {
             dividendType = 'non_eligible'
         } = req.body;
 
-        // Validation
         if (corporateCost === undefined || corporateCost === null) {
             return res.status(400).json({
                 error: 'corporateCost is required'
@@ -53,7 +47,6 @@ router.post('/optimize', async (req, res) => {
             });
         }
 
-        // Calculate optimization
         const result = await optimizeWithdrawal({
             corporateCost,
             owedToOwner,
@@ -75,24 +68,26 @@ router.post('/optimize', async (req, res) => {
 
 /**
  * GET /api/pay-myself/health
- * 
- * Health check for the optimizer service
  */
 router.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'pay-myself-optimizer' });
+    res.json({
+        status: 'ok',
+        service: 'pay-myself-optimizer',
+        deprecated: true,
+        message: 'Optimization moved client-side; prefer frontend payMyselfOptimizer.ts',
+    });
 });
 
 /**
  * GET /api/pay-myself/ytd-income/:companyId/:memberId
- * 
- * Fetch year-to-date salaries and dividends for a company member
- * This is used to auto-populate YTD income in the optimizer
- * 
- * Query params:
- *   fiscalYear: number (optional, defaults to current year)
+ *
+ * @deprecated Use api.getYtdIncome() (direct Supabase) instead.
  */
 router.get('/ytd-income/:companyId/:memberId', async (req, res) => {
     try {
+        res.set('Deprecation', 'true');
+        res.set('Sunset', 'Sat, 01 Aug 2026 00:00:00 GMT');
+
         const { companyId, memberId } = req.params;
         const fiscalYear = parseInt(req.query.fiscalYear) || new Date().getFullYear();
 
@@ -102,19 +97,33 @@ router.get('/ytd-income/:companyId/:memberId', async (req, res) => {
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        // Get fiscal year date range (assuming calendar year for now)
-        // TODO: Could be enhanced to use company's fiscal year end
         const startDate = `${fiscalYear}-01-01`;
         const endDate = `${fiscalYear}-12-31`;
 
-        // Fetch salaries for this member (by employee_id linked to member)
-        // First, find employee record for this member
-        const { data: employee } = await supabase
+        // employees.auth_user_id is UUID; memberId may be profile id or auth uuid
+        let employeeQuery = supabase
             .from('employees')
             .select('id')
-            .eq('company_id', companyId)
-            .eq('user_id', memberId)
-            .maybeSingle();
+            .eq('company_id', companyId);
+
+        if (memberId.includes('-')) {
+            employeeQuery = employeeQuery.eq('auth_user_id', memberId);
+        } else {
+            // Legacy: profile id — resolve via profiles.auth_user_id
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('auth_user_id')
+                .eq('id', memberId)
+                .maybeSingle();
+
+            if (profile?.auth_user_id) {
+                employeeQuery = employeeQuery.eq('auth_user_id', profile.auth_user_id);
+            } else {
+                employeeQuery = employeeQuery.eq('id', -1); // force empty
+            }
+        }
+
+        const { data: employee } = await employeeQuery.maybeSingle();
 
         let ytdSalaries = 0;
         if (employee) {
@@ -130,8 +139,6 @@ router.get('/ytd-income/:companyId/:memberId', async (req, res) => {
             ytdSalaries = (salaries || []).reduce((sum, s) => sum + (s.amount || 0), 0);
         }
 
-        // Fetch dividends for this member
-        // Dividends are linked to shareholder_id or we look at company-level dividends
         const { data: dividends } = await supabase
             .from('dividends')
             .select('amount, shareholder_id')
@@ -139,8 +146,7 @@ router.get('/ytd-income/:companyId/:memberId', async (req, res) => {
             .eq('fiscal_year', fiscalYear)
             .in('status', ['paid', 'declared']);
 
-        // For now, sum all dividends (TODO: filter by shareholder when multi-shareholder is implemented)
-        let ytdDividends = (dividends || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+        const ytdDividends = (dividends || []).reduce((sum, d) => sum + (d.amount || 0), 0);
 
         res.json({
             companyId: parseInt(companyId),

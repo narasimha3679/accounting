@@ -52,7 +52,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     const [name, setName] = useState('');
     const [businessNumber, setBusinessNumber] = useState('');
     const [hstNumber, setHstNumber] = useState('');
-    const [province, setProvince] = useState('ON');
+    // Cashual currently only supports Ontario businesses
+    const province = 'ON';
     const [fiscalYearEnd, setFiscalYearEnd] = useState(() => {
         const today = new Date();
         return today.toISOString().split('T')[0];
@@ -143,7 +144,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         businessNumber={businessNumber}
                         hstNumber={hstNumber}
                         fiscalYearEnd={fiscalYearEnd}
-                        province={province}
                         onNameChange={setName}
                         onBusinessNumberChange={(value) => {
                             setBusinessNumber(value);
@@ -151,7 +151,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         }}
                         onHstNumberChange={setHstNumber}
                         onFiscalYearEndChange={setFiscalYearEnd}
-                        onProvinceChange={setProvince}
                         businessNumberError={businessNumberError || internalBusinessNumberError}
                     />
                 );

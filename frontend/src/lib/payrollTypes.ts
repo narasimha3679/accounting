@@ -164,6 +164,30 @@ export interface TaxConstants {
     ei_max_premium: number;
     federal_basic_personal_amount: number;
     federal_employment_amount: number;
+    rrsp_max_contribution_room?: number;
+}
+
+/**
+ * Dividend gross-up and tax credit constants
+ */
+export interface DividendTaxConstants {
+    tax_year: number;
+    province: string;
+    dividend_type: 'eligible' | 'non_eligible';
+    gross_up_rate: number;
+    federal_tax_credit_rate: number;
+    provincial_tax_credit_rate: number;
+}
+
+/**
+ * Ontario Health Premium tier
+ */
+export interface OntarioHealthPremiumTier {
+    tax_year: number;
+    min_income: number;
+    max_income: number | null;
+    base_premium: number;
+    rate_on_excess: number;
 }
 
 /**

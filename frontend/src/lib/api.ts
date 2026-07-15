@@ -1,6 +1,8 @@
 import { supabase, SUPABASE_STORAGE_BUCKET } from './supabaseClient';
 import { getFiscalYear, isDateInFiscalYear, getFiscalYearRange } from './fiscalYear';
-import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD } from './payrollTypes';
+import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD, DividendTaxConstants, OntarioHealthPremiumTier } from './payrollTypes';
+import type { PayMyselfOptimizeRequest, PayMyselfOptimizeResponse } from './payMyselfTypes';
+import { optimizeWithdrawal as runPayMyselfOptimizer } from './payMyselfOptimizer';
 import type { BusinessType, EnabledFeatures } from './featureConfig';
 
 // Backend server URL - defaults to localhost in development
@@ -1965,47 +1967,68 @@ class SupabaseApi {
         const hst_amount = company.hst_registered ? subtotal * company.hst_rate : 0;
         const total = subtotal + hst_amount;
 
-        // Generate invoice number: INV-FY-NNNN format (using fiscal year)
+        // Generate invoice number: INV-FY-NNNN format (scoped per company + fiscal year)
         const fiscalYear = company.fiscal_year_end
             ? getFiscalYear(new Date(issue_date), company.fiscal_year_end)
             : new Date(issue_date).getFullYear();
-        const { data: existingInvoices, error: countError } = await supabase
-            .from('invoices')
-            .select('invoice_number')
-            .eq('company_id', company_id)
-            .like('invoice_number', `INV-${fiscalYear}-%`)
-            .order('invoice_number', { ascending: false })
-            .limit(1);
 
-        if (countError) throw new Error(countError.message);
+        const nextInvoiceNumber = async (): Promise<string> => {
+            const { data: existingInvoices, error: countError } = await supabase
+                .from('invoices')
+                .select('invoice_number')
+                .eq('company_id', company_id)
+                .like('invoice_number', `INV-${fiscalYear}-%`)
+                .order('invoice_number', { ascending: false })
+                .limit(1);
 
-        let invoiceNumber: string;
-        if (existingInvoices && existingInvoices.length > 0) {
-            // Extract the number from the last invoice and increment
-            const lastNumber = existingInvoices[0].invoice_number.match(/\d+$/);
-            const nextNumber = lastNumber ? parseInt(lastNumber[0], 10) + 1 : 1;
-            invoiceNumber = `INV-${fiscalYear}-${String(nextNumber).padStart(4, '0')}`;
-        } else {
-            // First invoice for this fiscal year
-            invoiceNumber = `INV-${fiscalYear}-0001`;
+            if (countError) throw new Error(countError.message);
+
+            if (existingInvoices && existingInvoices.length > 0) {
+                const lastNumber = existingInvoices[0].invoice_number.match(/\d+$/);
+                const nextNumber = lastNumber ? parseInt(lastNumber[0], 10) + 1 : 1;
+                return `INV-${fiscalYear}-${String(nextNumber).padStart(4, '0')}`;
+            }
+            return `INV-${fiscalYear}-0001`;
+        };
+
+        // Retry on unique conflicts (concurrent creates for the same company)
+        const maxAttempts = 5;
+        let invoice: Invoice | null = null;
+        let lastError: Error | null = null;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const invoiceNumber = await nextInvoiceNumber();
+            const { data, error } = await supabase
+                .from('invoices')
+                .insert({
+                    invoice_number: invoiceNumber,
+                    client_id,
+                    issue_date,
+                    due_date,
+                    description,
+                    company_id,
+                    subtotal,
+                    hst_amount,
+                    total,
+                })
+                .select('*')
+                .single<Invoice>();
+
+            if (!error && data) {
+                invoice = data;
+                break;
+            }
+
+            if (error?.code === '23505') {
+                lastError = new Error(error.message);
+                continue;
+            }
+            throw new Error(error?.message ?? 'Failed to create invoice');
         }
 
-        const { data: invoice, error } = await supabase
-            .from('invoices')
-            .insert({
-                invoice_number: invoiceNumber,
-                client_id,
-                issue_date,
-                due_date,
-                description,
-                company_id,
-                subtotal,
-                hst_amount,
-                total,
-            })
-            .select('*')
-            .single<Invoice>();
-        if (error) throw new Error(error.message);
+        if (!invoice) {
+            throw lastError ?? new Error('Failed to create invoice after retries');
+        }
 
         if (items.length > 0) {
             const itemPayload = items.map((item) => ({
@@ -3576,7 +3599,53 @@ class SupabaseApi {
             ei_max_premium: Number(data.ei_max_premium),
             federal_basic_personal_amount: Number(data.federal_basic_personal_amount),
             federal_employment_amount: Number(data.federal_employment_amount),
+            rrsp_max_contribution_room: data.rrsp_max_contribution_room != null
+                ? Number(data.rrsp_max_contribution_room)
+                : undefined,
         };
+    }
+
+    /**
+     * Get dividend tax constants (gross-up and credit rates) for a tax year and province
+     */
+    async getDividendTaxConstants(taxYear: number, province: string): Promise<DividendTaxConstants[]> {
+        const { data, error } = await supabase
+            .from('dividend_tax_constants')
+            .select('tax_year, province, dividend_type, gross_up_rate, federal_tax_credit_rate, provincial_tax_credit_rate')
+            .eq('tax_year', taxYear)
+            .in('province', ['federal', province]);
+
+        if (error) throw new Error(error.message);
+
+        return (data || []).map(row => ({
+            tax_year: Number(row.tax_year),
+            province: row.province,
+            dividend_type: row.dividend_type as 'eligible' | 'non_eligible',
+            gross_up_rate: Number(row.gross_up_rate),
+            federal_tax_credit_rate: Number(row.federal_tax_credit_rate),
+            provincial_tax_credit_rate: Number(row.provincial_tax_credit_rate),
+        }));
+    }
+
+    /**
+     * Get Ontario Health Premium tiers for a tax year
+     */
+    async getOntarioHealthPremium(taxYear: number): Promise<OntarioHealthPremiumTier[]> {
+        const { data, error } = await supabase
+            .from('ontario_health_premium')
+            .select('tax_year, min_income, max_income, base_premium, rate_on_excess')
+            .eq('tax_year', taxYear)
+            .order('min_income', { ascending: true });
+
+        if (error) throw new Error(error.message);
+
+        return (data || []).map(row => ({
+            tax_year: Number(row.tax_year),
+            min_income: Number(row.min_income),
+            max_income: row.max_income != null ? Number(row.max_income) : null,
+            base_premium: Number(row.base_premium),
+            rate_on_excess: Number(row.rate_on_excess),
+        }));
     }
 
     /**
@@ -6070,66 +6139,6 @@ class SupabaseApi {
     }
 
     /**
-     * Send invoice via email
-     * Generates PDF and sends it via edge function
-     */
-    async sendInvoiceEmail(invoiceId: number, recipientEmail: string, message?: string): Promise<{ success: boolean; message: string }> {
-        try {
-            // Get the current session token
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) {
-                throw new Error('Not authenticated. Please log in again.');
-            }
-
-            // Generate PDF
-            const pdfBlob = await this.getInvoicePDF(invoiceId);
-
-            // Convert blob to base64
-            const base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64String = (reader.result as string).split(',')[1];
-                    resolve(base64String);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(pdfBlob);
-            });
-
-            // Call Node server with user's session token
-            const response = await fetch(`${BACKEND_URL}/api/emails/invoice`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                    invoiceId,
-                    recipientEmail,
-                    pdfBase64: base64,
-                    message,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to send invoice email');
-            }
-
-            return {
-                success: true,
-                message: data.message || 'Invoice sent successfully',
-            };
-        } catch (error: any) {
-            console.error('Error sending invoice email:', error);
-            return {
-                success: false,
-                message: error.message || 'Failed to send invoice email',
-            };
-        }
-    }
-
-    /**
      * Generate T4 PDF (client-side)
      * Returns a Blob that can be downloaded
      */
@@ -6472,58 +6481,17 @@ class SupabaseApi {
     // Pay Myself Optimizer methods --------------------------------------------------------
 
     /**
-     * Optimize withdrawal strategy (salary vs dividend vs reimbursement)
+     * Optimize withdrawal strategy (client-side calculation using Supabase tax tables)
      */
-    async optimizeWithdrawal(params: {
-        corporateCost: number;
-        owedToOwner?: number;
-        province?: string;
-        taxYear?: number;
-        ytdPersonalIncome?: number;
-        dividendType?: 'eligible' | 'non_eligible';
-    }): Promise<{
-        input: any;
-        options: {
-            reimbursement: any;
-            dividend: any;
-            salary: any;
-        };
-        recommendation: {
-            strategy: string;
-            totalNetInPocket: number;
-            totalEfficiency: string;
-            breakdown: Array<{ type: string; amount: number }>;
-            explanation: string;
-        };
-        disclaimer: string;
-    }> {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            throw new Error('Not authenticated');
-        }
-
-        const response = await fetch(`${BACKEND_URL}/api/pay-myself/optimize`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify(params),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to optimize withdrawal');
-        }
-
-        return response.json();
+    async optimizeWithdrawal(params: PayMyselfOptimizeRequest): Promise<PayMyselfOptimizeResponse> {
+        return runPayMyselfOptimizer(params);
     }
 
     /**
-     * Get YTD income (salaries + dividends) recorded on the platform for a company member
+     * Get YTD income (salaries + dividends) recorded on the platform for the current user
      * Used by Pay Myself Optimizer for accurate marginal rate calculations
      */
-    async getYtdIncome(companyId: number, memberId: string, fiscalYear?: number): Promise<{
+    async getYtdIncome(companyId: number, _memberId: string, fiscalYear?: number): Promise<{
         companyId: number;
         memberId: string;
         fiscalYear: number;
@@ -6532,27 +6500,55 @@ class SupabaseApi {
         total: number;
     }> {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        if (!session?.user) {
             throw new Error('Not authenticated');
         }
 
         const year = fiscalYear || new Date().getFullYear();
-        const response = await fetch(
-            `${BACKEND_URL}/api/pay-myself/ytd-income/${companyId}/${memberId}?fiscalYear=${year}`,
-            {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-            }
-        );
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to fetch YTD income');
+        // Prefer employee linked to this auth user in the company
+        const { data: employee } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('auth_user_id', session.user.id)
+            .maybeSingle();
+
+        let ytdSalaries = 0;
+        if (employee) {
+            const { data: salaries, error: salariesError } = await supabase
+                .from('salaries')
+                .select('amount')
+                .eq('company_id', companyId)
+                .eq('employee_id', employee.id)
+                .gte('payment_date', startDate)
+                .lte('payment_date', endDate)
+                .in('status', ['paid', 'pending']);
+
+            if (salariesError) throw new Error(salariesError.message);
+            ytdSalaries = (salaries || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
         }
 
-        return response.json();
+        const { data: dividends, error: dividendsError } = await supabase
+            .from('dividends')
+            .select('amount')
+            .eq('company_id', companyId)
+            .eq('fiscal_year', year)
+            .in('status', ['paid', 'declared']);
+
+        if (dividendsError) throw new Error(dividendsError.message);
+        const ytdDividends = (dividends || []).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+        return {
+            companyId,
+            memberId: session.user.id,
+            fiscalYear: year,
+            ytdSalaries: Math.round(ytdSalaries * 100) / 100,
+            ytdDividends: Math.round(ytdDividends * 100) / 100,
+            total: Math.round((ytdSalaries + ytdDividends) * 100) / 100,
+        };
     }
 
     // Compensation Strategy methods --------------------------------------------------------

@@ -41,10 +41,10 @@ export const Pricing = () => {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 id="pricing-heading" className="text-3xl md:text-5xl font-bold text-white mb-6">
-              Simple, Transparent Pricing
+              Free for a Limited Time
             </h2>
             <p className="text-slate-400 text-lg">
-              Simple, transparent pricing. Better than any competitor. All features included.
+              Full access to every feature, free for a limited time. No credit card required.
             </p>
           </div>
 
@@ -63,16 +63,19 @@ export const Pricing = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="inline-block px-4 py-1.5 rounded-full bg-neon-emerald/10 text-neon-emerald text-sm font-semibold border border-neon-emerald/20">
-                      BEST VALUE
+                      LIMITED TIME
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                       <Sparkles className="w-4 h-4 text-golden-hour" aria-hidden="true" />
                       <span>Unlimited employees</span>
                     </div>
                   </div>
-                  <h3 className="text-4xl font-bold text-white mb-2">$5/month or $50/year</h3>
+                  <h3 className="text-4xl font-bold text-white mb-2">
+                    Free
+                    <span className="ml-3 text-2xl font-normal text-slate-500 line-through">$5/month</span>
+                  </h3>
                   <p className="text-slate-400 mb-6">
-                    Save 17% with annual billing. Everything included—no per-employee fees, no hidden costs.
+                    Free for a limited time. Everything included—no per-employee fees, no hidden costs.
                   </p>
                   <div className="flex items-center gap-2 mb-6 text-sm text-slate-400">
                     <Users className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
@@ -81,13 +84,13 @@ export const Pricing = () => {
                   <div className="flex flex-col sm:flex-row gap-4">
                     <Link to="/login" className="w-full sm:w-auto">
                       <Button variant="cta" size="lg" className="w-full sm:w-auto px-12 min-h-[56px]">
-                        Get Started
+                        Get Started Free
                         <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
                       </Button>
                     </Link>
                   </div>
                   <p className="mt-4 text-xs text-slate-500">
-                    * Cancel anytime with no long-term commitments.
+                    * No credit card required. Offer available for a limited time.
                   </p>
                 </div>
 

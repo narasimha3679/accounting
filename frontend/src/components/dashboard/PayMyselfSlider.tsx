@@ -5,6 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 import { useDebouncedCallback } from 'use-debounce';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+    fetchTaxConstants,
+    optimizeWithdrawalWithConstants,
+} from '../../lib/payMyselfOptimizer';
 
 interface PayMyselfSliderProps {
     availableDividends: number;
@@ -31,6 +35,8 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
         (user?.company?.default_dividend_type || 'non_eligible') as 'eligible' | 'non_eligible'
     );
 
+    const smallBusinessRate = user?.company?.small_business_rate ?? 0.125;
+
     // Debounced optimizer call
     const debouncedOptimize = useDebouncedCallback((value: number) => {
         setOptimizeAmount(value);
@@ -51,35 +57,62 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
             return api.getYtdIncome(user.company_id, String(user.id), taxYear);
         },
         enabled: !!user?.company_id && !!user?.id,
-        staleTime: 60000, // Cache for 1 minute
+        staleTime: 60000,
     });
 
     // Combine platform YTD + user-entered other income for total YTD
     const totalYtdIncome = (platformYtd?.total || 0) + otherPersonalIncome;
 
-    // Fetch optimization data from backend
-    const { data: optimization, isLoading, error } = useQuery({
-        queryKey: ['payMyselfOptimize', optimizeAmount, reimbursementsOwed, selectedProvince, taxYear, totalYtdIncome, dividendType],
-        queryFn: async () => {
-            if (optimizeAmount <= 0) return null;
-            return api.optimizeWithdrawal({
-                corporateCost: optimizeAmount,
-                owedToOwner: reimbursementsOwed,
-                province: selectedProvince,
-                taxYear,
-                ytdPersonalIncome: totalYtdIncome,
-                dividendType
-            });
-        },
-        enabled: optimizeAmount > 0,
-        staleTime: 30000,
+    // Cache tax constants (shared across slider moves)
+    const {
+        data: taxBundle,
+        isLoading: taxLoading,
+        error: taxError,
+    } = useQuery({
+        queryKey: ['payMyselfTaxConstants', taxYear, selectedProvince],
+        queryFn: () => fetchTaxConstants(taxYear, selectedProvince),
+        staleTime: 60 * 60 * 1000, // 1 hour — CRA constants rarely change mid-session
     });
 
-    // Fallback calculation if API fails
+    // Client-side optimization (instant once tax data is loaded)
+    const optimization = useMemo(() => {
+        if (optimizeAmount <= 0 || !taxBundle) return null;
+        try {
+            return optimizeWithdrawalWithConstants(
+                {
+                    corporateCost: optimizeAmount,
+                    owedToOwner: reimbursementsOwed,
+                    province: selectedProvince,
+                    taxYear,
+                    ytdPersonalIncome: totalYtdIncome,
+                    dividendType,
+                    smallBusinessRate,
+                },
+                taxBundle,
+                smallBusinessRate
+            );
+        } catch {
+            return null;
+        }
+    }, [
+        optimizeAmount,
+        reimbursementsOwed,
+        selectedProvince,
+        taxYear,
+        totalYtdIncome,
+        dividendType,
+        taxBundle,
+        smallBusinessRate,
+    ]);
+
+    const isLoading = taxLoading && optimizeAmount > 0;
+    const error = taxError as Error | null;
+
+    // Fallback calculation if optimizer fails
     const fallbackBreakdown = useMemo(() => {
         const reimbursementPart = Math.min(amount, reimbursementsOwed);
         const dividendPart = Math.max(0, amount - reimbursementPart);
-        const estimatedTax = dividendPart * 0.15; // Fallback 15%
+        const estimatedTax = dividendPart * 0.15;
         return {
             reimbursementPart,
             dividendPart,
@@ -93,7 +126,6 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
 
     const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
-    // Determine which option is best
     const getBestOption = () => {
         if (!optimization) return null;
         const { options } = optimization;
@@ -104,7 +136,6 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
 
     const bestOption = getBestOption();
 
-    // Helper: Get recommended option types from breakdown
     const recommendedTypes = useMemo(() => {
         if (!optimization?.recommendation?.breakdown) return [];
         return optimization.recommendation.breakdown.map(item => item.type);
@@ -585,7 +616,7 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                             <p className="text-sm text-yellow-600">
                                 <Info className="w-4 h-4 inline mr-1" />
                                 Unable to calculate optimization. Showing simplified breakdown.
-                                {error.message && ` Error: ${error.message}`}
+                                {error?.message && ` Error: ${error.message}`}
                             </p>
                         </div>
                     )}
@@ -606,7 +637,7 @@ export const PayMyselfSlider: React.FC<PayMyselfSliderProps> = ({
                             )}
                             <div className="mt-3 pt-3 border-t border-border/30">
                                 <p className="text-xs text-muted-foreground">
-                                    Note: Full comparison with Salary option requires API connection.
+                                    Note: Full comparison with Salary option requires tax rate data for this year.
                                 </p>
                             </div>
                         </div>

@@ -52,7 +52,7 @@ export const HowItWorks = () => {
             className="text-slate-400 text-lg"
           >
             No complex setup. No lengthy onboarding. Just sign up and start managing your business finances. 
-            Simple pricing at $5/month with all features included.
+            Free for a limited time with all features included.
           </motion.p>
         </div>
 
@@ -101,7 +101,7 @@ export const HowItWorks = () => {
             { value: "5 min", label: "Average Setup Time" },
             { value: "CRA", label: "Designed for Canadian compliance workflows" },
             { value: "24/7", label: "Platform Access" },
-            { value: "$5/mo", label: "Simple Pricing" },
+            { value: "Free", label: "Limited Time Offer" },
           ].map((stat, index) => (
             <div key={index} className="text-center p-6 glass-light rounded-xl border border-white/5">
               <div className="text-2xl md:text-3xl font-bold text-neon-emerald mb-1">{stat.value}</div>

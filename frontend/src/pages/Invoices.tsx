@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentCompany } from '../hooks/useCurrentCompany';
 import api, { type Invoice, type Client, type InvoiceItem, type RecurringInvoice } from '../lib/api';
-import { Plus, Edit, Eye, Trash2, Send, Check, X, Power, PowerOff, Calendar } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, DollarSign, FileCheck, X, Power, PowerOff, Calendar } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -23,11 +23,6 @@ const Invoices: React.FC = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
     const [previewingInvoice, setPreviewingInvoice] = useState<Invoice | null>(null);
-    const [showEmailModal, setShowEmailModal] = useState(false);
-    const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
-    const [emailInput, setEmailInput] = useState('');
-    const [saveEmailToClient, setSaveEmailToClient] = useState(true);
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
 
     // Fetch invoices
     const { data: invoices, isLoading } = useQuery({
@@ -65,17 +60,6 @@ const Invoices: React.FC = () => {
             return api.updateInvoice(id, data);
         },
         onSuccess: () => {
-            _queryClient.invalidateQueries({ queryKey: ['invoices'] });
-        },
-    });
-
-    // Update client mutation
-    const updateClientMutation = useMutation({
-        mutationFn: async ({ id, email }: { id: number; email: string }) => {
-            return api.updateClient(id, { email });
-        },
-        onSuccess: () => {
-            _queryClient.invalidateQueries({ queryKey: ['clients'] });
             _queryClient.invalidateQueries({ queryKey: ['invoices'] });
         },
     });
@@ -118,87 +102,8 @@ const Invoices: React.FC = () => {
             if (paid_date) {
                 updateStatusMutation.mutate({ id: invoice.id, status: newStatus, paid_date });
             }
-        } else if (newStatus === 'sent') {
-            // Check if client has an email before sending
-            const clientEmail = invoice.client?.email;
-            if (!clientEmail || clientEmail.trim() === '') {
-                // Show email modal to ask for email
-                setInvoiceToSend(invoice);
-                setEmailInput('');
-                setSaveEmailToClient(true);
-                setShowEmailModal(true);
-                return;
-            }
-            // Client has email, send invoice via email
-            try {
-                setIsSendingEmail(true);
-                const result = await api.sendInvoiceEmail(invoice.id, clientEmail);
-                
-                if (result.success) {
-                    // Refresh invoices to get updated status
-                    _queryClient.invalidateQueries({ queryKey: ['invoices'] });
-                    alert('Invoice sent successfully!');
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error: any) {
-                console.error('Error sending invoice:', error);
-                alert(`Failed to send invoice: ${error.message || 'Please try again.'}`);
-            } finally {
-                setIsSendingEmail(false);
-            }
         } else {
             updateStatusMutation.mutate({ id: invoice.id, status: newStatus });
-        }
-    };
-
-    const handleSendWithEmail = async () => {
-        if (!invoiceToSend || !invoiceToSend.client_id) return;
-
-        const email = emailInput.trim();
-        if (!email) {
-            alert('Please enter an email address');
-            return;
-        }
-
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            alert('Please enter a valid email address');
-            return;
-        }
-
-        setIsSendingEmail(true);
-        try {
-            // Update client email if requested
-            if (saveEmailToClient && invoiceToSend.client_id) {
-                await updateClientMutation.mutateAsync({ 
-                    id: invoiceToSend.client_id, 
-                    email 
-                });
-            }
-
-            // Send invoice via email (this will also update status to 'sent')
-            const result = await api.sendInvoiceEmail(invoiceToSend.id, email);
-
-            if (result.success) {
-                // Refresh invoices to get updated status
-                _queryClient.invalidateQueries({ queryKey: ['invoices'] });
-                
-                // Close modal
-                setShowEmailModal(false);
-                setInvoiceToSend(null);
-                setEmailInput('');
-                
-                alert('Invoice sent successfully!');
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error: any) {
-            console.error('Error sending invoice:', error);
-            alert(`Failed to send invoice: ${error.message || 'Please try again.'}`);
-        } finally {
-            setIsSendingEmail(false);
         }
     };
 
@@ -327,10 +232,10 @@ const Invoices: React.FC = () => {
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() => handleStatusChange(invoice, 'sent')}
-                                                    title="Send"
-                                                    className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                                                    title="Mark as Sent"
+                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
                                                 >
-                                                    <Send className="h-4 w-4" />
+                                                    <FileCheck className="h-4 w-4" />
                                                 </Button>
                                             )}
                                             {invoice.status === 'sent' && (
@@ -341,7 +246,7 @@ const Invoices: React.FC = () => {
                                                     title="Mark as Paid"
                                                     className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
                                                 >
-                                                    <Check className="h-4 w-4" />
+                                                    <DollarSign className="h-4 w-4" />
                                                 </Button>
                                             )}
                                             <Button
@@ -400,92 +305,6 @@ const Invoices: React.FC = () => {
                         setShowCreateModal(false);
                     }}
                 />
-            )}
-
-            {/* Email Input Modal */}
-            {showEmailModal && invoiceToSend && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-6">
-                    <Card className="w-full max-w-md">
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-semibold text-white">
-                                    Enter Email Address
-                                </h3>
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                    setShowEmailModal(false);
-                                    setInvoiceToSend(null);
-                                    setEmailInput('');
-                                }}>
-                                    <X className="h-5 w-5" />
-                                </Button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <p className="text-slate-muted">
-                                    Client <span className="font-medium text-white">{invoiceToSend.client?.name || 'Unknown'}</span> does not have an email address. Please enter an email address to send the invoice.
-                                </p>
-
-                                <div className="space-y-2">
-                                    <label htmlFor="email-input" className="text-sm font-medium text-white">
-                                        Email Address
-                                    </label>
-                                    <input
-                                        id="email-input"
-                                        type="email"
-                                        value={emailInput}
-                                        onChange={(e) => setEmailInput(e.target.value)}
-                                        placeholder="client@example.com"
-                                        className="flex h-10 w-full rounded-md glass border border-white/10 bg-transparent text-white placeholder:text-slate-muted focus-visible:ring-neon-emerald px-3 py-2 text-sm ring-offset-background placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                handleSendWithEmail();
-                                            }
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        id="save-email-checkbox"
-                                        type="checkbox"
-                                        checked={saveEmailToClient}
-                                        onChange={(e) => setSaveEmailToClient(e.target.checked)}
-                                        className="h-4 w-4 rounded border-white/10 bg-transparent text-neon-emerald focus:ring-neon-emerald focus:ring-offset-0"
-                                    />
-                                    <label htmlFor="save-email-checkbox" className="text-sm text-slate-muted cursor-pointer">
-                                        Save this email to the client's profile
-                                    </label>
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                            setShowEmailModal(false);
-                                            setInvoiceToSend(null);
-                                            setEmailInput('');
-                                        }}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={handleSendWithEmail}
-                                        disabled={isSendingEmail || updateClientMutation.isPending || !emailInput.trim()}
-                                    >
-                                        {isSendingEmail || updateClientMutation.isPending
-                                            ? 'Sending...'
-                                            : 'Send Invoice'
-                                        }
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
             )}
 
             {/* Invoice Preview Modal */}

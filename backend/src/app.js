@@ -2,10 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const ocrRoutes = require('./routes/ocrRoutes');
-const bankStatementRoutes = require('./routes/bankStatementRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
-const emailRoutes = require('./routes/emailRoutes');
 const pushNotificationRoutes = require('./routes/pushNotificationRoutes');
 const companyMemberRoutes = require('./routes/companyMemberRoutes');
 const payMyselfRoutes = require('./routes/payMyselfRoutes');
@@ -51,10 +48,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/ocr', ocrRoutes);
-app.use('/api/bank-statements', bankStatementRoutes);
 app.use('/api/employees', employeeRoutes);
-app.use('/api/emails', emailRoutes);
 app.use('/api/push-notifications', pushNotificationRoutes);
 app.use('/api/company-members', companyMemberRoutes);
 app.use('/api/pay-myself', payMyselfRoutes);

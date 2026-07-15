@@ -158,7 +158,7 @@ const comparisonData = [
   // Pricing
   {
     feature: "Cost (10 employees with payroll)",
-    cashual: { value: "$5/month", note: "Everything included, unlimited employees" },
+    cashual: { value: "Free", note: "Limited time — everything included, unlimited employees" },
     quickbooks: { value: "$150/month", note: "$100 accounting + $50 payroll" },
     wave: { value: "Free", note: "But no payroll available" },
     xero: { value: "$50/month", note: "$40 accounting + $10 payroll add-on" }

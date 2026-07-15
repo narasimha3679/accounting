@@ -67,7 +67,7 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg md:text-xl text-slate-400 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
             >
-              The only accounting platform built for Canadian contractors. Track time, run payroll, manage expenses, and stay CRA-compliant—all in one place. Simple, transparent pricing at $5/month.
+              The only accounting platform built for Canadian contractors. Track time, run payroll, manage expenses, and stay CRA-compliant—all in one place. Free for a limited time.
             </motion.p>
 
             <motion.div
@@ -129,7 +129,7 @@ export const Hero = () => {
               </div>
               <div className="flex items-center gap-2" role="listitem">
                 <CheckCircle2 className="w-4 h-4 text-neon-emerald" aria-hidden="true" />
-                <span>$5/month or $50/year</span>
+                <span>Free for a limited time</span>
               </div>
             </motion.div>
           </div>

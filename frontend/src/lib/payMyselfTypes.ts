@@ -25,6 +25,8 @@ export interface ReimbursementOption {
 
 export interface DividendOption {
     cashPaid: number;
+    grossCorpIncome: number;
+    corporateTax: number;
     grossedUp: number;
     dividendType: string;
     grossUpRate: number;
@@ -38,8 +40,10 @@ export interface DividendOption {
     netFederalTax: number;
     netProvincialTax: number;
     netTax: number;
+    totalTax: number;
     netInPocket: number;
     efficiency: number;
+    trueEfficiency: number;
     amount: number;
     note: string;
 }

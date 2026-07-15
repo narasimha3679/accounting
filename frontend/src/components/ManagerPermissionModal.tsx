@@ -35,7 +35,7 @@ const permissionDefinitions: Array<{
     {
         key: 'can_manage_invoices',
         label: 'Manage Invoices',
-        description: 'Create, edit, and send invoices',
+        description: 'Create, edit, and manage invoices',
     },
     {
         key: 'can_manage_expenses',

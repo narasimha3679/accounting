@@ -14,19 +14,19 @@ const faqs = [
   },
   {
     question: "What features are included?",
-    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included in one simple price—no add-ons or per-employee fees."
+    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included—no add-ons or per-employee fees—and it's free for a limited time."
   },
   {
     question: "How does pricing work?",
-    answer: "Cashual offers simple, transparent pricing: $5 per month or $50 per year (save 17% with annual billing). This includes all features—accounting, payroll, tax documents, and employee management. No hidden fees, no per-employee charges. Cancel anytime with no long-term commitments."
+    answer: "Cashual is free for a limited time. You get full access to all features—accounting, payroll, tax documents, and employee management—with no hidden fees and no per-employee charges. No credit card required to get started."
   },
   {
     question: "Can I cancel anytime?",
-    answer: "Yes, absolutely! You can cancel your subscription at any time with no penalties or fees. Cancellations take effect at the end of your current billing period. Since we offer one simple plan with all features included, there's no need to upgrade or downgrade—everything is available from day one."
+    answer: "Yes, absolutely! You can cancel at any time with no penalties or fees. Since we offer one simple plan with all features included, there's no need to upgrade or downgrade—everything is available from day one."
   },
   {
     question: "What payment methods do you accept?",
-    answer: "We accept all major credit cards and debit cards. Payment is processed securely through our payment provider. You can choose monthly billing at $5/month or save 17% with annual billing at $50/year.’ll "
+    answer: "Cashual is currently free for a limited time, so no payment is required to get started. When paid plans become available, we'll accept all major credit and debit cards through our secure payment provider."
   },
   {
     question: "Can I import data from other accounting systems?",

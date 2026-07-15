@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, AlertCircle } from 'lucide-react';
+import { Building2, AlertCircle, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface CompanyInfoStepProps {
@@ -7,42 +7,22 @@ interface CompanyInfoStepProps {
     businessNumber: string;
     hstNumber: string;
     fiscalYearEnd: string;
-    province: string;
     onNameChange: (value: string) => void;
     onBusinessNumberChange: (value: string) => void;
     onHstNumberChange: (value: string) => void;
     onFiscalYearEndChange: (value: string) => void;
-    onProvinceChange: (value: string) => void;
     businessNumberError?: string;
 }
-
-const PROVINCES = [
-    { value: 'ON', label: 'Ontario' },
-    { value: 'BC', label: 'British Columbia' },
-    { value: 'AB', label: 'Alberta' },
-    { value: 'SK', label: 'Saskatchewan' },
-    { value: 'MB', label: 'Manitoba' },
-    { value: 'QC', label: 'Quebec' },
-    { value: 'NB', label: 'New Brunswick' },
-    { value: 'NS', label: 'Nova Scotia' },
-    { value: 'PE', label: 'Prince Edward Island' },
-    { value: 'NL', label: 'Newfoundland and Labrador' },
-    { value: 'YT', label: 'Yukon' },
-    { value: 'NT', label: 'Northwest Territories' },
-    { value: 'NU', label: 'Nunavut' },
-];
 
 export const CompanyInfoStep: React.FC<CompanyInfoStepProps> = ({
     name,
     businessNumber,
     hstNumber,
     fiscalYearEnd,
-    province,
     onNameChange,
     onBusinessNumberChange,
     onHstNumberChange,
     onFiscalYearEndChange,
-    onProvinceChange,
     businessNumberError,
 }) => {
     return (
@@ -50,6 +30,14 @@ export const CompanyInfoStep: React.FC<CompanyInfoStepProps> = ({
             <div className="flex items-center space-x-2 pb-2 border-b border-border">
                 <Building2 className="h-5 w-5 text-neon-emerald" />
                 <h2 className="heading-3">Company Information</h2>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/40 p-4 flex items-start space-x-3">
+                <Info className="h-5 w-5 text-neon-emerald flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                    For now, Cashual only works for businesses registered in{' '}
+                    <span className="font-semibold text-foreground">Ontario</span>. Support for other provinces is coming later.
+                </p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -96,20 +84,14 @@ export const CompanyInfoStep: React.FC<CompanyInfoStepProps> = ({
                     <label htmlFor="province" className="block text-sm font-semibold text-foreground">
                         Province <span className="text-destructive">*</span>
                     </label>
-                    <select
+                    <input
                         id="province"
-                        value={province}
-                        onChange={(e) => onProvinceChange(e.target.value)}
-                        required
-                        className="input"
-                    >
-                        <option value="">Select province</option>
-                        {PROVINCES.map((p) => (
-                            <option key={p.value} value={p.value}>
-                                {p.label}
-                            </option>
-                        ))}
-                    </select>
+                        type="text"
+                        value="Ontario"
+                        readOnly
+                        aria-readonly="true"
+                        className="input bg-muted/50 cursor-not-allowed"
+                    />
                 </div>
 
                 <div className="space-y-2">

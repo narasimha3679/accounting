@@ -42,6 +42,12 @@ const CompanyOnboarding: React.FC = () => {
                 return;
             }
 
+            if (data.province !== 'ON') {
+                setError('Cashual currently only supports businesses registered in Ontario.');
+                setIsSaving(false);
+                return;
+            }
+
             // Create the company
             const company = await api.createCompany({
                 name: data.name,
@@ -111,7 +117,7 @@ const CompanyOnboarding: React.FC = () => {
                             <div className="flex-1">
                                 <h1 className="heading-1 mb-2">Set up your company</h1>
                                 <p className="text-muted-foreground text-base">
-                                    Welcome{user?.name ? `, ${user.name}` : ''}. Before you start using the app, we need a few details about your corporation.
+                                    Welcome{user?.name ? `, ${user.name}` : ''}. Before you start using the app, we need a few details about your corporation. Cashual currently only supports Ontario businesses.
                                 </p>
                             </div>
                         </div>

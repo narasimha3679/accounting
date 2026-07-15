@@ -9,8 +9,8 @@ const trustPoints = [
   },
   {
     icon: CreditCard,
-    title: "Simple Pricing",
-    description: "One transparent price: $5 per month or $50 per year. All features included—no hidden fees."
+    title: "Free for a Limited Time",
+    description: "Full access at no cost for a limited time. All features included—no hidden fees."
   },
   {
     icon: XCircle,
@@ -83,7 +83,7 @@ export const TrustSection = () => {
               </div>
               <div className="flex items-center gap-2 px-4 py-2 glass-emerald rounded-lg border border-neon-emerald/20">
                 <CreditCard className="w-5 h-5 text-neon-emerald" aria-hidden="true" />
-                <span className="text-sm font-semibold text-neon-emerald">Simple Pricing</span>
+                <span className="text-sm font-semibold text-neon-emerald">Free for a Limited Time</span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 glass rounded-lg border border-white/10">
                 <XCircle className="w-5 h-5 text-neon-emerald" aria-hidden="true" />
