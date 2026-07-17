@@ -34,6 +34,7 @@ import NotificationSettings from './pages/settings/NotificationSettings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
 import PublicTaxCalculator from './pages/PublicTaxCalculator';
+import SalaryVsDividendCalculator from './pages/SalaryVsDividendCalculator';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -175,6 +176,10 @@ function App() {
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/resume-builder" element={<ResumeBuilderPromo />} />
                   <Route path="/tax-calculator" element={<PublicTaxCalculator />} />
+                  <Route
+                    path="/salary-vs-dividend-calculator"
+                    element={<SalaryVsDividendCalculator />}
+                  />
                   <Route
                     path="/onboarding/company"
                     element={

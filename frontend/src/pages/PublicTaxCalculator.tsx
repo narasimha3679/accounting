@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Navbar } from '../components/landing/Navbar';
 import { Footer } from '../components/landing/Footer';
@@ -357,7 +358,15 @@ export default function PublicTaxCalculator() {
 
                 {incomeType !== 'salary' && (
                   <div className="p-4 rounded-xl bg-golden-hour/10 border border-golden-hour/20 text-golden-hour/90 text-sm">
-                    Dividend calculations are coming soon. Showing zeroed results.
+                    Paying yourself from your corporation? Compare both routes side by side with
+                    our free{' '}
+                    <Link
+                      to="/salary-vs-dividend-calculator"
+                      className="font-semibold underline hover:text-golden-hour"
+                    >
+                      Salary vs Dividend Calculator
+                    </Link>
+                    .
                   </div>
                 )}
               </div>

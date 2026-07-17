@@ -72,6 +72,14 @@ export const Footer = () => {
                   Tax Calculator
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/salary-vs-dividend-calculator"
+                  className="text-slate-400 hover:text-neon-emerald transition-colors"
+                >
+                  Salary vs Dividend Calculator
+                </Link>
+              </li>
               <li><Link to="/login" className="text-slate-400 hover:text-neon-emerald transition-colors">Login</Link></li>
               <li><Link to="/onboarding/company" className="text-slate-400 hover:text-neon-emerald transition-colors">Sign Up</Link></li>
             </ul>

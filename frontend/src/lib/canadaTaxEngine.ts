@@ -129,6 +129,17 @@ const CPP2_RATE = 0.04;
 const EI_MIE = 68900;
 const EI_RATE = 0.0163;
 
+// Dividend gross-ups and dividend tax credits (2026, as % of the grossed-up amount)
+export type DividendType = 'eligible' | 'non_eligible';
+
+const DIVIDEND_RATES: Record<
+  DividendType,
+  { grossUp: number; federalCreditRate: number; ontarioCreditRate: number }
+> = {
+  eligible: { grossUp: 1.38, federalCreditRate: 0.150198, ontarioCreditRate: 0.1 },
+  non_eligible: { grossUp: 1.15, federalCreditRate: 0.090301, ontarioCreditRate: 0.029863 },
+};
+
 function taxFromBrackets(taxableIncome: number, brackets: Bracket[]): number {
   let tax = 0;
   let previousMax = 0;
@@ -159,7 +170,18 @@ function federalBpa(taxableIncome: number): number {
   return FEDERAL_BPA_MAX - phaseOutRatio * (FEDERAL_BPA_MAX - FEDERAL_BPA_MIN);
 }
 
-function computeAnnual(annualIncome: number): Omit<TaxResult, 'marginalTaxRate' | 'averageTaxRate'> {
+export interface SalaryTaxOptions {
+  /**
+   * Owner-managers holding more than 40% of voting shares are not insurable
+   * under the EI Act, so neither employee nor employer premiums apply.
+   */
+  eiExempt?: boolean;
+}
+
+function computeAnnual(
+  annualIncome: number,
+  options: SalaryTaxOptions = {}
+): Omit<TaxResult, 'marginalTaxRate' | 'averageTaxRate'> {
   const income = Math.max(0, annualIncome);
 
   // CPP1: 5.95% of pensionable earnings between the $3,500 exemption and YMPE
@@ -172,7 +194,7 @@ function computeAnnual(annualIncome: number): Omit<TaxResult, 'marginalTaxRate' 
   const cpp2 =
     income > CPP_YMPE ? (Math.min(income, CPP2_YAMPE) - CPP_YMPE) * CPP2_RATE : 0;
 
-  const ei = Math.min(income, EI_MIE) * EI_RATE;
+  const ei = options.eiExempt ? 0 : Math.min(income, EI_MIE) * EI_RATE;
 
   const taxableIncome = Math.max(0, income - cppEnhanced - cpp2);
 
@@ -224,16 +246,105 @@ function computeAnnual(annualIncome: number): Omit<TaxResult, 'marginalTaxRate' 
  * Calculate 2026 Ontario taxes for an ANNUAL gross salary.
  * Use `convertTaxResult` to express the result in another pay period.
  */
-export function calculateTaxes(annualIncome: number): TaxResult {
-  const result = computeAnnual(annualIncome);
+export function calculateTaxes(annualIncome: number, options: SalaryTaxOptions = {}): TaxResult {
+  const result = computeAnnual(annualIncome, options);
 
   // Marginal rate: numerical delta on the next $100 of gross income
   const delta = 100;
-  const bumped = computeAnnual(Math.max(0, annualIncome) + delta);
+  const bumped = computeAnnual(Math.max(0, annualIncome) + delta, options);
   const marginalTaxRate = ((bumped.totalTax - result.totalTax) / delta) * 100;
 
   const averageTaxRate =
     result.grossIncome > 0 ? (result.totalTax / result.grossIncome) * 100 : 0;
+
+  return { ...result, marginalTaxRate, averageTaxRate };
+}
+
+export interface DividendTaxResult {
+  /** Actual (cash) dividends received */
+  actualDividend: number;
+  /** Taxable (grossed-up) amount */
+  grossedUpDividend: number;
+  federalTax: number;
+  provincialTax: number;
+  ontarioHealthPremium: number;
+  federalDividendTaxCredit: number;
+  provincialDividendTaxCredit: number;
+  totalTax: number;
+  netCash: number;
+  averageTaxRate: number; // percent of actual dividend
+  marginalTaxRate: number; // percent on next $ of actual dividend
+}
+
+function computeDividendAnnual(
+  actualDividend: number,
+  type: DividendType
+): Omit<DividendTaxResult, 'marginalTaxRate' | 'averageTaxRate'> {
+  const dividend = Math.max(0, actualDividend);
+  const rates = DIVIDEND_RATES[type];
+  const grossedUp = dividend * rates.grossUp;
+
+  const federalDtc = grossedUp * rates.federalCreditRate;
+  const provincialDtc = grossedUp * rates.ontarioCreditRate;
+
+  // Federal tax: brackets on grossed-up income, minus BPA and dividend tax credit
+  const federalRaw = taxFromBrackets(grossedUp, FEDERAL_BRACKETS);
+  const federalBpaCredit = federalBpa(grossedUp) * FEDERAL_LOWEST_RATE;
+  const federalTax = Math.max(0, federalRaw - federalBpaCredit - federalDtc);
+
+  // Ontario tax: the dividend tax credit reduces basic tax BEFORE surtax
+  const ontarioRaw = taxFromBrackets(grossedUp, ONTARIO_BRACKETS);
+  const ontarioBpaCredit = ONTARIO_BPA * ONTARIO_LOWEST_RATE;
+  const basicOntarioTax = Math.max(0, ontarioRaw - ontarioBpaCredit - provincialDtc);
+
+  let surtax = 0;
+  if (basicOntarioTax > SURTAX_1_THRESHOLD) {
+    surtax += (basicOntarioTax - SURTAX_1_THRESHOLD) * SURTAX_1_RATE;
+  }
+  if (basicOntarioTax > SURTAX_2_THRESHOLD) {
+    surtax += (basicOntarioTax - SURTAX_2_THRESHOLD) * SURTAX_2_RATE;
+  }
+
+  const ontarioTaxWithSurtax = basicOntarioTax + surtax;
+  const ontarioTaxReduction = Math.min(
+    ontarioTaxWithSurtax,
+    Math.max(0, 2 * ONTARIO_TAX_REDUCTION_BASE - ontarioTaxWithSurtax)
+  );
+  const provincialTax = ontarioTaxWithSurtax - ontarioTaxReduction;
+
+  const ontarioHealthPremium = calculateOntarioHealthPremium(grossedUp);
+
+  const totalTax = federalTax + provincialTax + ontarioHealthPremium;
+
+  return {
+    actualDividend: dividend,
+    grossedUpDividend: grossedUp,
+    federalTax,
+    provincialTax,
+    ontarioHealthPremium,
+    federalDividendTaxCredit: federalDtc,
+    provincialDividendTaxCredit: provincialDtc,
+    totalTax,
+    netCash: dividend - totalTax,
+  };
+}
+
+/**
+ * Calculate 2026 Ontario personal taxes on an ANNUAL actual (cash) dividend,
+ * assuming it is the person's only income. No CPP/EI applies to dividends.
+ */
+export function calculateDividendTaxes(
+  actualDividend: number,
+  type: DividendType
+): DividendTaxResult {
+  const result = computeDividendAnnual(actualDividend, type);
+
+  const delta = 100;
+  const bumped = computeDividendAnnual(Math.max(0, actualDividend) + delta, type);
+  const marginalTaxRate = ((bumped.totalTax - result.totalTax) / delta) * 100;
+
+  const averageTaxRate =
+    result.actualDividend > 0 ? (result.totalTax / result.actualDividend) * 100 : 0;
 
   return { ...result, marginalTaxRate, averageTaxRate };
 }
