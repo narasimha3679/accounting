@@ -79,7 +79,7 @@ export const PrivacyPolicy = () => {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">8. Contact Us</h2>
             <p className="text-slate-300 leading-relaxed">
-              If you have questions about this Privacy Policy or wish to exercise your rights, please contact us at support@cashual.app
+              If you have questions about this Privacy Policy or wish to exercise your rights, please contact us at info@cashual.org
             </p>
           </section>
         </div>

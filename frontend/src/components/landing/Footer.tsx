@@ -1,19 +1,24 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '../ui/Logo';
 
+const NAV_OFFSET = 80;
+
 export const Footer = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-    const element = document.querySelector(href);
-    if (element) {
-      const offset = 80;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - offset;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      });
+    if (location.pathname === '/') {
+      const element = document.querySelector(href);
+      if (element) {
+        const offsetPosition =
+          element.getBoundingClientRect().top + window.pageYOffset - NAV_OFFSET;
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+      }
+      return;
     }
+    navigate({ pathname: '/', hash: href.replace(/^#/, '') });
   };
 
   return (
@@ -34,7 +39,7 @@ export const Footer = () => {
             <ul className="space-y-4" role="list">
               <li>
                 <a
-                  href="#features"
+                  href="/#features"
                   onClick={(e) => handleAnchorClick(e, '#features')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
@@ -43,7 +48,7 @@ export const Footer = () => {
               </li>
               <li>
                 <a
-                  href="#pricing"
+                  href="/#pricing"
                   onClick={(e) => handleAnchorClick(e, '#pricing')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
@@ -52,12 +57,20 @@ export const Footer = () => {
               </li>
               <li>
                 <a
-                  href="#faq"
+                  href="/#faq"
                   onClick={(e) => handleAnchorClick(e, '#faq')}
                   className="text-slate-400 hover:text-neon-emerald transition-colors focus:outline-none focus:ring-2 focus:ring-neon-emerald focus:ring-offset-2 focus:ring-offset-charcoal rounded"
                 >
                   FAQ
                 </a>
+              </li>
+              <li>
+                <Link
+                  to="/tax-calculator"
+                  className="text-slate-400 hover:text-neon-emerald transition-colors"
+                >
+                  Tax Calculator
+                </Link>
               </li>
               <li><Link to="/login" className="text-slate-400 hover:text-neon-emerald transition-colors">Login</Link></li>
               <li><Link to="/onboarding/company" className="text-slate-400 hover:text-neon-emerald transition-colors">Sign Up</Link></li>
@@ -75,8 +88,8 @@ export const Footer = () => {
           <div>
             <h4 className="text-white font-semibold mb-6">Support</h4>
             <ul className="space-y-4" role="list">
-              <li><a href="mailto:support@cashual.org" className="text-slate-400 hover:text-neon-emerald transition-colors">support@cashual.org</a></li>
-              <li><a href="#faq" onClick={(e) => handleAnchorClick(e, '#faq')} className="text-slate-400 hover:text-neon-emerald transition-colors">FAQ</a></li>
+              <li><a href="mailto:info@cashual.org" className="text-slate-400 hover:text-neon-emerald transition-colors">info@cashual.org</a></li>
+              <li><a href="/#faq" onClick={(e) => handleAnchorClick(e, '#faq')} className="text-slate-400 hover:text-neon-emerald transition-colors">FAQ</a></li>
             </ul>
 
             <h4 className="text-white font-semibold mb-6 mt-10">Our Products</h4>

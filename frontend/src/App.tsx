@@ -33,6 +33,7 @@ import BenefitsSettingsPage from './pages/settings/BenefitsSettingsPage';
 import NotificationSettings from './pages/settings/NotificationSettings';
 import CompanyOnboarding from './pages/CompanyOnboarding';
 import TaxCalculator from './pages/TaxCalculator';
+import PublicTaxCalculator from './pages/PublicTaxCalculator';
 import Employees from './pages/Employees';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import TimeManagement from './pages/TimeManagement';
@@ -173,6 +174,7 @@ function App() {
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/resume-builder" element={<ResumeBuilderPromo />} />
+                  <Route path="/tax-calculator" element={<PublicTaxCalculator />} />
                   <Route
                     path="/onboarding/company"
                     element={
@@ -334,7 +336,7 @@ function App() {
                     }
                   />
                   <Route
-                    path="/tax-calculator"
+                    path="/reports/tax-summary"
                     element={
                       <ProtectedRoute>
                         <TaxCalculator />

@@ -100,7 +100,7 @@ export const TermsOfService = () => {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">11. Contact Information</h2>
             <p className="text-slate-300 leading-relaxed">
-              For questions about these Terms of Service, please contact us at support@cashual.app
+              For questions about these Terms of Service, please contact us at info@cashual.org
             </p>
           </section>
         </div>

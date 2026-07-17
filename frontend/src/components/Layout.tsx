@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'ROEs', href: '/payroll/roe', icon: FileCheck, feature: 'payroll' as const },
         { name: 'T4 Generation', href: '/payroll/t4', icon: FileCheck, feature: 'payroll' as const },
         { name: 'Reports', href: '/reports', icon: TrendingUp, feature: 'reports' as const },
-        { name: 'Tax Calculator', href: '/tax-calculator', icon: Calculator, feature: 'tax_calculator' as const },
+        { name: 'Tax Summary', href: '/reports/tax-summary', icon: Calculator, feature: 'tax_calculator' as const },
         { name: 'Settings', href: '/settings', icon: Settings, feature: null }, // Always shown
     ];
 

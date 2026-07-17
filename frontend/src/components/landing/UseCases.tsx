@@ -30,7 +30,7 @@ const useCases = [
       },
       {
         title: "Dividend Optimization",
-        description: "Use the tax calculator to optimize salary vs. dividend payments",
+        description: "Plan salary vs. dividends in Cashual, or start with our free income tax calculator",
         icon: Calculator
       },
       {

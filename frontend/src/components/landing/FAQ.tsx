@@ -9,6 +9,10 @@ const faqs = [
     answer: "Cashual is designed around CRA rules for Canadian small businesses, with a focus on HST, corporate accounting, and reporting. The app helps you stay organized with invoicing, expenses, HST tracking, payroll with automatic tax deductions (CPP/EI/income tax), and automated T4/T5/ROE generation. All calculations follow current CRA guidelines. We still recommend working with a professional accountant for final filings and complex tax situations."
   },
   {
+    question: "Do you offer a free Canadian income tax calculator?",
+    answer: "Yes. Cashual includes a free 2026 Canadian income tax calculator at cashual.org/tax-calculator—no account required. It estimates Ontario take-home pay using federal and provincial brackets, CPP, CPP2, EI, and the Ontario Health Premium. For business tax planning (salary vs dividends, HST, and CRA documents), sign up for Cashual."
+  },
+  {
     question: "Can I track employee hours and schedules?",
     answer: "Yes! Cashual includes comprehensive time management. Employees can submit timesheets, managers can approve them with one click, and you can schedule shifts using calendar views. All time data integrates with payroll for accurate pay calculations. The system supports both employee-submitted time entries and manager-assigned schedules."
   },

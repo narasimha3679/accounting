@@ -374,7 +374,7 @@ const TaxCalculator: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Tax Calculator</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Tax Summary</h1>
                     <p className="text-slate-muted mt-2">Calculate taxes owed to CRA for Ontario small corporations</p>
                 </div>
 

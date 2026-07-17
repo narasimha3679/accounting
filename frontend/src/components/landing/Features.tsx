@@ -121,10 +121,17 @@ const features = [
     category: "Tax & Compliance"
   },
   {
-    title: "Tax Calculator",
-    description: "Compare salary vs. dividends in real-time. See the tax impact of different compensation strategies. Make informed decisions about how to pay yourself and optimize your tax structure.",
+    title: "Free Income Tax Calculator",
+    description: "Estimate your 2026 Canadian take-home pay for free—no account needed. Ontario federal and provincial brackets, CPP, EI, and the Ontario Health Premium. Try it from the Tax Calculator link in the nav.",
     icon: Calculator,
     color: "text-fuchsia-400",
+    category: "Tax & Compliance"
+  },
+  {
+    title: "Salary vs Dividend Planner",
+    description: "Compare salary vs. dividends in real-time inside Cashual. See the tax impact of different compensation strategies and optimize how you pay yourself.",
+    icon: DollarSign,
+    color: "text-purple-400",
     category: "Tax & Compliance"
   },
   {

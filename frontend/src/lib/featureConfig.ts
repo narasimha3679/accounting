@@ -70,7 +70,7 @@ export const FEATURE_LABELS: Record<keyof EnabledFeatures, string> = {
     dividends: 'Dividends',
     clients: 'Clients',
     reports: 'Reports',
-    tax_calculator: 'Tax Calculator',
+    tax_calculator: 'Tax Summary',
     salary_dividend_optimizer: 'Salary vs Dividend Optimizer',
     owner_reimbursement: 'Owner Reimbursement',
     employees: 'Employee Management',
