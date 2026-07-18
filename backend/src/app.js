@@ -57,7 +57,7 @@ app.use('/api/compensation-strategy', compensationStrategyRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
+    res.status(200).json({ status: 'ok', service: 'backend' });
 });
 
 module.exports = app;
