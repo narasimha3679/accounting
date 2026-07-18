@@ -21,6 +21,8 @@ const businessTypeColors = {
     small_business: 'from-golden-hour/20 to-golden-hour/10',
 };
 
+const BETA_BUSINESS_TYPES: BusinessType[] = ['small_business'];
+
 export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ selectedType, onSelect }) => {
     const types: BusinessType[] = ['solo_corporation', 'small_business'];
 
@@ -39,6 +41,7 @@ export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ sele
                 {types.map((type) => {
                     const Icon = businessTypeIcons[type];
                     const isSelected = selectedType === type;
+                    const isBeta = BETA_BUSINESS_TYPES.includes(type);
 
                     return (
                         <motion.div
@@ -52,7 +55,9 @@ export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ sele
                                     "p-6 cursor-pointer transition-all duration-200",
                                     isSelected
                                         ? "ring-2 ring-neon-emerald bg-neon-emerald/10 border-neon-emerald/50"
-                                        : "hover:bg-card/50 border-border"
+                                        : isBeta
+                                            ? "hover:bg-card/50 border-dashed border-border opacity-90"
+                                            : "hover:bg-card/50 border-border"
                                 )}
                             >
                                 <div className="flex items-start space-x-4">
@@ -66,15 +71,27 @@ export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ sele
                                         )} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className={cn(
-                                            "text-lg font-semibold mb-1",
-                                            isSelected ? "text-neon-emerald" : "text-foreground"
-                                        )}>
-                                            {BUSINESS_TYPE_LABELS[type]}
-                                        </h3>
+                                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                                            <h3 className={cn(
+                                                "text-lg font-semibold",
+                                                isSelected ? "text-neon-emerald" : "text-foreground"
+                                            )}>
+                                                {BUSINESS_TYPE_LABELS[type]}
+                                            </h3>
+                                            {isBeta && (
+                                                <span className="inline-flex items-center rounded-md border border-golden-hour/40 bg-golden-hour/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-golden-hour">
+                                                    Beta
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-sm text-muted-foreground">
                                             {BUSINESS_TYPE_DESCRIPTIONS[type]}
                                         </p>
+                                        {isBeta && (
+                                            <p className="mt-2 text-xs text-golden-hour">
+                                                Early access — features may change as we refine the experience.
+                                            </p>
+                                        )}
                                     </div>
                                     {isSelected && (
                                         <div className="flex-shrink-0">
