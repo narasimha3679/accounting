@@ -468,10 +468,10 @@ const TaxCalculator: React.FC = () => {
 
             {/* Total Taxes Owed Summary */}
             <Card className={cn(
-                "p-6",
+                "p-6 border-l-4",
                 taxData.totalTaxesOwed > 0
-                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-                    : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                    ? "border-l-destructive bg-card"
+                    : "border-l-primary bg-card"
             )}>
                 <div className="flex items-center justify-between">
                     <div>
@@ -487,13 +487,13 @@ const TaxCalculator: React.FC = () => {
                         <div className={cn(
                             "text-4xl font-bold",
                             taxData.totalTaxesOwed > 0
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-green-600 dark:text-green-400"
+                                ? "text-destructive"
+                                : "text-primary"
                         )}>
                             {formatCurrency(taxData.totalTaxesOwed)}
                         </div>
                         {taxData.totalTaxesOwed < 0 && (
-                            <p className="text-sm text-green-600 dark:text-green-400 mt-1">Refund/Credit</p>
+                            <p className="text-sm text-primary mt-1">Refund/Credit</p>
                         )}
                     </div>
                 </div>
@@ -501,7 +501,7 @@ const TaxCalculator: React.FC = () => {
 
             {/* HST to Pay Section */}
             <div className="space-y-4">
-                <Card className="p-6 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+                <Card className="p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-bold text-white">HST to Pay</h2>
                         <button
@@ -513,11 +513,11 @@ const TaxCalculator: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                        <div className="bg-background rounded-lg p-4 border">
                             <div className="text-sm text-slate-muted mb-1">HST Collected</div>
                             <div className="text-2xl font-bold text-white">{formatCurrency(taxData.hstCollected)}</div>
                         </div>
-                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                        <div className="bg-background rounded-lg p-4 border">
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="text-sm text-slate-muted">HST Credits from Expenses</div>
                                 <HelpIcon
@@ -525,26 +525,26 @@ const TaxCalculator: React.FC = () => {
                                     size="sm"
                                 />
                             </div>
-                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <div className="text-2xl font-bold text-primary">
                                 {taxData.isHSTRegistered ? formatCurrency(taxData.hstInputTaxCredits) : '$0.00 (Not HST Registered)'}
                             </div>
                         </div>
-                        <div className="bg-background rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                        <div className="bg-background rounded-lg p-4 border">
                             <div className="text-sm text-slate-muted mb-1">HST Already Paid to CRA</div>
-                            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(taxData.hstAlreadyPaid)}</div>
+                            <div className="text-2xl font-bold text-white">{formatCurrency(taxData.hstAlreadyPaid)}</div>
                         </div>
                         <div className={cn(
-                            "bg-background rounded-lg p-4 border-2",
+                            "bg-background rounded-lg p-4 border-l-4",
                             taxData.hstOwed > 0
-                                ? "border-red-300 dark:border-red-700"
-                                : "border-green-300 dark:border-green-700"
+                                ? "border-l-destructive"
+                                : "border-l-primary"
                         )}>
                             <div className="text-sm text-slate-muted mb-1">Net HST Owed</div>
                             <div className={cn(
                                 "text-2xl font-bold",
                                 taxData.hstOwed > 0
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "text-green-600 dark:text-green-400"
+                                    ? "text-destructive"
+                                    : "text-primary"
                             )}>
                                 {formatCurrency(taxData.hstOwed)}
                             </div>
@@ -601,7 +601,7 @@ const TaxCalculator: React.FC = () => {
 
             {/* Corporate Income Tax Section */}
             <div className="space-y-4">
-                <Card className="p-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <Card className="p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-bold text-white">Business Income Tax</h2>
                         <button
@@ -614,7 +614,7 @@ const TaxCalculator: React.FC = () => {
 
                     <div className="space-y-4">
                         {/* Active Business Income Section */}
-                        <div className="bg-background rounded-lg p-4 border-2 border-blue-300 dark:border-blue-700">
+                        <div className="bg-background rounded-lg p-4 border">
                             <h3 className="text-lg font-semibold text-white mb-3">Business Income (from operations)</h3>
                             <div className="space-y-3">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -630,23 +630,23 @@ const TaxCalculator: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div>
                                         <div className="text-sm text-slate-muted mb-1">Deductible Expenses</div>
-                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalDeductibleExpenses)}</div>
+                                        <div className="text-lg font-bold text-destructive">-{formatCurrency(taxData.totalDeductibleExpenses)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-slate-muted mb-1">Salaries</div>
-                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalSalaries)}</div>
+                                        <div className="text-lg font-bold text-destructive">-{formatCurrency(taxData.totalSalaries)}</div>
                                     </div>
                                     <div>
                                         <div className="text-sm text-slate-muted mb-1">Depreciation (CCA)</div>
-                                        <div className="text-lg font-bold text-red-600 dark:text-red-400">-{formatCurrency(taxData.totalDepreciation)}</div>
+                                        <div className="text-lg font-bold text-destructive">-{formatCurrency(taxData.totalDepreciation)}</div>
                                     </div>
                                 </div>
-                                <div className="bg-muted/50 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                                <div className="bg-muted/50 rounded-lg p-3 border">
                                     <div className="flex justify-between items-center mb-1">
                                         <div className="text-sm font-medium text-white">Active Business Income</div>
                                         <div className="text-sm text-slate-muted">Tax Rate: {formatPercentage(taxData.smallBusinessTaxRate)}</div>
                                     </div>
-                                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(taxData.activeBusinessIncome)}</div>
+                                    <div className="text-2xl font-bold text-white">{formatCurrency(taxData.activeBusinessIncome)}</div>
                                     <div className="text-sm text-slate-muted mt-1">Tax: {formatCurrency(taxData.activeBusinessTax)}</div>
                                 </div>
                             </div>
@@ -763,7 +763,7 @@ const TaxCalculator: React.FC = () => {
 
                 {/* RDTOH Section */}
                 {(taxData.rdtohBalance > 0 || taxData.dividendsPaid > 0) && (
-                    <div className="bg-background rounded-lg p-4 border-2 border-purple-300 dark:border-purple-700">
+                    <div className="bg-background rounded-lg p-4 border">
                         <div className="flex items-center gap-2 mb-3">
                             <h3 className="text-lg font-semibold text-white">Refundable Tax Account</h3>
                             <HelpIcon
@@ -779,13 +779,13 @@ const TaxCalculator: React.FC = () => {
                                     <div className="text-xs text-slate-muted">RDTOH Refund: {formatCurrency(taxData.rdtohRefund)} ($1 per $2.61 dividend)</div>
                                 </div>
                             )}
-                            <div className="bg-muted/50 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
+                            <div className="bg-muted/50 rounded-lg p-3 border">
                                 <div className="flex justify-between items-center mb-1">
                                     <div className="text-sm font-medium text-white">RDTOH Balance</div>
                                 </div>
-                                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(taxData.rdtohBalance)}</div>
+                                <div className="text-2xl font-bold text-white">{formatCurrency(taxData.rdtohBalance)}</div>
                                 {taxData.rdtohRefundable > 0 && (
-                                    <div className="text-sm text-green-600 dark:text-green-400 mt-1">Refundable: {formatCurrency(taxData.rdtohRefundable)}</div>
+                                    <div className="text-sm text-primary mt-1">Refundable: {formatCurrency(taxData.rdtohRefundable)}</div>
                                 )}
                             </div>
                         </div>
@@ -794,17 +794,17 @@ const TaxCalculator: React.FC = () => {
 
                 {/* Total Corporate Tax */}
                 <div className={cn(
-                    "bg-background rounded-lg p-4 border-2",
+                    "bg-background rounded-lg p-4 border-l-4",
                     taxData.totalCorporateTax > 0
-                        ? "border-red-300 dark:border-red-700"
-                        : "border-green-300 dark:border-green-700"
+                        ? "border-l-destructive"
+                        : "border-l-primary"
                 )}>
                     <div className="text-sm text-slate-muted mb-1">Total Corporate Income Tax</div>
                     <div className="text-3xl font-bold text-white mb-2">{formatCurrency(taxData.totalCorporateTax)}</div>
                     <div className="text-sm text-slate-muted">
                         Active Business: {formatCurrency(taxData.activeBusinessTax)}
                         {taxData.rdtohRefundable > 0 && (
-                            <span className="text-green-600 dark:text-green-400"> - RDTOH Refund: {formatCurrency(taxData.rdtohRefundable)}</span>
+                            <span className="text-primary"> - RDTOH Refund: {formatCurrency(taxData.rdtohRefundable)}</span>
                         )}
                     </div>
                 </div>
@@ -812,9 +812,9 @@ const TaxCalculator: React.FC = () => {
 
             {/* Validation Warnings */}
             {taxData.validationWarnings && taxData.validationWarnings.length > 0 && (
-                <Card className="p-6 border-2 border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+                <Card className="p-6 border border-accent/50 bg-accent/10">
                     <div className="flex items-start">
-                        <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className="h-6 w-6 text-accent mr-3 mt-0.5 flex-shrink-0" />
                         <div>
                             <h3 className="text-lg font-semibold text-white mb-2">Validation Warnings</h3>
                             <ul className="text-sm text-slate-muted space-y-2 list-disc list-inside">
@@ -828,9 +828,9 @@ const TaxCalculator: React.FC = () => {
             )}
 
             {/* Information Card */}
-            <Card className="p-6 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+            <Card className="p-6 border bg-card">
                 <div className="flex items-start">
-                    <AlertCircle className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
+                    <AlertCircle className="h-6 w-6 text-primary mr-3 mt-0.5 flex-shrink-0" />
                     <div>
                         <h3 className="text-lg font-semibold text-white mb-2">Important Notes</h3>
                         <ul className="text-sm text-slate-muted space-y-2 list-disc list-inside">
