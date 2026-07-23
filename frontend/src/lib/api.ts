@@ -277,9 +277,23 @@ export interface Dividend {
     updated_at: string;
 }
 
+export interface DividendRecipientProfile {
+    id: number;
+    company_id: number;
+    name: string;
+    recipient_sin?: string | null;
+    recipient_type: 'individual' | 'corporation' | 'trust';
+    business_number?: string | null;
+    mailing_address?: string | null;
+    is_default: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface DividendRecipient {
     id: number;
     dividend_id: number;
+    profile_id?: number | null;
     recipient_name: string;
     recipient_sin?: string | null;
     recipient_type: 'individual' | 'corporation' | 'trust';
@@ -2516,6 +2530,171 @@ class SupabaseApi {
     async deleteDividendRecipient(id: number): Promise<void> {
         const { error } = await supabase.from('dividend_recipients').delete().eq('id', id);
         if (error) throw new Error(error.message);
+    }
+
+    // Dividend Recipient Profiles -------------------------------------------
+    async getDividendRecipientProfiles(company_id: number): Promise<DividendRecipientProfile[]> {
+        const { data, error } = await supabase
+            .from('dividend_recipient_profiles')
+            .select('*')
+            .eq('company_id', company_id)
+            .order('is_default', { ascending: false })
+            .order('name', { ascending: true });
+        if (error) throw new Error(error.message);
+        return data || [];
+    }
+
+    async createDividendRecipientProfile(
+        profile: Omit<DividendRecipientProfile, 'id' | 'created_at' | 'updated_at'>
+    ): Promise<DividendRecipientProfile> {
+        if (profile.is_default) {
+            await this.clearDefaultDividendRecipientProfiles(profile.company_id);
+        }
+        const { data, error } = await supabase
+            .from('dividend_recipient_profiles')
+            .insert(profile)
+            .select()
+            .single<DividendRecipientProfile>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async updateDividendRecipientProfile(
+        id: number,
+        profile: Partial<Omit<DividendRecipientProfile, 'id' | 'created_at' | 'updated_at'>>
+    ): Promise<DividendRecipientProfile> {
+        if (profile.is_default === true && profile.company_id != null) {
+            await this.clearDefaultDividendRecipientProfiles(profile.company_id, id);
+        } else if (profile.is_default === true) {
+            const existing = await this.getDividendRecipientProfile(id);
+            await this.clearDefaultDividendRecipientProfiles(existing.company_id, id);
+        }
+        const { data, error } = await supabase
+            .from('dividend_recipient_profiles')
+            .update({ ...profile, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single<DividendRecipientProfile>();
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    async deleteDividendRecipientProfile(id: number): Promise<void> {
+        const { error } = await supabase.from('dividend_recipient_profiles').delete().eq('id', id);
+        if (error) throw new Error(error.message);
+    }
+
+    async getDividendRecipientProfile(id: number): Promise<DividendRecipientProfile> {
+        const { data, error } = await supabase
+            .from('dividend_recipient_profiles')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle<DividendRecipientProfile>();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Dividend recipient profile not found');
+        return data;
+    }
+
+    async setDefaultDividendRecipientProfile(company_id: number, profile_id: number): Promise<DividendRecipientProfile> {
+        await this.clearDefaultDividendRecipientProfiles(company_id, profile_id);
+        return this.updateDividendRecipientProfile(profile_id, { is_default: true, company_id });
+    }
+
+    private async clearDefaultDividendRecipientProfiles(company_id: number, exceptId?: number): Promise<void> {
+        let query = supabase
+            .from('dividend_recipient_profiles')
+            .update({ is_default: false, updated_at: new Date().toISOString() })
+            .eq('company_id', company_id)
+            .eq('is_default', true);
+        if (exceptId != null) {
+            query = query.neq('id', exceptId);
+        }
+        const { error } = await query;
+        if (error) throw new Error(error.message);
+    }
+
+    /**
+     * Returns a default allocation draft when exactly one profile exists,
+     * or when a default profile is marked. Used to prefill new dividends.
+     */
+    getDefaultDividendRecipientAllocation(
+        profiles: DividendRecipientProfile[],
+        dividendAmount: number,
+        dividendId = 0
+    ): Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'> | null {
+        if (profiles.length === 0 || dividendAmount <= 0) return null;
+        const defaultProfile =
+            profiles.find((p) => p.is_default) ??
+            (profiles.length === 1 ? profiles[0] : null);
+        if (!defaultProfile) return null;
+        return {
+            dividend_id: dividendId,
+            profile_id: defaultProfile.id,
+            recipient_name: defaultProfile.name,
+            recipient_sin: defaultProfile.recipient_sin ?? null,
+            recipient_type: defaultProfile.recipient_type,
+            business_number: defaultProfile.business_number ?? null,
+            mailing_address: defaultProfile.mailing_address ?? null,
+            amount: Math.round(dividendAmount * 100) / 100,
+        };
+    }
+
+    /**
+     * Assign the default (or sole) profile to dividends that have no recipients.
+     * User-initiated only — never run automatically from migrations.
+     */
+    async assignMissingDividendsToDefaultProfile(company_id: number): Promise<{
+        assignedCount: number;
+        totalAmount: number;
+    }> {
+        const profiles = await this.getDividendRecipientProfiles(company_id);
+        const defaultProfile =
+            profiles.find((p) => p.is_default) ??
+            (profiles.length === 1 ? profiles[0] : null);
+        if (!defaultProfile) {
+            throw new Error('No default recipient profile found. Create a profile or mark one as default.');
+        }
+
+        const dividendsResponse = await this.getDividends({ company_id, limit: 1000 });
+        let assignedCount = 0;
+        let totalAmount = 0;
+
+        for (const dividend of dividendsResponse.data) {
+            const existing = await this.getDividendRecipients(dividend.id);
+            if (existing.length > 0) continue;
+
+            await this.createDividendRecipient({
+                dividend_id: dividend.id,
+                profile_id: defaultProfile.id,
+                recipient_name: defaultProfile.name,
+                recipient_sin: defaultProfile.recipient_sin ?? null,
+                recipient_type: defaultProfile.recipient_type,
+                business_number: defaultProfile.business_number ?? null,
+                mailing_address: defaultProfile.mailing_address ?? null,
+                amount: dividend.amount,
+            });
+            assignedCount += 1;
+            totalAmount += Number(dividend.amount) || 0;
+        }
+
+        return { assignedCount, totalAmount };
+    }
+
+    async countDividendsMissingRecipients(company_id: number): Promise<{
+        count: number;
+        totalAmount: number;
+    }> {
+        const dividendsResponse = await this.getDividends({ company_id, limit: 1000 });
+        let count = 0;
+        let totalAmount = 0;
+        for (const dividend of dividendsResponse.data) {
+            const existing = await this.getDividendRecipients(dividend.id);
+            if (existing.length === 0) {
+                count += 1;
+                totalAmount += Number(dividend.amount) || 0;
+            }
+        }
+        return { count, totalAmount };
     }
 
     // Dividend Document Generation ------------------------------------------

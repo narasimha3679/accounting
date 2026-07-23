@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { type Dividend, type DividendRecipient, type Company } from './api';
@@ -5,27 +6,36 @@ import { formatLocalDate } from './utils';
 
 /**
  * CRA T5 Slip Generator
- * 
+ *
  * Generates T5 slips (Statement of Investment Income) in compliance with CRA requirements.
  * T5 slips are required when paying dividends or investment income to Canadian residents.
  */
 
-// CRA tax rates and gross-up factors (2024 rates)
-const NON_ELIGIBLE_GROSS_UP = 1.15; // 15% gross-up
-const ELIGIBLE_GROSS_UP = 1.38; // 38% gross-up
-const NON_ELIGIBLE_TAX_CREDIT_RATE = 0.10; // 10% of grossed-up amount
-const ELIGIBLE_TAX_CREDIT_RATE = 0.15; // 15% of grossed-up amount
+const NON_ELIGIBLE_GROSS_UP = 1.15;
+const ELIGIBLE_GROSS_UP = 1.38;
+const NON_ELIGIBLE_TAX_CREDIT_RATE = 0.10;
+const ELIGIBLE_TAX_CREDIT_RATE = 0.15;
 
-// interface T5SlipData {
-//     dividend: Dividend;
-//     recipient: DividendRecipient;
-//     company: Company;
-//     calendarYear: number;
-// }
+export interface AnnualT5RecipientGroup {
+    key: string;
+    profileId: number | null;
+    recipientName: string;
+    recipientSin: string | null;
+    recipientType: 'individual' | 'corporation' | 'trust';
+    businessNumber: string | null;
+    mailingAddress: string | null;
+    eligibleAmount: number;
+    nonEligibleAmount: number;
+}
 
-/**
- * Calculate T5 slip box values for a dividend recipient
- */
+export interface AnnualT5GenerationResult {
+    zipBlob: Blob;
+    slipCount: number;
+    missingRecipientDividendCount: number;
+    missingRecipientTotalAmount: number;
+    groups: AnnualT5RecipientGroup[];
+}
+
 function calculateT5Boxes(
     dividendAmount: number,
     dividendType: 'eligible' | 'non_eligible'
@@ -35,10 +45,10 @@ function calculateT5Boxes(
     taxCredit: number;
 } {
     const actualAmount = dividendAmount;
-    
+
     let grossedUpAmount: number;
     let taxCredit: number;
-    
+
     if (dividendType === 'eligible') {
         grossedUpAmount = actualAmount * ELIGIBLE_GROSS_UP;
         taxCredit = grossedUpAmount * ELIGIBLE_TAX_CREDIT_RATE;
@@ -46,7 +56,7 @@ function calculateT5Boxes(
         grossedUpAmount = actualAmount * NON_ELIGIBLE_GROSS_UP;
         taxCredit = grossedUpAmount * NON_ELIGIBLE_TAX_CREDIT_RATE;
     }
-    
+
     return {
         actualAmount: Math.round(actualAmount * 100) / 100,
         grossedUpAmount: Math.round(grossedUpAmount * 100) / 100,
@@ -54,9 +64,6 @@ function calculateT5Boxes(
     };
 }
 
-/**
- * Format SIN for display (XXX XXX XXX)
- */
 function formatSIN(sin: string | null | undefined): string {
     if (!sin) return '';
     const cleaned = sin.replace(/\D/g, '');
@@ -64,14 +71,124 @@ function formatSIN(sin: string | null | undefined): string {
     return `${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6, 9)}`;
 }
 
+function normalizeName(name: string): string {
+    return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 /**
- * Generate a single T5 slip PDF
+ * Group by CRA identity: SIN for individuals, BN for corporations, then profile, then name.
+ * Preferring SIN over profile_id merges legacy rows with profile-linked rows for the same person.
  */
-export async function generateT5SlipPDF(
-    dividend: Dividend,
-    recipient: DividendRecipient,
-    company: Company
-): Promise<Blob> {
+function recipientGroupKey(recipient: DividendRecipient): string {
+    const sin = recipient.recipient_sin?.replace(/\D/g, '');
+    if (sin && sin.length === 9) {
+        return `sin:${sin}`;
+    }
+    const bn = recipient.business_number?.replace(/\s+/g, '').toUpperCase();
+    if (bn) {
+        return `bn:${bn}`;
+    }
+    if (recipient.profile_id != null) {
+        return `profile:${recipient.profile_id}`;
+    }
+    return `name:${normalizeName(recipient.recipient_name)}`;
+}
+
+/** Calendar year from payment_date (else declaration_date), timezone-safe for YYYY-MM-DD. */
+export function getDividendCalendarYear(dividend: Dividend): number {
+    const dateStr = dividend.payment_date || dividend.declaration_date;
+    const dateOnly = dateStr.split('T')[0];
+    const year = Number(dateOnly.split('-')[0]);
+    if (!Number.isFinite(year)) {
+        throw new Error(`Invalid dividend date for calendar year: ${dateStr}`);
+    }
+    return year;
+}
+
+/**
+ * Group allocation rows for a calendar year into one slip per recipient identity
+ * (SIN → business number → profile_id → normalized name).
+ */
+export function groupRecipientsForCalendarYear(
+    dividends: Dividend[],
+    recipients: DividendRecipient[]
+): AnnualT5RecipientGroup[] {
+    const dividendById = new Map(dividends.map((d) => [d.id, d]));
+    const groups = new Map<string, AnnualT5RecipientGroup>();
+
+    for (const recipient of recipients) {
+        const dividend = dividendById.get(recipient.dividend_id);
+        if (!dividend) continue;
+
+        const key = recipientGroupKey(recipient);
+        const amount = Number(recipient.amount) || 0;
+        const existing = groups.get(key);
+        if (!existing) {
+            groups.set(key, {
+                key,
+                profileId: recipient.profile_id ?? null,
+                recipientName: recipient.recipient_name,
+                recipientSin: recipient.recipient_sin ?? null,
+                recipientType: recipient.recipient_type,
+                businessNumber: recipient.business_number ?? null,
+                mailingAddress: recipient.mailing_address ?? null,
+                eligibleAmount: dividend.dividend_type === 'eligible' ? amount : 0,
+                nonEligibleAmount: dividend.dividend_type === 'non_eligible' ? amount : 0,
+            });
+        } else {
+            if (dividend.dividend_type === 'eligible') {
+                existing.eligibleAmount += amount;
+            } else {
+                existing.nonEligibleAmount += amount;
+            }
+            if (!existing.recipientSin && recipient.recipient_sin) {
+                existing.recipientSin = recipient.recipient_sin;
+            }
+            if (!existing.mailingAddress && recipient.mailing_address) {
+                existing.mailingAddress = recipient.mailing_address;
+            }
+            if (!existing.businessNumber && recipient.business_number) {
+                existing.businessNumber = recipient.business_number;
+            }
+            if (existing.profileId == null && recipient.profile_id != null) {
+                existing.profileId = recipient.profile_id;
+            }
+            // Prefer profile-linked name when merging legacy + profile rows
+            if (recipient.profile_id != null && recipient.recipient_name) {
+                existing.recipientName = recipient.recipient_name;
+            }
+        }
+    }
+
+    return Array.from(groups.values()).map((g) => ({
+        ...g,
+        eligibleAmount: Math.round(g.eligibleAmount * 100) / 100,
+        nonEligibleAmount: Math.round(g.nonEligibleAmount * 100) / 100,
+    }));
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function buildT5SlipPdf(
+    company: Company,
+    calendarYear: number,
+    recipientName: string,
+    recipientSin: string | null,
+    recipientType: 'individual' | 'corporation' | 'trust',
+    businessNumber: string | null,
+    mailingAddress: string | null,
+    eligibleAmount: number,
+    nonEligibleAmount: number
+): Blob {
     const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -83,26 +200,16 @@ export async function generateT5SlipPDF(
     const margin = 10;
     let yPos = margin;
 
-    // Get calendar year from payment date or declaration date
-    const paymentDate = dividend.payment_date ? new Date(dividend.payment_date) : new Date(dividend.declaration_date);
-    const calendarYear = paymentDate.getFullYear();
-
-    // Calculate T5 box values
-    const boxes = calculateT5Boxes(recipient.amount, dividend.dividend_type);
-
-    // Header - CRA T5 Slip
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
     pdf.text('T5 - Statement of Investment Income', pageWidth / 2, yPos, { align: 'center' });
     yPos += 8;
 
-    // Year
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
     pdf.text(`Tax Year: ${calendarYear}`, pageWidth / 2, yPos, { align: 'center' });
     yPos += 10;
 
-    // Payer Information Section
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
     pdf.text('PAYER INFORMATION', margin, yPos);
@@ -111,62 +218,67 @@ export async function generateT5SlipPDF(
     pdf.setFont('helvetica', 'normal');
     pdf.text(`Name: ${company.name}`, margin, yPos);
     yPos += 5;
-    
+
     if (company.business_number) {
         pdf.text(`Business Number: ${company.business_number}`, margin, yPos);
         yPos += 5;
     }
 
-    // Recipient Information Section
     yPos += 3;
     pdf.setFont('helvetica', 'bold');
     pdf.text('RECIPIENT INFORMATION', margin, yPos);
     yPos += 6;
 
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Name: ${recipient.recipient_name}`, margin, yPos);
+    pdf.text(`Name: ${recipientName}`, margin, yPos);
     yPos += 5;
 
-    if (recipient.recipient_sin) {
-        pdf.text(`SIN: ${formatSIN(recipient.recipient_sin)}`, margin, yPos);
+    if (recipientSin) {
+        pdf.text(`SIN: ${formatSIN(recipientSin)}`, margin, yPos);
         yPos += 5;
-    } else {
+    } else if (recipientType === 'individual') {
         pdf.setTextColor(255, 0, 0);
         pdf.text('SIN: MISSING - REQUIRED FOR FILING', margin, yPos);
         pdf.setTextColor(0, 0, 0);
         yPos += 5;
     }
 
-    if (recipient.recipient_type === 'corporation' && recipient.business_number) {
-        pdf.text(`Business Number: ${recipient.business_number}`, margin, yPos);
+    if (recipientType === 'corporation' && businessNumber) {
+        pdf.text(`Business Number: ${businessNumber}`, margin, yPos);
         yPos += 5;
     }
 
-    if (recipient.mailing_address) {
-        const addressLines = recipient.mailing_address.split('\n');
+    if (mailingAddress) {
+        const addressLines = mailingAddress.split('\n');
         addressLines.forEach((line) => {
             pdf.text(`Address: ${line}`, margin, yPos);
             yPos += 5;
         });
     }
 
-    // T5 Boxes Section
     yPos += 5;
     pdf.setFont('helvetica', 'bold');
     pdf.text('INCOME INFORMATION', margin, yPos);
     yPos += 8;
 
-    // Create table for T5 boxes
     const tableData: string[][] = [];
-    
-    if (dividend.dividend_type === 'non_eligible') {
+
+    if (nonEligibleAmount > 0) {
+        const boxes = calculateT5Boxes(nonEligibleAmount, 'non_eligible');
         tableData.push(['Box 10', 'Non-eligible dividends', `$${boxes.actualAmount.toFixed(2)}`]);
         tableData.push(['Box 11', 'Grossed-up amount (15%)', `$${boxes.grossedUpAmount.toFixed(2)}`]);
         tableData.push(['Box 12', 'Dividend tax credit', `$${boxes.taxCredit.toFixed(2)}`]);
-    } else {
+    }
+
+    if (eligibleAmount > 0) {
+        const boxes = calculateT5Boxes(eligibleAmount, 'eligible');
         tableData.push(['Box 24', 'Eligible dividends', `$${boxes.actualAmount.toFixed(2)}`]);
         tableData.push(['Box 25', 'Grossed-up amount (38%)', `$${boxes.grossedUpAmount.toFixed(2)}`]);
         tableData.push(['Box 26', 'Dividend tax credit', `$${boxes.taxCredit.toFixed(2)}`]);
+    }
+
+    if (tableData.length === 0) {
+        tableData.push(['—', 'No dividend income', '$0.00']);
     }
 
     autoTable(pdf, {
@@ -179,7 +291,6 @@ export async function generateT5SlipPDF(
         margin: { left: margin, right: margin },
     });
 
-    // Footer
     const finalY = (pdf as any).lastAutoTable.finalY || yPos + 30;
     yPos = finalY + 10;
 
@@ -200,19 +311,41 @@ export async function generateT5SlipPDF(
         { align: 'center' }
     );
 
-    // Convert to blob
-    const pdfBlob = pdf.output('blob');
-    return pdfBlob;
+    return pdf.output('blob');
 }
 
 /**
- * Generate T5 Summary PDF for a fiscal year
+ * Generate a single T5 slip PDF for one payment allocation (preview only).
+ */
+export async function generateT5SlipPDF(
+    dividend: Dividend,
+    recipient: DividendRecipient,
+    company: Company
+): Promise<Blob> {
+    const calendarYear = getDividendCalendarYear(dividend);
+    const eligibleAmount = dividend.dividend_type === 'eligible' ? recipient.amount : 0;
+    const nonEligibleAmount = dividend.dividend_type === 'non_eligible' ? recipient.amount : 0;
+
+    return buildT5SlipPdf(
+        company,
+        calendarYear,
+        recipient.recipient_name,
+        recipient.recipient_sin ?? null,
+        recipient.recipient_type,
+        recipient.business_number ?? null,
+        recipient.mailing_address ?? null,
+        eligibleAmount,
+        nonEligibleAmount
+    );
+}
+
+/**
+ * Generate T5 Summary PDF for a calendar year (slip count = number of recipient groups).
  */
 export async function generateT5SummaryPDF(
     company: Company,
-    fiscalYear: number,
-    dividends: Dividend[],
-    recipients: DividendRecipient[]
+    calendarYear: number,
+    groups: AnnualT5RecipientGroup[]
 ): Promise<Blob> {
     const pdf = new jsPDF({
         orientation: 'portrait',
@@ -225,7 +358,6 @@ export async function generateT5SummaryPDF(
     const margin = 15;
     let yPos = margin;
 
-    // Header
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
     pdf.text('T5 Summary - Return of Investment Income', pageWidth / 2, yPos, { align: 'center' });
@@ -233,10 +365,9 @@ export async function generateT5SummaryPDF(
 
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Fiscal Year: ${fiscalYear}`, pageWidth / 2, yPos, { align: 'center' });
+    pdf.text(`Calendar Year: ${calendarYear}`, pageWidth / 2, yPos, { align: 'center' });
     yPos += 10;
 
-    // Company Information
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
     pdf.text('PAYER INFORMATION', margin, yPos);
@@ -252,31 +383,12 @@ export async function generateT5SummaryPDF(
         yPos += 5;
     }
 
-    // Aggregate T5 data
-    const eligibleDividends: DividendRecipient[] = [];
-    const nonEligibleDividends: DividendRecipient[] = [];
-
-    dividends.forEach((dividend) => {
-        const dividendRecipients = recipients.filter(r => r.dividend_id === dividend.id);
-        dividendRecipients.forEach((recipient) => {
-            if (dividend.dividend_type === 'eligible') {
-                eligibleDividends.push(recipient);
-            } else {
-                nonEligibleDividends.push(recipient);
-            }
-        });
-    });
-
-    // Calculate totals
-    const eligibleTotal = eligibleDividends.reduce((sum, r) => sum + r.amount, 0);
-    const nonEligibleTotal = nonEligibleDividends.reduce((sum, r) => sum + r.amount, 0);
-
+    const eligibleTotal = groups.reduce((sum, g) => sum + g.eligibleAmount, 0);
+    const nonEligibleTotal = groups.reduce((sum, g) => sum + g.nonEligibleAmount, 0);
     const eligibleBoxes = calculateT5Boxes(eligibleTotal, 'eligible');
     const nonEligibleBoxes = calculateT5Boxes(nonEligibleTotal, 'non_eligible');
+    const totalSlips = groups.length;
 
-    const totalSlips = recipients.length;
-
-    // Summary Table
     yPos += 5;
     pdf.setFont('helvetica', 'bold');
     pdf.text('SUMMARY OF T5 SLIPS', margin, yPos);
@@ -306,7 +418,6 @@ export async function generateT5SummaryPDF(
         margin: { left: margin, right: margin },
     });
 
-    // Signature section
     const finalY = (pdf as any).lastAutoTable.finalY || yPos + 50;
     yPos = finalY + 15;
 
@@ -323,7 +434,6 @@ export async function generateT5SummaryPDF(
     yPos += 8;
     pdf.text('Date: _________________________', margin, yPos);
 
-    // Footer
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'italic');
     pdf.setTextColor(100, 100, 100);
@@ -341,6 +451,84 @@ export async function generateT5SummaryPDF(
         { align: 'center' }
     );
 
-    const pdfBlob = pdf.output('blob');
-    return pdfBlob;
+    return pdf.output('blob');
+}
+
+/**
+ * Generate calendar-year T5 slips (one per profile/group) + summary as a zip.
+ */
+export async function generateAnnualT5Package(
+    company: Company,
+    calendarYear: number,
+    dividends: Dividend[],
+    recipients: DividendRecipient[]
+): Promise<AnnualT5GenerationResult> {
+    const yearDividends = dividends.filter((d) => getDividendCalendarYear(d) === calendarYear);
+    const yearDividendIds = new Set(yearDividends.map((d) => d.id));
+    const yearRecipients = recipients.filter((r) => yearDividendIds.has(r.dividend_id));
+
+    const dividendsWithRecipients = new Set(yearRecipients.map((r) => r.dividend_id));
+    const missingDividends = yearDividends.filter((d) => !dividendsWithRecipients.has(d.id));
+    const missingRecipientDividendCount = missingDividends.length;
+    const missingRecipientTotalAmount = missingDividends.reduce(
+        (sum, d) => sum + (Number(d.amount) || 0),
+        0
+    );
+
+    const groups = groupRecipientsForCalendarYear(yearDividends, yearRecipients);
+
+    if (groups.length === 0) {
+        throw new Error(
+            missingRecipientDividendCount > 0
+                ? `No recipient allocations found for ${calendarYear}. ${missingRecipientDividendCount} dividend(s) are missing recipients (${missingRecipientTotalAmount.toFixed(2)} CAD). Assign recipients first.`
+                : `No dividends with recipients found for calendar year ${calendarYear}.`
+        );
+    }
+
+    const zip = new JSZip();
+
+    groups.forEach((group, index) => {
+        const slipBlob = buildT5SlipPdf(
+            company,
+            calendarYear,
+            group.recipientName,
+            group.recipientSin,
+            group.recipientType,
+            group.businessNumber,
+            group.mailingAddress,
+            group.eligibleAmount,
+            group.nonEligibleAmount
+        );
+        const safeName = group.recipientName.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'recipient';
+        const safeKey = group.key.replace(/[^a-zA-Z0-9]+/g, '_');
+        zip.file(`T5_${safeName}_${calendarYear}_${index + 1}_${safeKey}.pdf`, slipBlob);
+    });
+
+    const summaryBlob = await generateT5SummaryPDF(company, calendarYear, groups);
+    zip.file(`T5_Summary_${calendarYear}.pdf`, summaryBlob);
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    return {
+        zipBlob,
+        slipCount: groups.length,
+        missingRecipientDividendCount,
+        missingRecipientTotalAmount,
+        groups,
+    };
+}
+
+export function downloadAnnualT5Package(zipBlob: Blob, calendarYear: number): void {
+    downloadBlob(zipBlob, `T5_${calendarYear}.zip`);
+}
+
+/** @deprecated Prefer generateT5SummaryPDF(company, calendarYear, groups) */
+export async function generateFiscalYearT5SummaryPDF(
+    company: Company,
+    fiscalYear: number,
+    dividends: Dividend[],
+    recipients: DividendRecipient[]
+): Promise<Blob> {
+    const groups = groupRecipientsForCalendarYear(dividends, recipients);
+    return generateT5SummaryPDF(company, fiscalYear, groups);
 }

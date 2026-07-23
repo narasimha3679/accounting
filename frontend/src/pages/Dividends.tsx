@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Dividend, type DividendRecipient } from '../lib/api';
+import api, { type Dividend, type DividendRecipient, type DividendRecipientProfile } from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import DividendRecipientModal from '../components/dividends/DividendRecipientModal';
 import DividendRecipientList from '../components/dividends/DividendRecipientList';
-import { generateT5SlipPDF, generateT5SummaryPDF } from '../lib/t5Generator';
+import DividendRecipientProfilesCard from '../components/dividends/DividendRecipientProfilesCard';
+import {
+    downloadAnnualT5Package,
+    generateAnnualT5Package,
+} from '../lib/t5Generator';
 import { generateDividendMinutesPDF } from '../lib/dividendMinutesGenerator';
 import { getFiscalYear } from '../lib/fiscalYear';
 import { formatLocalDate } from '../lib/utils';
@@ -21,9 +25,34 @@ import {
     X,
     FileText,
     Download,
-    // AlertCircle,
     Users
 } from 'lucide-react';
+
+let draftRecipientId = -1;
+function nextDraftRecipientId(): number {
+    draftRecipientId -= 1;
+    return draftRecipientId;
+}
+
+function allocationFromProfile(
+    profile: DividendRecipientProfile,
+    amount: number,
+    dividendId = 0
+): DividendRecipient {
+    return {
+        id: nextDraftRecipientId(),
+        dividend_id: dividendId,
+        profile_id: profile.id,
+        recipient_name: profile.name,
+        recipient_sin: profile.recipient_sin ?? null,
+        recipient_type: profile.recipient_type,
+        business_number: profile.business_number ?? null,
+        mailing_address: profile.mailing_address ?? null,
+        amount: Math.round(amount * 100) / 100,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+}
 
 // Dividend Table Row Component
 const DividendTableRow: React.FC<{
@@ -39,7 +68,6 @@ const DividendTableRow: React.FC<{
     }>;
     handleEdit: (dividend: Dividend) => void;
     handleDelete: (id: number) => void;
-    handleGenerateT5Slip: (dividend: Dividend, recipient: DividendRecipient) => Promise<void>;
     handleGenerateMinutes: (dividend: Dividend) => Promise<void>;
 }> = ({
     dividend,
@@ -50,7 +78,6 @@ const DividendTableRow: React.FC<{
     getComplianceStatus,
     handleEdit,
     handleDelete,
-    handleGenerateT5Slip,
     handleGenerateMinutes,
 }) => {
     const [compliance, setCompliance] = useState<{
@@ -137,25 +164,6 @@ const DividendTableRow: React.FC<{
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={async () => {
-                            const recipients = await api.getDividendRecipients(dividend.id);
-                            if (recipients.length === 0) {
-                                alert('No recipients found. Please add recipients first.');
-                                return;
-                            }
-                            // Generate T5 slips for all recipients
-                            for (const recipient of recipients) {
-                                await handleGenerateT5Slip(dividend, recipient);
-                            }
-                        }}
-                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
-                        title="Generate T5 Slips"
-                    >
-                        <FileText className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
                         onClick={() => handleGenerateMinutes(dividend)}
                         className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
                         title="Generate Minutes"
@@ -186,7 +194,8 @@ const Dividends: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [yearFilter, setYearFilter] = useState<'all' | number>('all');
     const [currentPage, setCurrentPage] = useState(1);
-    const [selectedFiscalYear, setSelectedFiscalYear] = useState<number>(new Date().getFullYear());
+    const [selectedCalendarYear, setSelectedCalendarYear] = useState<number>(new Date().getFullYear());
+    const [generatingAnnualT5, setGeneratingAnnualT5] = useState(false);
 
     const [formData, setFormData] = useState({
         amount: '',
@@ -202,6 +211,14 @@ const Dividends: React.FC = () => {
     const [showRecipientModal, setShowRecipientModal] = useState(false);
     const [editingRecipient, setEditingRecipient] = useState<DividendRecipient | null>(null);
     const [loadingRecipients, setLoadingRecipients] = useState(false);
+    /** True when recipients are the auto-prefilled single default allocation (amount tracks dividend amount). */
+    const [isDefaultAllocation, setIsDefaultAllocation] = useState(false);
+
+    const { data: recipientProfiles = [] } = useQuery({
+        queryKey: ['dividend_recipient_profiles', user?.company_id],
+        queryFn: () => api.getDividendRecipientProfiles(user!.company_id!),
+        enabled: !!user?.company_id,
+    });
 
     const yearDates = useMemo(() => {
         if (yearFilter === 'all') {
@@ -229,7 +246,9 @@ const Dividends: React.FC = () => {
     const yearOptions = useMemo(() => {
         const years = new Set<number>();
         dividendYearSeed?.forEach((d) => {
-            years.add(new Date(d.declaration_date).getFullYear());
+            const dateOnly = (d.payment_date || d.declaration_date).split('T')[0];
+            const year = Number(dateOnly.split('-')[0]);
+            if (Number.isFinite(year)) years.add(year);
         });
         if (years.size === 0) {
             years.add(new Date().getFullYear());
@@ -276,13 +295,33 @@ const Dividends: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['dividends'] });
         queryClient.invalidateQueries({ queryKey: ['dividends_summary'] });
         queryClient.invalidateQueries({ queryKey: ['dividends_year_options'] });
+        queryClient.invalidateQueries({ queryKey: ['dividends_missing_recipients'] });
+        queryClient.invalidateQueries({ queryKey: ['dividend_recipient_profiles'] });
+    };
+
+    const resolveDefaultProfile = (): DividendRecipientProfile | null => {
+        const markedDefault = recipientProfiles.find((p) => p.is_default);
+        if (markedDefault) return markedDefault;
+        if (recipientProfiles.length === 1) return recipientProfiles[0];
+        return null;
+    };
+
+    const applyDefaultRecipientPrefill = (amount: number) => {
+        const profile = resolveDefaultProfile();
+        if (!profile || amount <= 0) {
+            setRecipients([]);
+            setIsDefaultAllocation(false);
+            return;
+        }
+        setRecipients([allocationFromProfile(profile, amount)]);
+        setIsDefaultAllocation(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
         // Validate recipient amounts
-        const totalAllocated = recipients.reduce((sum, r) => sum + r.amount, 0);
+        const totalAllocated = recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
         const dividendAmount = parseFloat(formData.amount);
         
         if (recipients.length > 0 && Math.abs(totalAllocated - dividendAmount) > 0.01) {
@@ -321,28 +360,31 @@ const Dividends: React.FC = () => {
                 savedDividend = await api.createDividend(dividendData);
             }
 
-            // Save recipients
-            if (recipients.length > 0) {
-                // Delete existing recipients if editing
-                if (editingDividend) {
-                    const existingRecipients = await api.getDividendRecipients(savedDividend.id);
-                    for (const recipient of existingRecipients) {
-                        await api.deleteDividendRecipient(recipient.id);
-                    }
+            // Persist recipients only on Save (replace set) so Cancel discards in-modal edits
+            if (editingDividend) {
+                const existingRecipients = await api.getDividendRecipients(savedDividend.id);
+                for (const recipient of existingRecipients) {
+                    await api.deleteDividendRecipient(recipient.id);
                 }
+            }
 
-                // Create new recipients
-                for (const recipient of recipients) {
-                    await api.createDividendRecipient({
-                        ...recipient,
-                        dividend_id: savedDividend.id,
-                    });
-                }
+            for (const recipient of recipients) {
+                await api.createDividendRecipient({
+                    dividend_id: savedDividend.id,
+                    profile_id: recipient.profile_id ?? null,
+                    recipient_name: recipient.recipient_name,
+                    recipient_sin: recipient.recipient_sin ?? null,
+                    recipient_type: recipient.recipient_type,
+                    business_number: recipient.business_number ?? null,
+                    mailing_address: recipient.mailing_address ?? null,
+                    amount: recipient.amount,
+                });
             }
 
             setShowModal(false);
             setEditingDividend(null);
             setRecipients([]);
+            setIsDefaultAllocation(false);
             resetForm();
             invalidateDividendQueries();
         } catch (error) {
@@ -368,9 +410,11 @@ const Dividends: React.FC = () => {
         try {
             const dividendRecipients = await api.getDividendRecipients(dividend.id);
             setRecipients(dividendRecipients);
+            setIsDefaultAllocation(false);
         } catch (error) {
             console.error('Error loading recipients:', error);
             setRecipients([]);
+            setIsDefaultAllocation(false);
         } finally {
             setLoadingRecipients(false);
         }
@@ -400,11 +444,13 @@ const Dividends: React.FC = () => {
             fiscal_year: new Date().getFullYear(),
         });
         setRecipients([]);
+        setIsDefaultAllocation(false);
     };
 
     const openModal = () => {
         setEditingDividend(null);
         resetForm();
+        applyDefaultRecipientPrefill(0);
         setShowModal(true);
     };
 
@@ -412,6 +458,7 @@ const Dividends: React.FC = () => {
         setShowModal(false);
         setEditingDividend(null);
         setRecipients([]);
+        setIsDefaultAllocation(false);
         resetForm();
     };
 
@@ -421,99 +468,110 @@ const Dividends: React.FC = () => {
         setShowRecipientModal(true);
     };
 
+    const handleAddFromProfile = (profileId: number) => {
+        const profile = recipientProfiles.find((p) => p.id === profileId);
+        if (!profile) return;
+        const amount = parseFloat(formData.amount) || 0;
+        const remaining =
+            amount - recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+        if (remaining <= 0.01) {
+            alert('No remaining amount to allocate. Adjust the dividend amount or existing recipients.');
+            return;
+        }
+        setRecipients((prev) => [
+            ...prev,
+            allocationFromProfile(profile, remaining, editingDividend?.id || 0),
+        ]);
+        setIsDefaultAllocation(false);
+    };
+
     const handleEditRecipient = (recipient: DividendRecipient) => {
         setEditingRecipient(recipient);
         setShowRecipientModal(true);
     };
 
-    const handleSaveRecipient = async (recipientData: Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'>) => {
+    /** Local-only — recipient rows are persisted on dividend Save so Cancel can discard edits. */
+    const handleSaveRecipient = (
+        recipientData: Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'>
+    ) => {
         if (editingRecipient) {
-            const updated = await api.updateDividendRecipient(editingRecipient.id, recipientData);
-            setRecipients(recipients.map(r => r.id === updated.id ? updated : r));
+            setRecipients(
+                recipients.map((r) =>
+                    r.id === editingRecipient.id
+                        ? {
+                              ...r,
+                              ...recipientData,
+                              dividend_id: editingDividend?.id || r.dividend_id,
+                              updated_at: new Date().toISOString(),
+                          }
+                        : r
+                )
+            );
         } else {
-            const newRecipient = await api.createDividendRecipient({
-                ...recipientData,
-                dividend_id: editingDividend?.id || 0, // Temporary, will be set on save
-            });
-            setRecipients([...recipients, newRecipient]);
+            setRecipients([
+                ...recipients,
+                {
+                    ...recipientData,
+                    id: nextDraftRecipientId(),
+                    dividend_id: editingDividend?.id || 0,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+            ]);
         }
+        setIsDefaultAllocation(false);
         setShowRecipientModal(false);
         setEditingRecipient(null);
     };
 
-    const handleDeleteRecipient = async (id: number) => {
-        try {
-            if (editingDividend) {
-                await api.deleteDividendRecipient(id);
-            }
-            setRecipients(recipients.filter(r => r.id !== id));
-        } catch (error) {
-            console.error('Error deleting recipient:', error);
-        }
+    const handleDeleteRecipient = (id: number) => {
+        setRecipients(recipients.filter((r) => r.id !== id));
+        setIsDefaultAllocation(false);
     };
 
     // Document generation
-    const handleGenerateT5Slip = async (dividend: Dividend, recipient: DividendRecipient) => {
+    const handleGenerateT5Summary = async (calendarYear: number) => {
         try {
             const company = user?.company;
             if (!company) {
                 alert('Company information not available');
                 return;
             }
-            const blob = await generateT5SlipPDF(dividend, recipient, company);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `T5_${recipient.recipient_name.replace(/\s+/g, '_')}_${dividend.id}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Error generating T5 slip:', error);
-            alert('Error generating T5 slip. Please try again.');
-        }
-    };
 
-    const handleGenerateT5Summary = async (fiscalYear: number) => {
-        try {
-            const company = user?.company;
-            if (!company) {
-                alert('Company information not available');
-                return;
-            }
-            
-            // Get all dividends for the fiscal year
+            setGeneratingAnnualT5(true);
+
             const dividendsResponse = await api.getDividends({
                 company_id: company.id,
                 limit: 1000,
             });
-            const fiscalYearDividends = dividendsResponse.data.filter(d => d.fiscal_year === fiscalYear);
-            
-            // Get all recipients for these dividends
+
             const allRecipients: DividendRecipient[] = [];
-            for (const dividend of fiscalYearDividends) {
-                const recipients = await api.getDividendRecipients(dividend.id);
-                allRecipients.push(...recipients);
+            for (const dividend of dividendsResponse.data) {
+                const divRecipients = await api.getDividendRecipients(dividend.id);
+                allRecipients.push(...divRecipients);
             }
 
-            if (allRecipients.length === 0) {
-                alert('No recipients found for this fiscal year');
-                return;
+            const result = await generateAnnualT5Package(
+                company,
+                calendarYear,
+                dividendsResponse.data,
+                allRecipients
+            );
+
+            if (result.missingRecipientDividendCount > 0) {
+                const formatted = formatCurrency(result.missingRecipientTotalAmount);
+                const proceed = window.confirm(
+                    `${result.missingRecipientDividendCount} dividend(s) in ${calendarYear} have no recipients (total ${formatted}). Those amounts are excluded from the T5 package. Download anyway?`
+                );
+                if (!proceed) return;
             }
 
-            const blob = await generateT5SummaryPDF(company, fiscalYear, fiscalYearDividends, allRecipients);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `T5_Summary_FY${fiscalYear}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadAnnualT5Package(result.zipBlob, calendarYear);
         } catch (error) {
-            console.error('Error generating T5 Summary:', error);
-            alert('Error generating T5 Summary. Please try again.');
+            console.error('Error generating annual T5 package:', error);
+            alert(error instanceof Error ? error.message : 'Error generating T5 package. Please try again.');
+        } finally {
+            setGeneratingAnnualT5(false);
         }
     };
 
@@ -729,6 +787,10 @@ const Dividends: React.FC = () => {
                 </Card>
             </div>
 
+            {user?.company_id != null && (
+                <DividendRecipientProfilesCard companyId={user.company_id} />
+            )}
+
             {/* Filters */}
             <Card className="p-4">
                 <div className="flex flex-col sm:flex-row gap-4">
@@ -815,7 +877,6 @@ const Dividends: React.FC = () => {
                                     getComplianceStatus={getComplianceStatus}
                                     handleEdit={handleEdit}
                                     handleDelete={handleDelete}
-                                    handleGenerateT5Slip={handleGenerateT5Slip}
                                     handleGenerateMinutes={handleGenerateMinutes}
                                 />
                             ))}
@@ -939,7 +1000,13 @@ const Dividends: React.FC = () => {
                                     step="0.01"
                                     required
                                     value={formData.amount}
-                                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                    onChange={(e) => {
+                                        const amountValue = e.target.value;
+                                        setFormData({ ...formData, amount: amountValue });
+                                        if (!editingDividend && (isDefaultAllocation || recipients.length === 0)) {
+                                            applyDefaultRecipientPrefill(parseFloat(amountValue) || 0);
+                                        }
+                                    }}
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     placeholder="0.00"
                                 />
@@ -1038,19 +1105,63 @@ const Dividends: React.FC = () => {
 
                             {/* Recipients Section */}
                             <div className="pt-4 border-t border-white/10">
-                                <div className="flex items-center justify-between mb-4">
-                                    <label className="block text-sm font-medium text-white">
-                                        Recipients *
-                                    </label>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleAddRecipient}
-                                        icon={Plus}
-                                    >
-                                        Add Recipient
-                                    </Button>
+                                <div className="flex flex-col gap-3 mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-sm font-medium text-white">
+                                            Recipients *
+                                        </label>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleAddRecipient}
+                                            icon={Plus}
+                                        >
+                                            Add manually
+                                        </Button>
+                                    </div>
+                                    {recipientProfiles.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-muted-foreground mb-1">
+                                                Add from profile
+                                            </label>
+                                            <select
+                                                className="input"
+                                                defaultValue=""
+                                                onChange={(e) => {
+                                                    const id = parseInt(e.target.value, 10);
+                                                    if (!Number.isNaN(id)) {
+                                                        handleAddFromProfile(id);
+                                                    }
+                                                    e.target.value = '';
+                                                }}
+                                            >
+                                                <option value="" disabled>
+                                                    Use profile…
+                                                </option>
+                                                {recipientProfiles.map((profile) => (
+                                                    <option key={profile.id} value={profile.id}>
+                                                        {profile.name}
+                                                        {profile.is_default ? ' (default)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {!editingDividend &&
+                                        recipientProfiles.length > 1 &&
+                                        !resolveDefaultProfile() &&
+                                        recipients.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Multiple profiles exist with no default. Pick a profile above or add a recipient manually.
+                                            </p>
+                                        )}
+                                    {!editingDividend &&
+                                        recipientProfiles.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No recipient profiles yet. Create one on this page, or add a recipient manually for this dividend.
+                                            </p>
+                                        )}
                                 </div>
                                 
                                 {loadingRecipients ? (
@@ -1102,31 +1213,34 @@ const Dividends: React.FC = () => {
                 />
             )}
 
-            {/* T5 Summary Generation Button */}
+            {/* Year-end T5 package (calendar year) */}
             {user?.company && (
                 <Card className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
-                            <h3 className="text-sm font-semibold text-white">T5 Summary</h3>
-                            <p className="text-xs text-slate-muted mt-1">
-                                Generate T5 Summary for a fiscal year
+                            <h3 className="text-sm font-semibold text-foreground">Year-end T5 package</h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                One T5 slip per recipient profile for the calendar year (payment date, else declaration date), plus a T5 Summary. Downloads as a zip.
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
                             <select
-                                value={selectedFiscalYear || new Date().getFullYear()}
-                                onChange={(e) => setSelectedFiscalYear(parseInt(e.target.value))}
-                                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={selectedCalendarYear}
+                                onChange={(e) => setSelectedCalendarYear(parseInt(e.target.value, 10))}
+                                className="input"
                             >
-                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                                    <option key={year} value={year}>{year}</option>
+                                {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 3 + i).map((year) => (
+                                    <option key={year} value={year}>
+                                        {year}
+                                    </option>
                                 ))}
                             </select>
                             <Button
-                                onClick={() => handleGenerateT5Summary(selectedFiscalYear || new Date().getFullYear())}
+                                onClick={() => handleGenerateT5Summary(selectedCalendarYear)}
                                 icon={FileText}
+                                disabled={generatingAnnualT5}
                             >
-                                Generate T5 Summary
+                                {generatingAnnualT5 ? 'Generating…' : 'Download T5 package'}
                             </Button>
                         </div>
                     </div>

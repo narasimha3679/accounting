@@ -85,6 +85,7 @@ const DividendRecipientModal: React.FC<DividendRecipientModalProps> = ({
 
         const recipientData: Omit<DividendRecipient, 'id' | 'created_at' | 'updated_at'> = {
             dividend_id: recipient?.dividend_id || 0, // Will be set by parent
+            profile_id: recipient?.profile_id ?? null,
             recipient_name: formData.recipient_name.trim(),
             recipient_sin: formData.recipient_sin.trim() || null,
             recipient_type: formData.recipient_type,
