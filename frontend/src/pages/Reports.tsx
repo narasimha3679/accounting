@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { getFiscalYearRange, formatFiscalYear, getCurrentFiscalYear, isDateInFiscalYear, getFiscalYearOptions } from '../lib/fiscalYear';
 import { getHSTPeriodsForFiscalYear, formatHSTPeriod, type HSTPeriod } from '../lib/hstPeriods';
 import { formatLocalDate } from '../lib/utils';
+import { isCogsCategory } from '../lib/expenseCategories';
 
 const Reports: React.FC = () => {
     const { user } = useAuth();
@@ -247,6 +248,10 @@ const Reports: React.FC = () => {
 
         // Calculate expenses, salaries, and depreciation first (needed for active business income calculation)
         const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const cogsTotal = expenses
+            .filter((exp) => isCogsCategory(exp.category?.name))
+            .reduce((sum, exp) => sum + exp.amount, 0);
+        const operatingExpensesTotal = totalExpenses - cogsTotal;
         // Calculate deductible expenses using deduction percentage
         const totalDeductibleExpenses = expenses.reduce((sum, exp) => {
             const deductionPercentage = exp.deduction_percentage ?? 1.0;
@@ -283,6 +288,7 @@ const Reports: React.FC = () => {
 
         // Total gross income for display
         const grossIncome = grossRevenue + otherIncome;
+        const grossProfit = grossIncome - cogsTotal;
 
         // Total corporate tax (active business only)
         const totalCorporateTax = activeBusinessTax;
@@ -326,6 +332,9 @@ const Reports: React.FC = () => {
             invoiceRevenue,
             clientIncome,
             otherIncome,
+            cogsTotal,
+            operatingExpensesTotal,
+            grossProfit,
             // Active Business Income
             activeBusinessIncome,
             activeBusinessTax,
@@ -452,7 +461,13 @@ const Reports: React.FC = () => {
             body: [
                 ['Gross Revenue', formatCurrency(data.grossRevenue)],
                 ['Other Income', formatCurrency(data.otherIncome)],
-                ['Total Expenses', formatCurrency(data.totalExpenses)],
+                ...(data.cogsTotal > 0 ? [
+                    ['Cost of Goods Sold', formatCurrency(data.cogsTotal)],
+                    ['Gross Profit', formatCurrency(data.grossProfit)],
+                    ['Operating Expenses', formatCurrency(data.operatingExpensesTotal)],
+                ] : [
+                    ['Total Expenses', formatCurrency(data.totalExpenses)],
+                ]),
                 ...(data.totalSalaries > 0 ? [['Total Salaries', formatCurrency(data.totalSalaries)]] : []),
                 ...(data.totalDepreciationForYear > 0 ? [['Depreciation (CCA)', formatCurrency(data.totalDepreciationForYear)]] : []),
                 ['---', '---'],
@@ -897,10 +912,27 @@ const Reports: React.FC = () => {
                             <span className="text-sm text-slate-muted">Gross Income:</span>
                             <span className="font-medium text-white">{formatCurrency(reportData.grossIncome)}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-slate-muted">Total Expenses:</span>
-                            <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
-                        </div>
+                        {reportData.cogsTotal > 0 ? (
+                            <>
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-slate-muted">Cost of Goods Sold:</span>
+                                    <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.cogsTotal)}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-white/10 pt-2">
+                                    <span className="text-sm font-medium text-white">Gross Profit:</span>
+                                    <span className="font-medium text-white">{formatCurrency(reportData.grossProfit)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-slate-muted">Operating Expenses:</span>
+                                    <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.operatingExpensesTotal)}</span>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-slate-muted">Total Expenses:</span>
+                                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalExpenses)}</span>
+                            </div>
+                        )}
                         {reportData.totalSalaries > 0 && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-slate-muted">Total Salaries:</span>

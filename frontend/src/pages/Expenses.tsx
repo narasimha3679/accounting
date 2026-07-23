@@ -12,6 +12,7 @@ import HelpIcon from '../components/ui/HelpIcon';
 import { cn, formatLocalDate } from '../lib/utils';
 import { getFiscalYearRange, getFiscalYear, formatFiscalYear, getCurrentFiscalYear } from '../lib/fiscalYear';
 import { CRA_MILEAGE_RATE } from '../lib/api';
+import { isCogsCategory } from '../lib/expenseCategories';
 
 const Expenses: React.FC = () => {
     const { user } = useAuth();
@@ -780,6 +781,14 @@ function ExpenseModal({ expense, categories, onClose, onSave }: ExpenseModalProp
         };
 
         const name = categoryName.toLowerCase();
+
+        // Cost of Goods Sold - 100% deductible product costs
+        if (isCogsCategory(categoryName)) {
+            return {
+                default: 1.0,
+                explanation: 'CRA Rule: Cost of goods sold (ingredients, materials, packaging, freight-in, and other costs of products you sell) is generally 100% deductible.'
+            };
+        }
 
         // Meals & Entertainment - 50% deductible per CRA rules
         if (name.includes('meal') || name.includes('entertainment')) {

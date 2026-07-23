@@ -11,3 +11,7 @@ MARKETING_STRATEGY.md
 /backend/dist
 /backend/.env
 /analysis/
+/playwright-ui/node_modules/
+/playwright-ui/test-results/
+/playwright-ui/playwright-report/
+/playwright-ui/.env
