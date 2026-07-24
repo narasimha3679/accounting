@@ -512,6 +512,30 @@ export interface PayrollSettings {
     updated_at: string;
 }
 
+/** Ontario-first defaults matching PayrollSettings form (Phase 1). */
+export const DEFAULT_PAYROLL_SETTINGS: Omit<
+    PayrollSettings,
+    'id' | 'company_id' | 'created_at' | 'updated_at'
+> = {
+    pay_frequency: 'biweekly',
+    province: 'ON',
+    overtime_enabled: true,
+    overtime_threshold_weekly: 44.0,
+    overtime_multiplier: 1.5,
+    vacation_tracking_enabled: true,
+    vacation_rate_under_5_years: 0.04,
+    vacation_rate_5_plus_years: 0.06,
+    vacation_accrual_method: 'per_pay',
+    remitter_type: 'regular',
+    default_work_hours_per_day: 8.0,
+    default_work_days_per_week: 5,
+};
+
+export interface EnsurePayrollSettingsResult {
+    settings: PayrollSettings;
+    created: boolean;
+}
+
 export interface BenefitType {
     id: number;
     company_id: number;
@@ -3506,6 +3530,29 @@ class SupabaseApi {
     }
 
     /**
+     * Return existing payroll settings, or create Ontario defaults if none exist.
+     */
+    async ensurePayrollSettings(companyId: number): Promise<EnsurePayrollSettingsResult> {
+        this.ensureCompanyId(companyId);
+        const existing = await this.getPayrollSettings(companyId);
+        if (existing) {
+            return { settings: existing, created: false };
+        }
+
+        try {
+            const settings = await this.createPayrollSettings(companyId, DEFAULT_PAYROLL_SETTINGS);
+            return { settings, created: true };
+        } catch (error) {
+            // Concurrent create race: unique(company_id) — re-fetch the winner
+            const raced = await this.getPayrollSettings(companyId);
+            if (raced) {
+                return { settings: raced, created: false };
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Create payroll settings for a company
      */
     async createPayrollSettings(companyId: number, settings: Omit<PayrollSettings, 'id' | 'company_id' | 'created_at' | 'updated_at'>): Promise<PayrollSettings> {
@@ -4585,18 +4632,14 @@ class SupabaseApi {
             throw new Error('Employee or pay run data missing');
         }
 
-        // Get required data
+        // Get required data (auto-provision settings if missing)
         const taxYear = new Date(payRun.pay_period_start).getFullYear();
-        const [ytd, taxCredits, benefits, payrollSettings] = await Promise.all([
+        const [ytd, taxCredits, benefits, { settings: payrollSettings }] = await Promise.all([
             this.getEmployeeYTD(employee.id, taxYear),
             this.getEmployeeTaxCredits(employee.id, taxYear),
             this.getEmployeeBenefits(employee.id),
-            this.getPayrollSettings(payRun.company_id),
+            this.ensurePayrollSettings(payRun.company_id),
         ]);
-
-        if (!payrollSettings) {
-            throw new Error('Payroll settings not found');
-        }
 
         // Get default tax credits if not set
         const defaultTaxCredits: EmployeeTaxCredits = taxCredits || {
@@ -4638,6 +4681,10 @@ class SupabaseApi {
         };
 
         // Recalculate benefits with actual gross (will be updated after calculation)
+        const otherEarnings = {
+            other: Number(item.other_earnings) || 0,
+        };
+
         const tempResult = calculator.calculate({
             employee: {
                 id: employee.id,
@@ -4652,6 +4699,7 @@ class SupabaseApi {
                 payDate: payRun.pay_date,
             },
             hours,
+            otherEarnings,
             benefits: benefitTotals,
             ytd,
             taxCredits: defaultTaxCredits,
@@ -4676,6 +4724,7 @@ class SupabaseApi {
                 payDate: payRun.pay_date,
             },
             hours,
+            otherEarnings,
             benefits: finalBenefitTotals,
             ytd,
             taxCredits: defaultTaxCredits,
@@ -4945,6 +4994,8 @@ class SupabaseApi {
             });
         }
 
+        await this.reverseRemittancePeriodOnVoid(payRun);
+
         return this.updatePayRun(id, {
             status: 'void',
             voided_at: new Date().toISOString(),
@@ -5003,10 +5054,7 @@ class SupabaseApi {
         const periodEnd = new Date(payDate.getFullYear(), payDate.getMonth() + 1, 0);
 
         // Get payroll settings for remitter type
-        const settings = await this.getPayrollSettings(payRun.company_id);
-        if (!settings) {
-            throw new Error('Payroll settings not found');
-        }
+        const { settings } = await this.ensurePayrollSettings(payRun.company_id);
 
         const dueDate = this.calculateDueDate(periodEnd, settings.remitter_type);
 
@@ -5089,6 +5137,70 @@ class SupabaseApi {
                 .update({ status: 'overdue' })
                 .eq('id', period.id);
         }
+    }
+
+    /**
+     * Reverse remittance period totals when a finalized pay run is voided.
+     */
+    private async reverseRemittancePeriodOnVoid(payRun: PayRun): Promise<void> {
+        const payDate = new Date(payRun.pay_date);
+        const periodStart = new Date(payDate.getFullYear(), payDate.getMonth(), 1);
+        const periodEnd = new Date(payDate.getFullYear(), payDate.getMonth() + 1, 0);
+
+        const { data: existingPeriod } = await supabase
+            .from('remittance_periods')
+            .select('*')
+            .eq('company_id', payRun.company_id)
+            .eq('period_start', periodStart.toISOString().split('T')[0])
+            .eq('period_end', periodEnd.toISOString().split('T')[0])
+            .maybeSingle();
+
+        if (!existingPeriod) {
+            return;
+        }
+
+        const newCppEmployee = Math.max(0, Number(existingPeriod.cpp_employee) - payRun.total_cpp);
+        const newCppEmployer = Math.max(
+            0,
+            Number(existingPeriod.cpp_employer) - payRun.total_employer_cpp
+        );
+        const newCpp2Employee = Math.max(
+            0,
+            Number(existingPeriod.cpp2_employee || 0) - (payRun.total_cpp2 || 0)
+        );
+        const newEiEmployee = Math.max(0, Number(existingPeriod.ei_employee) - payRun.total_ei);
+        const newEiEmployer = Math.max(
+            0,
+            Number(existingPeriod.ei_employer) - payRun.total_employer_ei
+        );
+        const newIncomeTax = Math.max(
+            0,
+            Number(existingPeriod.income_tax) -
+                (payRun.total_federal_tax + payRun.total_provincial_tax)
+        );
+        const newTotalOwing =
+            newCppEmployee +
+            newCppEmployer +
+            newCpp2Employee +
+            newEiEmployee +
+            newEiEmployer +
+            newIncomeTax;
+
+        const { error } = await supabase
+            .from('remittance_periods')
+            .update({
+                cpp_employee: newCppEmployee,
+                cpp_employer: newCppEmployer,
+                cpp2_employee: newCpp2Employee,
+                ei_employee: newEiEmployee,
+                ei_employer: newEiEmployer,
+                income_tax: newIncomeTax,
+                total_owing: newTotalOwing,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingPeriod.id);
+
+        if (error) throw new Error(error.message);
     }
 
     // Payroll Reports --------------------------------------------------------
@@ -5337,107 +5449,32 @@ class SupabaseApi {
      */
     async getPayrollJournalEntry(payRunId: number): Promise<JournalEntry> {
         const payRun = await this.getPayRun(payRunId);
+        const { buildPayrollJournalEntries } = await import('./payrollHelpers');
 
-        const entries: Array<{ account: string; debit: number; credit: number }> = [];
+        const otherDeductionsTotal = payRun.items.reduce(
+            (sum, item) =>
+                sum + Number(item.pre_tax_deductions || 0) + Number(item.post_tax_deductions || 0),
+            0
+        );
 
-        // Wages Expense
-        entries.push({
-            account: 'Wages Expense',
-            debit: payRun.total_gross,
-            credit: 0,
+        const { entries, total_debit, total_credit } = buildPayrollJournalEntries({
+            total_gross: payRun.total_gross,
+            total_employer_cpp: payRun.total_employer_cpp,
+            total_employer_ei: payRun.total_employer_ei,
+            total_cpp: payRun.total_cpp,
+            total_cpp2: payRun.total_cpp2 || 0,
+            total_ei: payRun.total_ei,
+            total_federal_tax: payRun.total_federal_tax,
+            total_provincial_tax: payRun.total_provincial_tax,
+            total_other_deductions: otherDeductionsTotal,
+            total_net: payRun.total_net,
         });
 
-        // Overtime Expense (if any)
-        const overtimeTotal = payRun.items.reduce((sum, item) => sum + Number(item.overtime_pay || 0), 0);
-        if (overtimeTotal > 0) {
-            entries.push({
-                account: 'Overtime Expense',
-                debit: overtimeTotal,
-                credit: 0,
-            });
+        if (Math.abs(total_debit - total_credit) > 0.01) {
+            throw new Error(
+                `Payroll journal entry is out of balance: debit ${total_debit} vs credit ${total_credit}`
+            );
         }
-
-        // Vacation Pay Expense (if any)
-        const vacationTotal = payRun.items.reduce((sum, item) => sum + Number(item.vacation_pay || 0), 0);
-        if (vacationTotal > 0) {
-            entries.push({
-                account: 'Vacation Pay Expense',
-                debit: vacationTotal,
-                credit: 0,
-            });
-        }
-
-        // Benefits Expense (if any)
-        const benefitsTotal = payRun.items.reduce((sum, item) => sum + Number(item.taxable_benefits || 0), 0);
-        if (benefitsTotal > 0) {
-            entries.push({
-                account: 'Benefits Expense',
-                debit: benefitsTotal,
-                credit: 0,
-            });
-        }
-
-        // Employer CPP Expense
-        entries.push({
-            account: 'CPP Expense (Employer)',
-            debit: payRun.total_employer_cpp,
-            credit: 0,
-        });
-
-        // Employer EI Expense
-        entries.push({
-            account: 'EI Expense (Employer)',
-            debit: payRun.total_employer_ei,
-            credit: 0,
-        });
-
-        // CPP Payable
-        entries.push({
-            account: 'CPP Payable',
-            debit: 0,
-            credit: payRun.total_cpp + payRun.total_employer_cpp + (payRun.total_cpp2 || 0),
-        });
-
-        // EI Payable
-        entries.push({
-            account: 'EI Payable',
-            debit: 0,
-            credit: payRun.total_ei + payRun.total_employer_ei,
-        });
-
-        // Federal Tax Payable
-        entries.push({
-            account: 'Federal Tax Payable',
-            debit: 0,
-            credit: payRun.total_federal_tax,
-        });
-
-        // Provincial Tax Payable
-        entries.push({
-            account: 'Provincial Tax Payable',
-            debit: 0,
-            credit: payRun.total_provincial_tax,
-        });
-
-        // Other Deductions Payable (pre-tax and post-tax)
-        const otherDeductionsTotal = payRun.items.reduce((sum, item) => sum + Number(item.pre_tax_deductions || 0) + Number(item.post_tax_deductions || 0), 0);
-        if (otherDeductionsTotal > 0) {
-            entries.push({
-                account: 'Other Deductions Payable',
-                debit: 0,
-                credit: otherDeductionsTotal,
-            });
-        }
-
-        // Wages Payable / Cash
-        entries.push({
-            account: 'Wages Payable / Cash',
-            debit: 0,
-            credit: payRun.total_net,
-        });
-
-        const totalDebit = entries.reduce((sum, entry) => sum + entry.debit, 0);
-        const totalCredit = entries.reduce((sum, entry) => sum + entry.credit, 0);
 
         return {
             pay_run_id: payRunId,
@@ -5445,8 +5482,8 @@ class SupabaseApi {
             pay_period_end: payRun.pay_period_end,
             pay_date: payRun.pay_date,
             entries,
-            total_debit: totalDebit,
-            total_credit: totalCredit,
+            total_debit,
+            total_credit,
         };
     }
 

@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Calendar, DollarSign, Filter, X } from 'lucide-react';
+import { Plus, Calendar, DollarSign, Filter, X, AlertCircle } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PayRunTable from '../components/payroll/PayRunTable';
 import StatCard from '../components/ui/StatCard';
+import CreatePayRunModal from '../components/payroll/CreatePayRunModal';
+
+const autoSettingsBannerKey = (companyId: number) =>
+    `payroll-settings-auto-created-banner-${companyId}`;
 
 const PayRuns: React.FC = () => {
     const { user } = useAuth();
@@ -16,6 +20,26 @@ const PayRuns: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [startDateFilter, setStartDateFilter] = useState<string>('');
     const [endDateFilter, setEndDateFilter] = useState<string>('');
+    const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+
+    // Ensure payroll settings exist (cold-start companies have 0 rows)
+    const { data: settingsResult, isLoading: settingsLoading } = useQuery({
+        queryKey: ['payrollSettings', user?.company_id, 'ensure'],
+        queryFn: async () => {
+            if (!user?.company_id) return null;
+            const result = await api.ensurePayrollSettings(user.company_id);
+            queryClient.setQueryData(['payrollSettings', user.company_id], result.settings);
+            return result;
+        },
+        enabled: !!user?.company_id,
+    });
+
+    const showAutoSettingsBanner =
+        !!user?.company_id &&
+        !!settingsResult?.created &&
+        !bannerDismissed &&
+        sessionStorage.getItem(autoSettingsBannerKey(user.company_id)) !== 'dismissed';
 
     // Fetch pay runs
     const { data: payRuns = [], isLoading } = useQuery({
@@ -70,7 +94,14 @@ const PayRuns: React.FC = () => {
     };
 
     const handleCreate = () => {
-        navigate('/payroll/runs/new');
+        setShowCreateModal(true);
+    };
+
+    const dismissBanner = () => {
+        if (user?.company_id) {
+            sessionStorage.setItem(autoSettingsBannerKey(user.company_id), 'dismissed');
+        }
+        setBannerDismissed(true);
     };
 
     const clearFilters = () => {
@@ -81,7 +112,7 @@ const PayRuns: React.FC = () => {
 
     const hasFilters = statusFilter || startDateFilter || endDateFilter;
 
-    if (isLoading) {
+    if (isLoading || settingsLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
@@ -100,6 +131,30 @@ const PayRuns: React.FC = () => {
                     Create New Pay Run
                 </Button>
             </div>
+
+            {showAutoSettingsBanner && (
+                <Card className="p-4 border-primary/40 bg-primary/10">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-sm text-foreground">
+                                    Default payroll settings applied — review in{' '}
+                                    <Link
+                                        to="/settings/payroll"
+                                        className="text-primary underline underline-offset-2 hover:opacity-90"
+                                    >
+                                        Settings → Payroll
+                                    </Link>
+                                </p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={dismissBanner} icon={X}>
+                            Dismiss
+                        </Button>
+                    </div>
+                </Card>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -167,6 +222,19 @@ const PayRuns: React.FC = () => {
             <Card className="p-6">
                 <PayRunTable payRuns={payRuns} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
             </Card>
+
+            {showCreateModal && user?.company_id && (
+                <CreatePayRunModal
+                    companyId={user.company_id}
+                    payFrequency={settingsResult?.settings.pay_frequency}
+                    onCreated={(payRunId) => {
+                        setShowCreateModal(false);
+                        queryClient.invalidateQueries({ queryKey: ['payRuns'] });
+                        navigate(`/payroll/runs/${payRunId}`);
+                    }}
+                    onClose={() => setShowCreateModal(false)}
+                />
+            )}
         </div>
     );
 };

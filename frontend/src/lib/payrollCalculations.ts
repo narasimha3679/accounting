@@ -460,18 +460,14 @@ export async function createPayrollCalculator(
     const api = (await import('./api')).default;
 
     // Load all required data
-    const [taxConstants, federalBrackets, provincialBrackets, provincialConstants, payrollSettings] =
+    const [taxConstants, federalBrackets, provincialBrackets, provincialConstants, { settings: payrollSettings }] =
         await Promise.all([
             api.getTaxConstants(taxYear),
             api.getTaxRates(taxYear, 'federal'),
             api.getTaxRates(taxYear, province),
             api.getProvincialTaxConstants(taxYear, province),
-            api.getPayrollSettings(companyId),
+            api.ensurePayrollSettings(companyId),
         ]);
-
-    if (!payrollSettings) {
-        throw new Error('Payroll settings not found for company');
-    }
 
     if (!taxConstants) {
         throw new Error(`Tax constants for year ${taxYear} not found`);

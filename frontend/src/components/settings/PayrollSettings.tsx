@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api, { type PayrollSettings as PayrollSettingsType } from '../../lib/api';
+import api, {
+    DEFAULT_PAYROLL_SETTINGS,
+    type PayrollSettings as PayrollSettingsType,
+} from '../../lib/api';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import HelpIcon from '../ui/HelpIcon';
@@ -13,26 +16,18 @@ interface PayrollSettingsProps {
 const PayrollSettings: React.FC<PayrollSettingsProps> = ({ companyId }) => {
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<Partial<PayrollSettingsType>>({
-        pay_frequency: 'biweekly',
-        province: 'ON',
-        overtime_enabled: true,
-        overtime_threshold_weekly: 44.00,
-        overtime_multiplier: 1.50,
-        vacation_tracking_enabled: true,
-        vacation_rate_under_5_years: 0.040,
-        vacation_rate_5_plus_years: 0.060,
-        vacation_accrual_method: 'per_pay',
-        remitter_type: 'regular',
-        default_work_hours_per_day: 8.00,
-        default_work_days_per_week: 5,
+        ...DEFAULT_PAYROLL_SETTINGS,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState('');
 
-    // Fetch existing settings
+    // Fetch existing settings (auto-create Ontario defaults if missing)
     const { data: existingSettings, isLoading } = useQuery({
         queryKey: ['payrollSettings', companyId],
-        queryFn: () => api.getPayrollSettings(companyId),
+        queryFn: async () => {
+            const { settings } = await api.ensurePayrollSettings(companyId);
+            return settings;
+        },
         enabled: !!companyId,
     });
 

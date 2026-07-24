@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { ROE_REASON_CODES } from '../lib/roeHelpers';
 import ROEPreview from '../components/payroll/ROEPreview';
+import SelectEmployeeForROEModal from '../components/payroll/SelectEmployeeForROEModal';
 
 const ROEGeneration: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -208,6 +209,38 @@ const ROEGeneration: React.FC = () => {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-emerald"></div>
+            </div>
+        );
+    }
+
+    if (isNew && !employeeId) {
+        if (!user?.company_id) {
+            return (
+                <div className="text-center py-12">
+                    <p className="text-muted-foreground">Company required to create an ROE</p>
+                </div>
+            );
+        }
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/payroll/roe')}>
+                        Back
+                    </Button>
+                    <h1 className="text-2xl font-bold text-white">Generate Record of Employment</h1>
+                </div>
+                <Card className="p-6">
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Select an employee to generate their Record of Employment.
+                    </p>
+                </Card>
+                <SelectEmployeeForROEModal
+                    companyId={user.company_id}
+                    onSelect={(selectedId) => {
+                        navigate(`/payroll/roe/new?employee=${selectedId}`, { replace: true });
+                    }}
+                    onClose={() => navigate('/payroll/roe')}
+                />
             </div>
         );
     }

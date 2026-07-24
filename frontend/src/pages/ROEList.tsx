@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { getReasonCodeLabel } from '../lib/roeHelpers';
 import ROEPreview from '../components/payroll/ROEPreview';
+import SelectEmployeeForROEModal from '../components/payroll/SelectEmployeeForROEModal';
 import { formatLocalDate } from '../lib/utils';
 
 const ROEList: React.FC = () => {
@@ -18,6 +19,7 @@ const ROEList: React.FC = () => {
     const [employeeFilter, setEmployeeFilter] = useState<string>('');
     const [previewingROE, setPreviewingROE] = useState<ROERecord | null>(null);
     const [previewEmployee, setPreviewEmployee] = useState<Employee | null>(null);
+    const [showEmployeePicker, setShowEmployeePicker] = useState(false);
 
     // Fetch ROEs
     const { data: roes = [], isLoading } = useQuery({
@@ -109,7 +111,7 @@ const ROEList: React.FC = () => {
     };
 
     const handleCreate = () => {
-        navigate('/payroll/roe/new');
+        setShowEmployeePicker(true);
     };
 
     const clearFilters = () => {
@@ -308,6 +310,17 @@ const ROEList: React.FC = () => {
                         setPreviewingROE(null);
                         setPreviewEmployee(null);
                     }}
+                />
+            )}
+
+            {showEmployeePicker && user?.company_id && (
+                <SelectEmployeeForROEModal
+                    companyId={user.company_id}
+                    onSelect={(employeeId) => {
+                        setShowEmployeePicker(false);
+                        navigate(`/payroll/roe/new?employee=${employeeId}`);
+                    }}
+                    onClose={() => setShowEmployeePicker(false)}
                 />
             )}
         </div>

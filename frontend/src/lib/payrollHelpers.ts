@@ -84,10 +84,7 @@ export async function pullHoursFromTimeEntries(
         throw new Error('Employee not found');
     }
 
-    const payrollSettings = await api.getPayrollSettings(employee.company_id);
-    if (!payrollSettings) {
-        throw new Error('Payroll settings not found');
-    }
+    const { settings: payrollSettings } = await api.ensurePayrollSettings(employee.company_id);
 
     // Get approved time entries for the period
     const { data: entries, error } = await supabase
@@ -275,4 +272,153 @@ export function calculatePayRunTotals(items: Array<{
         total_employer_ei: Math.round(totals.total_employer_ei * 100) / 100,
         total_employer_cost: Math.round(totals.total_employer_cost * 100) / 100,
     };
+}
+
+/**
+ * Build balanced payroll journal lines from pay-run totals.
+ * Debits wage expense once for gross (OT/vacation already included).
+ */
+export function buildPayrollJournalEntries(input: {
+    total_gross: number;
+    total_employer_cpp: number;
+    total_employer_ei: number;
+    total_cpp: number;
+    total_cpp2: number;
+    total_ei: number;
+    total_federal_tax: number;
+    total_provincial_tax: number;
+    total_other_deductions: number;
+    total_net: number;
+}): { entries: Array<{ account: string; debit: number; credit: number }>; total_debit: number; total_credit: number } {
+    const entries: Array<{ account: string; debit: number; credit: number }> = [
+        { account: 'Wages Expense', debit: input.total_gross, credit: 0 },
+        { account: 'CPP Expense (Employer)', debit: input.total_employer_cpp, credit: 0 },
+        { account: 'EI Expense (Employer)', debit: input.total_employer_ei, credit: 0 },
+        {
+            account: 'CPP Payable',
+            debit: 0,
+            credit: input.total_cpp + input.total_employer_cpp + input.total_cpp2,
+        },
+        {
+            account: 'EI Payable',
+            debit: 0,
+            credit: input.total_ei + input.total_employer_ei,
+        },
+        { account: 'Federal Tax Payable', debit: 0, credit: input.total_federal_tax },
+        { account: 'Provincial Tax Payable', debit: 0, credit: input.total_provincial_tax },
+    ];
+
+    if (input.total_other_deductions > 0) {
+        entries.push({
+            account: 'Other Deductions Payable',
+            debit: 0,
+            credit: input.total_other_deductions,
+        });
+    }
+
+    entries.push({
+        account: 'Wages Payable / Cash',
+        debit: 0,
+        credit: input.total_net,
+    });
+
+    const total_debit =
+        Math.round(entries.reduce((sum, entry) => sum + entry.debit, 0) * 100) / 100;
+    const total_credit =
+        Math.round(entries.reduce((sum, entry) => sum + entry.credit, 0) * 100) / 100;
+
+    return { entries, total_debit, total_credit };
+}
+
+/** Format a Date as YYYY-MM-DD in local time. */
+export function toLocalDateString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/** Add days to a YYYY-MM-DD string (noon local to avoid DST edge cases). */
+export function addDaysToDateString(dateStr: string, days: number): string {
+    const d = new Date(`${dateStr}T12:00:00`);
+    d.setDate(d.getDate() + days);
+    return toLocalDateString(d);
+}
+
+/**
+ * Prefill pay period dates from payroll frequency.
+ * Rule: end = start + (period length − 1), pay_date = end.
+ * Default start is the beginning of the most recent completed-length period ending today.
+ */
+export function getDefaultPayPeriodDates(
+    payFrequency: 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' = 'biweekly',
+    referenceDate: Date = new Date()
+): { pay_period_start: string; pay_period_end: string; pay_date: string } {
+    const end = new Date(referenceDate);
+    end.setHours(12, 0, 0, 0);
+
+    let start = new Date(end);
+    switch (payFrequency) {
+        case 'weekly':
+            start.setDate(end.getDate() - 6);
+            break;
+        case 'biweekly':
+            start.setDate(end.getDate() - 13);
+            break;
+        case 'semi_monthly':
+            start.setDate(end.getDate() - 14);
+            break;
+        case 'monthly':
+            start = new Date(end.getFullYear(), end.getMonth(), 1);
+            break;
+        default: {
+            const _exhaustive: never = payFrequency;
+            void _exhaustive;
+            start.setDate(end.getDate() - 13);
+            break;
+        }
+    }
+
+    const pay_period_start = toLocalDateString(start);
+    const pay_period_end = toLocalDateString(end);
+    return {
+        pay_period_start,
+        pay_period_end,
+        pay_date: pay_period_end,
+    };
+}
+
+/**
+ * Derive end and pay date when the start date changes (same frequency rules).
+ */
+export function derivePayPeriodFromStart(
+    startDate: string,
+    payFrequency: 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' = 'biweekly'
+): { pay_period_end: string; pay_date: string } {
+    let daysToAdd: number;
+    switch (payFrequency) {
+        case 'weekly':
+            daysToAdd = 6;
+            break;
+        case 'biweekly':
+            daysToAdd = 13;
+            break;
+        case 'semi_monthly':
+            daysToAdd = 14;
+            break;
+        case 'monthly': {
+            const start = new Date(`${startDate}T12:00:00`);
+            const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+            const pay_period_end = toLocalDateString(end);
+            return { pay_period_end, pay_date: pay_period_end };
+        }
+        default: {
+            const _exhaustive: never = payFrequency;
+            void _exhaustive;
+            daysToAdd = 13;
+            break;
+        }
+    }
+    const pay_period_end = addDaysToDateString(startDate, daysToAdd);
+    return { pay_period_end, pay_date: pay_period_end };
 }
