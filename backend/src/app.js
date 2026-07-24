@@ -10,23 +10,38 @@ const compensationStrategyRoutes = require('./routes/compensationStrategyRoutes'
 
 const app = express();
 
-// Security Middleware
-app.use(helmet());
+// Security Middleware — allow cross-origin API responses to the frontend
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // CORS Configuration
-const allowedOrigins = process.env.FRONTEND_URL 
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-    : ['http://localhost:3000', 'http://localhost:5173', 'https://cashual.org'];
+// FRONTEND_URL may be a single URL (also used for invite emails) or comma-separated origins.
+const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://cashual.org',
+    'https://www.cashual.org',
+    'http://cashual.org',
+    'http://www.cashual.org',
+];
+
+const envOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((url) => url.trim()).filter(Boolean)
+    : [];
+
+const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.indexOf(origin) !== -1) {
+
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            // Reject without throwing — a thrown Error becomes a 500 with no CORS headers
+            callback(null, false);
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

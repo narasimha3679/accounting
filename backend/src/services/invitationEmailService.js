@@ -5,7 +5,10 @@
 const sendCompanyInvitation = async (email, name, companyName, inviteToken, role) => {
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // FRONTEND_URL may be comma-separated for CORS; use the first entry for links
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173')
+        .split(',')[0]
+        .trim();
 
     if (!resendApiKey) {
         console.error('RESEND_API_KEY not configured');
