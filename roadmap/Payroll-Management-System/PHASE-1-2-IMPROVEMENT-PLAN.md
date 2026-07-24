@@ -68,10 +68,10 @@ A prior agent **deprecated the legacy Salary ledger** in favor of Pay Runs. Thes
 - [ ] Vacation / other earnings editable on pay run items (at least basic fields)
 
 ### Phase 2
-- [ ] 2026 `tax_rates` / `tax_constants` / provincial constants match CRA (and `canadaTaxEngine.ts` where overlapping)
-- [ ] Unit test mocks updated to same numbers
-- [ ] At least 3–5 golden PDOC-style asserts (exact dollars within $1) for known scenarios
-- [ ] Document remaining gaps vs full T4032 (what is still approximate)
+- [x] 2026 `tax_rates` / `tax_constants` / provincial constants match CRA (and `canadaTaxEngine.ts` where overlapping)
+- [x] Unit test mocks updated to same numbers
+- [x] At least 3–5 golden PDOC-style asserts (exact dollars within $1) for known scenarios
+- [x] Document remaining gaps vs full T4032 (what is still approximate)
 
 ---
 
@@ -308,7 +308,7 @@ Document source of expected values in test comments (CRA PDOC screenshot / sprea
 
 ## 2.3 Document remaining tax gaps (Phase 3 preview)
 
-Add short section to this file or `roadmap/Payroll-Management-System/TAX-ENGINE-GAPS.md`:
+See [`TAX-ENGINE-GAPS.md`](./TAX-ENGINE-GAPS.md).
 
 Still approximate after Phase 2:
 - Not full CRA T4032 Formula (claim codes, K' constants, pay-period factors)

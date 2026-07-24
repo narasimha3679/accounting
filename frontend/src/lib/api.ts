@@ -4,6 +4,7 @@ import type { TaxConstants, TaxBracket, ProvincialTaxConstants, EmployeeYTD, Div
 import type { PayMyselfOptimizeRequest, PayMyselfOptimizeResponse } from './payMyselfTypes';
 import { optimizeWithdrawal as runPayMyselfOptimizer } from './payMyselfOptimizer';
 import type { BusinessType, EnabledFeatures } from './featureConfig';
+import { CRA_2026 } from './cra2026Constants';
 
 // Backend server URL - defaults to localhost in development
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -4634,24 +4635,35 @@ class SupabaseApi {
 
         // Get required data (auto-provision settings if missing)
         const taxYear = new Date(payRun.pay_period_start).getFullYear();
-        const [ytd, taxCredits, benefits, { settings: payrollSettings }] = await Promise.all([
+        const [ytd, taxCredits, benefits, { settings: payrollSettings }, taxConstants] = await Promise.all([
             this.getEmployeeYTD(employee.id, taxYear),
             this.getEmployeeTaxCredits(employee.id, taxYear),
             this.getEmployeeBenefits(employee.id),
             this.ensurePayrollSettings(payRun.company_id),
+            this.getTaxConstants(taxYear),
         ]);
 
-        // Get default tax credits if not set
+        const provincialConstants = await this.getProvincialTaxConstants(
+            taxYear,
+            payrollSettings.province
+        ).catch(() => null);
+
+        // TD1 fallbacks from DB constants (CRA 2026 BPA), not hardcoded stale amounts
+        const federalBpa =
+            taxConstants?.federal_basic_personal_amount ?? CRA_2026.federalBpaMax;
+        const provincialBpa =
+            provincialConstants?.basic_personal_amount ?? CRA_2026.ontarioBpa;
+
         const defaultTaxCredits: EmployeeTaxCredits = taxCredits || {
             id: 0,
             employee_id: employee.id,
             tax_year: taxYear,
-            federal_basic_personal: payrollSettings.province === 'ON' ? 15705 : 15705,
+            federal_basic_personal: federalBpa,
             federal_additional_claims: 0,
-            federal_total_claim: payrollSettings.province === 'ON' ? 15705 : 15705, // 2026 federal basic
-            provincial_basic_personal: payrollSettings.province === 'ON' ? 12866 : 12866,
+            federal_total_claim: federalBpa,
+            provincial_basic_personal: provincialBpa,
             provincial_additional_claims: 0,
-            provincial_total_claim: payrollSettings.province === 'ON' ? 12866 : 12866, // 2026 ON basic
+            provincial_total_claim: provincialBpa,
             claim_tax_exempt: false,
             additional_tax_per_pay: 0,
             effective_date: new Date().toISOString().split('T')[0],
@@ -5992,12 +6004,12 @@ class SupabaseApi {
         // Get existing credits to fill in missing fields
         const existing = await this.getEmployeeTaxCredits(employee.id, year);
         const fullCredits: Omit<EmployeeTaxCredits, 'id' | 'employee_id' | 'tax_year' | 'created_at' | 'updated_at'> = {
-            federal_basic_personal: credits.federal_basic_personal ?? existing?.federal_basic_personal ?? 15705,
+            federal_basic_personal: credits.federal_basic_personal ?? existing?.federal_basic_personal ?? CRA_2026.federalBpaMax,
             federal_additional_claims: credits.federal_additional_claims ?? existing?.federal_additional_claims ?? 0,
-            federal_total_claim: credits.federal_total_claim ?? existing?.federal_total_claim ?? 15705,
-            provincial_basic_personal: credits.provincial_basic_personal ?? existing?.provincial_basic_personal ?? 12866,
+            federal_total_claim: credits.federal_total_claim ?? existing?.federal_total_claim ?? CRA_2026.federalBpaMax,
+            provincial_basic_personal: credits.provincial_basic_personal ?? existing?.provincial_basic_personal ?? CRA_2026.ontarioBpa,
             provincial_additional_claims: credits.provincial_additional_claims ?? existing?.provincial_additional_claims ?? 0,
-            provincial_total_claim: credits.provincial_total_claim ?? existing?.provincial_total_claim ?? 12866,
+            provincial_total_claim: credits.provincial_total_claim ?? existing?.provincial_total_claim ?? CRA_2026.ontarioBpa,
             claim_tax_exempt: credits.claim_tax_exempt ?? existing?.claim_tax_exempt ?? false,
             additional_tax_per_pay: credits.additional_tax_per_pay ?? existing?.additional_tax_per_pay ?? 0,
             effective_date: credits.effective_date ?? existing?.effective_date ?? new Date().toISOString().split('T')[0],

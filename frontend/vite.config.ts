@@ -81,6 +81,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: 'localhost',
-    strictPort: false,
+    // Fail instead of stealing 3001 (Node API) when 3000 is already in use
+    strictPort: true,
   },
 })

@@ -4,6 +4,8 @@
 // - Base CPP (4.95%), EI, BPA, and the Canada Employment Amount are
 //   non-refundable credits at the lowest rate
 
+import { CRA_2026 } from './cra2026Constants';
+
 export type TaxPeriod = 'annual' | 'monthly' | 'bi-weekly' | 'weekly' | 'daily' | 'hourly';
 
 /** Assumed work schedule for daily/hourly conversions (defaults = standard full-time). */
@@ -78,56 +80,44 @@ interface Bracket {
   rate: number;
 }
 
-// 2026 Federal tax brackets (taxable income)
-const FEDERAL_BRACKETS: Bracket[] = [
-  { max: 58523, rate: 0.14 },
-  { max: 117045, rate: 0.205 },
-  { max: 181440, rate: 0.26 },
-  { max: 258482, rate: 0.29 },
-  { max: Infinity, rate: 0.33 },
-];
+// 2026 Federal tax brackets (taxable income) — shared with cra2026Constants / DB seeds
+const FEDERAL_BRACKETS: Bracket[] = CRA_2026.federalBrackets.map((b) => ({
+  max: b.max_income ?? Infinity,
+  rate: b.rate,
+}));
 
-const FEDERAL_LOWEST_RATE = 0.14;
-const FEDERAL_BPA_MAX = 16452; // full BPA below 4th bracket
-const FEDERAL_BPA_MIN = 14829; // reduced BPA above 5th bracket threshold
-const FEDERAL_BPA_PHASEOUT_START = 181440;
-const FEDERAL_BPA_PHASEOUT_END = 258482;
-const CANADA_EMPLOYMENT_AMOUNT = 1501;
+const FEDERAL_LOWEST_RATE = CRA_2026.federalBrackets[0].rate;
+const FEDERAL_BPA_MAX = CRA_2026.federalBpaMax;
+const FEDERAL_BPA_MIN = CRA_2026.federalBpaMin;
+const FEDERAL_BPA_PHASEOUT_START = CRA_2026.federalBpaPhaseoutStart;
+const FEDERAL_BPA_PHASEOUT_END = CRA_2026.federalBpaPhaseoutEnd;
+const CANADA_EMPLOYMENT_AMOUNT = CRA_2026.canadaEmploymentAmount;
 
-// 2026 Ontario tax brackets (taxable income)
-const ONTARIO_BRACKETS: Bracket[] = [
-  { max: 53891, rate: 0.0505 },
-  { max: 107785, rate: 0.0915 },
-  { max: 150000, rate: 0.1116 },
-  { max: 220000, rate: 0.1216 },
-  { max: Infinity, rate: 0.1316 },
-];
+const ONTARIO_BRACKETS: Bracket[] = CRA_2026.ontarioBrackets.map((b) => ({
+  max: b.max_income ?? Infinity,
+  rate: b.rate,
+}));
 
-const ONTARIO_LOWEST_RATE = 0.0505;
-const ONTARIO_BPA = 12989;
+const ONTARIO_LOWEST_RATE = CRA_2026.ontarioBrackets[0].rate;
+const ONTARIO_BPA = CRA_2026.ontarioBpa;
 
-// Ontario surtax 2026 (applied to basic provincial tax)
-const SURTAX_1_THRESHOLD = 5818;
-const SURTAX_1_RATE = 0.2;
-const SURTAX_2_THRESHOLD = 7446;
-const SURTAX_2_RATE = 0.36;
+const SURTAX_1_THRESHOLD = CRA_2026.ontarioSurtaxThreshold1;
+const SURTAX_1_RATE = CRA_2026.ontarioSurtaxRate1;
+const SURTAX_2_THRESHOLD = CRA_2026.ontarioSurtaxThreshold2;
+const SURTAX_2_RATE = CRA_2026.ontarioSurtaxRate2;
 
-// Ontario tax reduction 2026 (basic personal amount portion only)
-const ONTARIO_TAX_REDUCTION_BASE = 300;
+const ONTARIO_TAX_REDUCTION_BASE = CRA_2026.ontarioTaxReductionBase;
 
-// CPP 2026
-const CPP_YMPE = 74600;
-const CPP_EXEMPTION = 3500;
-const CPP_RATE = 0.0595; // base 4.95% (credit) + enhanced 1% (deduction)
-const CPP_BASE_RATE = 0.0495;
+const CPP_YMPE = CRA_2026.cppYmpe;
+const CPP_EXEMPTION = CRA_2026.cppExemption;
+const CPP_RATE = CRA_2026.cppRate; // base 4.95% (credit) + enhanced 1% (deduction)
+const CPP_BASE_RATE = CRA_2026.cppBaseRate;
 
-// CPP2 2026
-const CPP2_YAMPE = 85000;
-const CPP2_RATE = 0.04;
+const CPP2_YAMPE = CRA_2026.cpp2Yampe;
+const CPP2_RATE = CRA_2026.cpp2Rate;
 
-// EI 2026
-const EI_MIE = 68900;
-const EI_RATE = 0.0163;
+const EI_MIE = CRA_2026.eiMie;
+const EI_RATE = CRA_2026.eiRate;
 
 // Dividend gross-ups and dividend tax credits (2026, as % of the grossed-up amount)
 export type DividendType = 'eligible' | 'non_eligible';

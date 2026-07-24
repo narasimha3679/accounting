@@ -252,14 +252,14 @@ export function calculateSalaryNet(
     const cppRate = Number(taxConstants.cpp_rate || 0.0595);
     const cppEmployerRate = Number(taxConstants.cpp_employer_rate || 0.0595);
     const cppBasicExemption = Number(taxConstants.cpp_basic_exemption || 3500);
-    const cppMaxContribution = Number(taxConstants.cpp_max_contribution || 4237.95);
+    const cppMaxContribution = Number(taxConstants.cpp_max_contribution || 4230.45);
 
     const eiEmployeeRate = Number(taxConstants.ei_employee_rate || 0.0163);
     const eiEmployerMultiplier = Number(taxConstants.ei_employer_multiplier || 1.4);
     const eiMaxPremium = Number(taxConstants.ei_max_premium || 1123.07);
 
-    const federalBasicPersonal = Number(taxConstants.federal_basic_personal_amount || 16129);
-    const provincialBasicPersonal = Number(provincialConstants.basic_personal_amount || 12399);
+    const federalBasicPersonal = Number(taxConstants.federal_basic_personal_amount || 16452);
+    const provincialBasicPersonal = Number(provincialConstants.basic_personal_amount || 12989);
 
     let grossSalary = corporateCost / 1.08;
     for (let i = 0; i < 10; i++) {
@@ -409,14 +409,14 @@ export function calculateDividendNet(
     const totalTaxableIncome = grossedUp + ytdIncome;
 
     const federalTaxBeforeCredits = calculateBracketTax(totalTaxableIncome, federalBrackets);
-    const federalBasicPersonal = Number(constants.taxConstants?.federal_basic_personal_amount || 16129);
+    const federalBasicPersonal = Number(constants.taxConstants?.federal_basic_personal_amount || 16452);
     const lowestFederalRate = federalBrackets[0]?.rate || 0.15;
     const federalBasicCredit = federalBasicPersonal * lowestFederalRate;
     const federalDividendCredit = round(grossedUp * federalCreditRate);
     const netFederalTax = round(Math.max(0, federalTaxBeforeCredits - federalBasicCredit - federalDividendCredit));
 
     const provincialTaxBeforeCredits = calculateBracketTax(totalTaxableIncome, provincialBrackets);
-    const provincialBasicPersonal = Number(constants.provincialConstants?.basic_personal_amount || 12399);
+    const provincialBasicPersonal = Number(constants.provincialConstants?.basic_personal_amount || 12989);
     const lowestProvincialRate = provincialBrackets[0]?.rate || 0.0505;
     const provincialBasicCredit = provincialBasicPersonal * lowestProvincialRate;
     const provincialDividendCredit = round(grossedUp * provincialCreditRate);

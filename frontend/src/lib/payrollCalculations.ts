@@ -395,13 +395,11 @@ export class PayrollCalculator {
     }
 
     /**
-     * Calculate Ontario surtax
-     * - If base tax > $5,554: Add 20% of amount over $5,554
-     * - If base tax > $7,108: Add additional 36% of amount over $7,108
+     * Calculate Ontario surtax (2026 thresholds are tax-amount based: $5,818 / $7,446)
      */
     private calculateOntarioSurtax(baseTax: number): number {
-        const threshold1 = this.provincialConstants.surtax_threshold_1 ?? 5554;
-        const threshold2 = this.provincialConstants.surtax_threshold_2 ?? 7108;
+        const threshold1 = this.provincialConstants.surtax_threshold_1 ?? 5818;
+        const threshold2 = this.provincialConstants.surtax_threshold_2 ?? 7446;
         const rate1 = this.provincialConstants.surtax_rate_1 ?? 0.20;
         const rate2 = this.provincialConstants.surtax_rate_2 ?? 0.36;
 

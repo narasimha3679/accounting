@@ -7,20 +7,21 @@
 
 import type { PayrollInput, EmployeeYTD } from '../payrollTypes';
 import type { PayrollSettings } from '../api';
+import { CRA_2026 } from '../cra2026Constants';
 
 /**
- * Default tax credits (standard TD1)
+ * Default tax credits (standard TD1 — CRA 2026 BPA)
  */
 const defaultTaxCredits = {
     id: 1,
     employee_id: 1,
     tax_year: 2026,
-    federal_basic_personal: 16129.0,
+    federal_basic_personal: CRA_2026.federalBpaMax,
     federal_additional_claims: 0,
-    federal_total_claim: 16129.0,
-    provincial_basic_personal: 12399.0,
+    federal_total_claim: CRA_2026.federalBpaMax,
+    provincial_basic_personal: CRA_2026.ontarioBpa,
     provincial_additional_claims: 0,
-    provincial_total_claim: 12399.0,
+    provincial_total_claim: CRA_2026.ontarioBpa,
     claim_tax_exempt: false,
     additional_tax_per_pay: 0,
     effective_date: '2026-01-01',

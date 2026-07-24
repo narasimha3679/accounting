@@ -4,10 +4,12 @@
     "description": "Custom accounting tool for incorporated contracting business",
     "main": "index.js",
     "scripts": {
-        "dev": "npm --prefix frontend run dev",
+        "dev": "concurrently -n ui,api -c cyan,magenta \"npm --prefix frontend run dev\" \"npm --prefix backend run dev\"",
+        "dev:ui": "npm --prefix frontend run dev",
+        "dev:api": "npm --prefix backend run dev",
         "build": "npm --prefix frontend run build",
         "preview": "npm --prefix frontend run preview",
-        "install-all": "npm install --prefix frontend",
+        "install-all": "npm install && npm install --prefix frontend && npm install --prefix backend",
         "test:ui": "npm --prefix playwright-ui test",
         "test:ui:cogs": "npm --prefix playwright-ui run test:cogs"
     },
@@ -23,6 +25,7 @@
     "author": "Your Name",
     "license": "MIT",
     "devDependencies": {
+        "concurrently": "^9.2.1",
         "supabase": "^2.72.8"
     }
 }

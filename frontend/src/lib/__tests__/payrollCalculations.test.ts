@@ -1,12 +1,15 @@
 /**
  * Unit Tests for Payroll Calculator
- * 
- * Comprehensive test suite for payroll calculations including CPP, CPP2, EI,
- * federal tax, provincial tax, and edge cases.
+ *
+ * Includes CRA-aligned 2026 seed mocks and golden PDOC-style asserts.
+ * Expected values: internal golden derived from corrected CRA 2026 brackets/
+ * constants (T4032-ON Jan 2026 + canada.ca CPP/EI tables). Replace with
+ * live PDOC screenshots when available.
  */
 
 import { describe, it, expect } from 'vitest';
 import { PayrollCalculator } from '../payrollCalculations';
+import { CRA_2026 } from '../cra2026Constants';
 import type {
     PayrollInput,
     TaxConstants,
@@ -16,53 +19,42 @@ import type {
 } from '../payrollTypes';
 import type { PayrollSettings } from '../api';
 
-// 2026 Tax Constants (from seed data)
+/** Assert currency within $1 (PDOC tolerance from Phase 2 plan). */
+function expectWithinDollar(actual: number, expected: number, label: string) {
+    expect(Math.abs(actual - expected), `${label}: got ${actual}, expected ~${expected}`).toBeLessThanOrEqual(1);
+}
+
+// 2026 Tax Constants (aligned with CRA / cra2026Constants / Supabase seeds)
 const mockTaxConstants: TaxConstants = {
-    cpp_rate: 0.0595,
-    cpp_employer_rate: 0.0595,
-    cpp_basic_exemption: 3500.0,
-    cpp_ympe: 74600.0,
-    cpp_max_contribution: 4237.95,
-    cpp2_rate: 0.04,
-    cpp2_yampe: 85000.0,
-    cpp2_max_contribution: 416.0,
-    ei_employee_rate: 0.0163,
-    ei_employer_multiplier: 1.4,
-    ei_max_insurable: 68900.0,
-    ei_max_premium: 1123.07,
-    federal_basic_personal_amount: 16129.0,
-    federal_employment_amount: 1433.0,
+    cpp_rate: CRA_2026.cppRate,
+    cpp_employer_rate: CRA_2026.cppRate,
+    cpp_basic_exemption: CRA_2026.cppExemption,
+    cpp_ympe: CRA_2026.cppYmpe,
+    cpp_max_contribution: CRA_2026.cppMaxContribution,
+    cpp2_rate: CRA_2026.cpp2Rate,
+    cpp2_yampe: CRA_2026.cpp2Yampe,
+    cpp2_max_contribution: CRA_2026.cpp2MaxContribution,
+    ei_employee_rate: CRA_2026.eiRate,
+    ei_employer_multiplier: CRA_2026.eiEmployerMultiplier,
+    ei_max_insurable: CRA_2026.eiMie,
+    ei_max_premium: CRA_2026.eiMaxPremium,
+    federal_basic_personal_amount: CRA_2026.federalBpaMax,
+    federal_employment_amount: CRA_2026.canadaEmploymentAmount,
 };
 
-// 2026 Federal Tax Brackets
-const mockFederalBrackets: TaxBracket[] = [
-    { min_income: 0, max_income: 58523, rate: 0.14 },
-    { min_income: 58523.01, max_income: 117037, rate: 0.205 },
-    { min_income: 117037.01, max_income: 161087, rate: 0.26 },
-    { min_income: 161087.01, max_income: 246752, rate: 0.29 },
-    { min_income: 246752.01, max_income: null, rate: 0.33 },
-];
+const mockFederalBrackets: TaxBracket[] = CRA_2026.federalBrackets.map((b) => ({ ...b }));
 
-// 2026 Ontario Tax Brackets
-const mockOntarioBrackets: TaxBracket[] = [
-    { min_income: 0, max_income: 51446, rate: 0.0505 },
-    { min_income: 51446.01, max_income: 102894, rate: 0.0915 },
-    { min_income: 102894.01, max_income: 150000, rate: 0.1116 },
-    { min_income: 150000.01, max_income: 220000, rate: 0.1216 },
-    { min_income: 220000.01, max_income: null, rate: 0.1316 },
-];
+const mockOntarioBrackets: TaxBracket[] = CRA_2026.ontarioBrackets.map((b) => ({ ...b }));
 
-// Ontario Provincial Constants
 const mockOntarioConstants: ProvincialTaxConstants = {
-    basic_personal_amount: 12399.0,
-    surtax_threshold_1: 5554.0,
-    surtax_rate_1: 0.2,
-    surtax_threshold_2: 7108.0,
-    surtax_rate_2: 0.36,
+    basic_personal_amount: CRA_2026.ontarioBpa,
+    surtax_threshold_1: CRA_2026.ontarioSurtaxThreshold1,
+    surtax_rate_1: CRA_2026.ontarioSurtaxRate1,
+    surtax_threshold_2: CRA_2026.ontarioSurtaxThreshold2,
+    surtax_rate_2: CRA_2026.ontarioSurtaxRate2,
     health_premium_enabled: true,
 };
 
-// Default payroll settings
 const mockPayrollSettings: PayrollSettings = {
     id: 1,
     company_id: 1,
@@ -82,7 +74,6 @@ const mockPayrollSettings: PayrollSettings = {
     updated_at: '2026-01-01T00:00:00Z',
 };
 
-// Default YTD (zero balances)
 const defaultYTD: EmployeeYTD = {
     gross_earnings: 0,
     pensionable_earnings: 0,
@@ -107,17 +98,16 @@ const defaultYTD: EmployeeYTD = {
     ei_maxed_out: false,
 };
 
-// Default tax credits
 const defaultTaxCredits = {
     id: 1,
     employee_id: 1,
     tax_year: 2026,
-    federal_basic_personal: 16129.0,
+    federal_basic_personal: CRA_2026.federalBpaMax,
     federal_additional_claims: 0,
-    federal_total_claim: 16129.0,
-    provincial_basic_personal: 12399.0,
+    federal_total_claim: CRA_2026.federalBpaMax,
+    provincial_basic_personal: CRA_2026.ontarioBpa,
     provincial_additional_claims: 0,
-    provincial_total_claim: 12399.0,
+    provincial_total_claim: CRA_2026.ontarioBpa,
     claim_tax_exempt: false,
     additional_tax_per_pay: 0,
     effective_date: '2026-01-01',
@@ -125,7 +115,6 @@ const defaultTaxCredits = {
     updated_at: '2026-01-01T00:00:00Z',
 };
 
-// Helper to create calculator
 function createCalculator(payFrequency: 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' = 'biweekly') {
     return new PayrollCalculator(
         mockTaxConstants,
@@ -136,7 +125,6 @@ function createCalculator(payFrequency: 'weekly' | 'biweekly' | 'semi_monthly' |
     );
 }
 
-// Helper to create payroll input
 function createPayrollInput(overrides: Partial<PayrollInput> = {}): PayrollInput {
     return {
         employee: {
@@ -188,7 +176,7 @@ describe('PayrollCalculator', () => {
             // $2,000 biweekly gross
             // CPP exemption per period: $3,500 / 26 = $134.62
             // Pensionable: $2,000 - $134.62 = $1,865.38
-            // CPP: $1,865.38 * 5.95% = $111.00 (approximately)
+            // CPP: $1,865.38 * 5.95% = $110.99
             expect(result.cpp.contribution).toBeGreaterThan(100);
             expect(result.cpp.contribution).toBeLessThan(120);
             expect(result.cpp.employerContribution).toBe(result.cpp.contribution);
@@ -200,13 +188,12 @@ describe('PayrollCalculator', () => {
             const input = createPayrollInput({
                 ytd: {
                     ...defaultYTD,
-                    cpp_contributions: 4200, // Close to max of $4,237.95
+                    cpp_contributions: 4200, // Close to max of $4,230.45
                 },
             });
 
             const result = calculator.calculate(input);
 
-            // Should only deduct remaining room
             expect(result.cpp.contribution).toBeLessThan(50);
             expect(result.cpp.ytdAfter).toBeLessThanOrEqual(mockTaxConstants.cpp_max_contribution);
         });
@@ -237,10 +224,7 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // High earner should have CPP2
-            // YMPE per period: $74,600 / 26 = $2,869.23
-            // YAMPE per period: $85,000 / 26 = $3,269.23
-            // If gross > YAMPE per period, CPP2 applies
+            // YMPE/period $2,869.23; YAMPE/period $3,269.23 — gross ~$3,846 → CPP2 on $400
             if (result.grossPay > 3269.23) {
                 expect(result.cpp2.contribution).toBeGreaterThan(0);
             }
@@ -272,8 +256,7 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // $2,000 biweekly
-            // EI: $2,000 * 1.63% = $32.60
+            // $2,000 biweekly → EI: $2,000 * 1.63% = $32.60
             expect(result.ei.premium).toBeGreaterThan(30);
             expect(result.ei.premium).toBeLessThan(35);
             expect(result.ei.employerPremium).toBeCloseTo(result.ei.premium * 1.4, 2);
@@ -291,7 +274,6 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Should only deduct remaining room
             expect(result.ei.premium).toBeLessThan(25);
             expect(result.ei.ytdAfter).toBeLessThanOrEqual(mockTaxConstants.ei_max_premium);
         });
@@ -322,7 +304,6 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Should have federal tax
             expect(result.federalTax).toBeGreaterThan(0);
             expect(result.totalIncomeTax).toBeGreaterThan(result.federalTax);
         });
@@ -332,14 +313,13 @@ describe('PayrollCalculator', () => {
             const input = createPayrollInput({
                 taxCredits: {
                     ...defaultTaxCredits,
-                    federal_total_claim: 20000, // Higher claim
+                    federal_total_claim: 20000,
                     provincial_total_claim: 15000,
                 },
             });
 
             const result = calculator.calculate(input);
 
-            // Higher credits should reduce tax
             expect(result.calculationDetails.federalCreditsUsed).toBeGreaterThan(0);
             expect(result.calculationDetails.provincialCreditsUsed).toBeGreaterThan(0);
         });
@@ -376,10 +356,8 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Regular: 80 * $25 = $2,000
-            // Overtime: 10 * $25 * 1.5 = $375
             expect(result.overtimePay).toBe(375);
-            expect(result.grossPay).toBeGreaterThan(2375);
+            expect(result.grossPay).toBe(2375);
         });
 
         it('respects overtime disabled setting', () => {
@@ -395,8 +373,7 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Overtime should be at regular rate
-            expect(result.overtimePay).toBe(250); // 10 * $25
+            expect(result.overtimePay).toBe(250);
         });
     });
 
@@ -456,7 +433,7 @@ describe('PayrollCalculator', () => {
             const calculator = createCalculator('biweekly');
             const input = createPayrollInput({
                 benefits: {
-                    taxable: 200, // Company vehicle benefit
+                    taxable: 200,
                     preTaxDeductions: 0,
                     postTaxDeductions: 0,
                 },
@@ -465,7 +442,8 @@ describe('PayrollCalculator', () => {
             const result = calculator.calculate(input);
 
             expect(result.taxableBenefits).toBe(200);
-            expect(result.grossPay).toBeGreaterThan(2000); // Should include benefit
+            expect(result.taxableIncome).toBe(result.grossPay + 200);
+            expect(result.grossPay).toBe(2000);
         });
 
         it('handles pre-tax deductions (RRSP)', () => {
@@ -473,7 +451,7 @@ describe('PayrollCalculator', () => {
             const input = createPayrollInput({
                 benefits: {
                     taxable: 0,
-                    preTaxDeductions: 100, // RRSP contribution
+                    preTaxDeductions: 100,
                     postTaxDeductions: 0,
                 },
             });
@@ -490,7 +468,7 @@ describe('PayrollCalculator', () => {
                 benefits: {
                     taxable: 0,
                     preTaxDeductions: 0,
-                    postTaxDeductions: 50, // Union dues
+                    postTaxDeductions: 50,
                 },
             });
 
@@ -511,7 +489,6 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Weekly should have different CPP exemption per period
             expect(result.cpp.contribution).toBeGreaterThan(0);
         });
 
@@ -538,7 +515,6 @@ describe('PayrollCalculator', () => {
 
             const result = calculator.calculate(input);
 
-            // Should still calculate, but may have minimal deductions
             expect(result.grossPay).toBeGreaterThan(0);
         });
 
@@ -551,6 +527,133 @@ describe('PayrollCalculator', () => {
             const result = calculator.calculate(input);
 
             expect(result.grossPay).toBe(0);
+            expect(result.netPay).toBe(0);
+        });
+    });
+
+    /**
+     * Golden scenarios (Phase 2.2)
+     *
+     * Source: internal golden — calculated from CRA 2026 seeds after
+     * fix_2026_tax_tables_cra migration (brackets/BPA/CPP max/surtax).
+     * Methodology matches PayrollCalculator (annualize → brackets → credits →
+     * de-annualize). Not full T4032 Formula; see TAX-ENGINE-GAPS.md.
+     * Replace expecteds with CRA PDOC screenshots when available.
+     */
+    describe('Golden PDOC-style scenarios (within $1)', () => {
+        it('1. biweekly ON hourly mid-income, no YTD, standard TD1', () => {
+            const calculator = createCalculator('biweekly');
+            const result = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2023-01-15',
+                        payrate: 25,
+                        payrate_type: 'hourly',
+                    },
+                    hours: { regular: 80, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                })
+            );
+
+            // Gross 80×$25=$2,000; CPP $110.99; EI $32.60; fed $171.31; ON $68.52; net $1,616.58
+            expectWithinDollar(result.grossPay, 2000, 'gross');
+            expectWithinDollar(result.cpp.contribution, 110.99, 'cpp');
+            expectWithinDollar(result.ei.premium, 32.6, 'ei');
+            expectWithinDollar(result.federalTax, 171.31, 'federalTax');
+            expectWithinDollar(result.provincialTax, 68.52, 'provincialTax');
+            expectWithinDollar(result.netPay, 1616.58, 'netPay');
+            expect(result.cpp2.contribution).toBe(0);
+        });
+
+        it('2. near CPP YMPE (YTD almost maxed) → CPP near remaining room only', () => {
+            const calculator = createCalculator('biweekly');
+            const ytdCpp = 4220; // remaining room vs $4,230.45 max = $10.45
+            const result = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2023-01-15',
+                        payrate: 25,
+                        payrate_type: 'hourly',
+                    },
+                    hours: { regular: 80, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                    ytd: { ...defaultYTD, cpp_contributions: ytdCpp },
+                })
+            );
+
+            expectWithinDollar(result.cpp.contribution, 10.45, 'cpp remaining');
+            expect(result.cpp.ytdAfter).toBeLessThanOrEqual(CRA_2026.cppMaxContribution);
+            expect(result.cpp.maxedOut).toBe(true);
+        });
+
+        it('3. high earner triggering CPP2', () => {
+            const calculator = createCalculator('biweekly');
+            const result = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2020-01-15',
+                        payrate: 100000,
+                        payrate_type: 'salary',
+                    },
+                    hours: { regular: 80, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                })
+            );
+
+            // 80h × ($100k/2080) = $3,846.15; CPP2 on $400 between YMPE/YAMPE per period = $16.00
+            expectWithinDollar(result.grossPay, 3846.15, 'gross');
+            expectWithinDollar(result.cpp.contribution, 162.71, 'cpp');
+            expectWithinDollar(result.cpp2.contribution, 16.0, 'cpp2');
+            expectWithinDollar(result.ei.premium, 43.19, 'ei');
+            expect(result.cpp2.contribution).toBeGreaterThan(0);
+        });
+
+        it('4. overtime period — gross and 1.5x OT rate', () => {
+            const calculator = createCalculator('biweekly');
+            const result = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2023-01-15',
+                        payrate: 25,
+                        payrate_type: 'hourly',
+                    },
+                    hours: { regular: 80, overtime: 10, vacation: 0, statutory_holiday: 0, sick: 0 },
+                    settings: {
+                        ...mockPayrollSettings,
+                        overtime_enabled: true,
+                        overtime_multiplier: 1.5,
+                    },
+                })
+            );
+
+            expectWithinDollar(result.regularPay, 2000, 'regularPay');
+            expectWithinDollar(result.overtimePay, 375, 'overtimePay'); // 10 × $25 × 1.5
+            expectWithinDollar(result.grossPay, 2375, 'gross');
+            expect(result.cpp.contribution).toBeGreaterThan(0);
+            expect(result.ei.premium).toBeGreaterThan(0);
+            expect(result.netPay).toBeGreaterThan(0);
+            expect(result.netPay).toBeLessThan(result.grossPay);
+        });
+
+        it('5. zero hours → zeros', () => {
+            const calculator = createCalculator('biweekly');
+            const result = calculator.calculate(
+                createPayrollInput({
+                    hours: { regular: 0, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                })
+            );
+
+            expect(result.grossPay).toBe(0);
+            expect(result.cpp.contribution).toBe(0);
+            expect(result.cpp2.contribution).toBe(0);
+            expect(result.ei.premium).toBe(0);
+            expect(result.federalTax).toBe(0);
+            expect(result.provincialTax).toBe(0);
             expect(result.netPay).toBe(0);
         });
     });
