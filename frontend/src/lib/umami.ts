@@ -5,8 +5,8 @@
  * Tracking is only enabled in production mode when environment variables are configured.
  */
 
-const UMAMI_URL = import.meta.env.VITE_UMAMI_URL;
-const UMAMI_WEBSITE_ID = import.meta.env.VITE_UMAMI_WEBSITE_ID;
+const UMAMI_URL = import.meta.env.VITE_UMAMI_URL || 'https://umami.suparesume.online';
+const UMAMI_WEBSITE_ID = import.meta.env.VITE_UMAMI_WEBSITE_ID || 'f869e2d8-d772-40ad-93fc-34e441ffdb1d';
 const IS_PRODUCTION = import.meta.env.PROD;
 
 // Type declaration for Umami global object
