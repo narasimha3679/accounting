@@ -16,7 +16,7 @@ function generatePassword(length = 16) {
 
 // All routes require authentication
 router.use(authenticateUser);
-router.use(requireRole(['admin', 'accountant']));
+router.use(requireRole(['owner', 'accountant']));
 
 /**
  * POST /api/employees
