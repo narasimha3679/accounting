@@ -109,7 +109,7 @@ const Dashboard: React.FC = () => {
                 dividendsResponse,
                 capitalAssetsResponse,
                 ownerPaymentsResponse,
-                salariesResponse
+                payrollExpense
             ] = await Promise.all([
                 // Fetch all invoices once (we'll filter by status and date client-side)
                 api.getInvoices({
@@ -158,13 +158,8 @@ const Dashboard: React.FC = () => {
                     end_date: endDateStr,
                     limit: 1000
                 }),
-                // Fetch salaries with date filtering
-                api.getSalaries({
-                    company_id: companyId,
-                    start_date: startDateStr,
-                    end_date: endDateStr,
-                    limit: 1000
-                })
+                // Payroll expense from finalized pay runs
+                api.getPayrollExpenseForPeriod(companyId, startDateStr, endDateStr)
             ]);
 
             // Filter invoices by status and date
@@ -185,7 +180,7 @@ const Dashboard: React.FC = () => {
             const dividends = dividendsResponse.data;
             const capitalAssets = capitalAssetsResponse.data;
             const ownerPayments = ownerPaymentsResponse.data;
-            const salaries = salariesResponse.data;
+            const totalSalaries = payrollExpense.totalEmployerCost;
 
             // Calculate stats
             const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
@@ -202,7 +197,6 @@ const Dashboard: React.FC = () => {
                 const deductionPercentage = expense.deduction_percentage ?? 1.0;
                 return sum + (expense.amount * deductionPercentage);
             }, 0);
-            const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
             const netIncome = totalRevenue + otherIncome - totalDeductibleExpenses - totalSalaries;
 
             // Calculate owner reimbursement owed (expenses and capital assets paid by owner that need to be reimbursed)

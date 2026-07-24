@@ -654,6 +654,12 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                     {formData.payrate_type === 'salary' && 'Annual salary'}
                                     {formData.payrate_type === 'monthly' && 'Per month'}
                                     {formData.payrate_type === 'biweekly' && 'Per biweekly period'}
+                                    {' — used by Pay Runs to calculate pay'}
+                                </p>
+                            )}
+                            {!formData.payrate_type && (
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Used by Pay Runs to calculate employee pay each period
                                 </p>
                             )}
                         </div>

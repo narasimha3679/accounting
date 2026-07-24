@@ -125,16 +125,11 @@ const TaxCalculator: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch salaries
-    const { data: salariesResponse } = useQuery({
-        queryKey: ['salaries_tax', user?.company_id, startDate, endDate],
+    // Payroll expense from finalized pay runs
+    const { data: payrollExpense } = useQuery({
+        queryKey: ['payroll_expense_tax', user?.company_id, startDate, endDate],
         queryFn: async () => {
-            return api.getSalaries({
-                company_id: user?.company_id,
-                start_date: startDate,
-                end_date: endDate,
-                limit: 1000,
-            });
+            return api.getPayrollExpenseForPeriod(user!.company_id!, startDate, endDate);
         },
         enabled: !!user?.company_id,
     });
@@ -153,7 +148,7 @@ const TaxCalculator: React.FC = () => {
 
     // Calculate tax data
     const taxData = useMemo(() => {
-        if (!invoicesResponse || !expensesResponse || !incomeResponse || !hstPaymentsResponse || !capitalAssetsResponse || !salariesResponse || !dividendsResponse) {
+        if (!invoicesResponse || !expensesResponse || !incomeResponse || !hstPaymentsResponse || !capitalAssetsResponse || !payrollExpense || !dividendsResponse) {
             return null;
         }
 
@@ -165,7 +160,7 @@ const TaxCalculator: React.FC = () => {
         const incomeEntries = incomeResponse.data;
         const hstPayments = hstPaymentsResponse.data;
         const capitalAssets = capitalAssetsResponse.data;
-        const salaries = salariesResponse.data;
+        const filteredSalaries = payrollExpense.lines;
         const dividends = dividendsResponse.data;
 
         // Validation: Check tax rates are reasonable (0-1 range) - will be checked after rates are declared
@@ -193,14 +188,6 @@ const TaxCalculator: React.FC = () => {
             const start = new Date(startDate);
             const end = new Date(endDate);
             return expenseDate >= start && expenseDate <= end;
-        });
-
-        // Filter salaries by date
-        const filteredSalaries = salaries.filter(salary => {
-            const salaryDate = new Date(salary.payment_date);
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            return salaryDate >= start && salaryDate <= end;
         });
 
         // Calculate HST Collected
@@ -240,7 +227,7 @@ const TaxCalculator: React.FC = () => {
             const deductionPercentage = expense.deduction_percentage ?? 1.0;
             return sum + (expense.amount * deductionPercentage);
         }, 0);
-        const totalSalaries = filteredSalaries.reduce((sum, salary) => sum + salary.amount, 0);
+        const totalSalaries = payrollExpense.totalEmployerCost;
 
         // Calculate Depreciation (CCA) for the fiscal year
         const depreciationEntries = capitalAssets
@@ -337,7 +324,7 @@ const TaxCalculator: React.FC = () => {
             // Validation warnings
             validationWarnings,
         };
-    }, [invoicesResponse, expensesResponse, incomeResponse, hstPaymentsResponse, capitalAssetsResponse, salariesResponse, dividendsResponse, startDate, endDate, fiscalYear, user?.company]);
+    }, [invoicesResponse, expensesResponse, incomeResponse, hstPaymentsResponse, capitalAssetsResponse, payrollExpense, dividendsResponse, startDate, endDate, fiscalYear, user?.company]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-CA', {
@@ -633,7 +620,7 @@ const TaxCalculator: React.FC = () => {
                                         <div className="text-lg font-bold text-destructive">-{formatCurrency(taxData.totalDeductibleExpenses)}</div>
                                     </div>
                                     <div>
-                                        <div className="text-sm text-slate-muted mb-1">Salaries</div>
+                                        <div className="text-sm text-slate-muted mb-1">Payroll</div>
                                         <div className="text-lg font-bold text-destructive">-{formatCurrency(taxData.totalSalaries)}</div>
                                     </div>
                                     <div>
@@ -696,22 +683,22 @@ const TaxCalculator: React.FC = () => {
 
                                 {taxData.filteredSalaries.length > 0 && (
                                     <div>
-                                        <h3 className="text-sm font-semibold text-white mb-2">Salaries ({taxData.filteredSalaries.length} items)</h3>
+                                        <h3 className="text-sm font-semibold text-white mb-2">Payroll ({taxData.filteredSalaries.length} items)</h3>
                                         <div className="bg-background rounded-lg border border-white/10 overflow-hidden max-h-64 overflow-y-auto">
                                             <table className="w-full text-sm text-left">
                                                 <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold sticky top-0">
                                                     <tr>
                                                         <th className="px-4 py-3">Date</th>
                                                         <th className="px-4 py-3">Employee</th>
-                                                        <th className="px-4 py-3 text-right">Amount</th>
+                                                        <th className="px-4 py-3 text-right">Employer Cost</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-border">
                                                     {taxData.filteredSalaries.map((salary) => (
                                                         <tr key={salary.id} className="hover:bg-muted/50 transition-colors">
-                                                            <td className="px-4 py-3 text-slate-muted">{formatDate(salary.payment_date)}</td>
-                                                            <td className="px-4 py-3 text-white">{salary.employee ? `${salary.employee.first_name} ${salary.employee.last_name}` : 'Unknown Employee'}</td>
-                                                            <td className="px-4 py-3 text-right text-white">{formatCurrency(salary.amount)}</td>
+                                                            <td className="px-4 py-3 text-slate-muted">{formatDate(salary.pay_date)}</td>
+                                                            <td className="px-4 py-3 text-white">{salary.employee_name}</td>
+                                                            <td className="px-4 py-3 text-right text-white">{formatCurrency(salary.employer_total_cost)}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>

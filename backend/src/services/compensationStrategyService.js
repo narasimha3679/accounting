@@ -81,16 +81,24 @@ async function getStrategyProgress(companyId, ownerId, fiscalYear, userClient) {
         const fiscalYearStart = `${fiscalYear}-01-01`;
         const fiscalYearEnd = `${fiscalYear}-12-31`;
 
-        const { data: salaries, error: salariesError } = await client
-            .from('salaries')
-            .select('amount')
-            .eq('company_id', companyId)
+        const { data: payItems, error: payItemsError } = await client
+            .from('pay_run_items')
+            .select(`
+                gross_pay,
+                pay_run:pay_runs!inner (
+                    status,
+                    pay_date,
+                    company_id
+                )
+            `)
             .in('employee_id', employeeIds)
-            .gte('payment_date', fiscalYearStart)
-            .lte('payment_date', fiscalYearEnd);
+            .eq('pay_run.company_id', companyId)
+            .eq('pay_run.status', 'finalized')
+            .gte('pay_run.pay_date', fiscalYearStart)
+            .lte('pay_run.pay_date', fiscalYearEnd);
 
-        if (salariesError) throw salariesError;
-        ytdSalary = salaries?.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0) || 0;
+        if (payItemsError) throw payItemsError;
+        ytdSalary = payItems?.reduce((sum, s) => sum + (parseFloat(s.gross_pay) || 0), 0) || 0;
     }
 
     // 4. Get YTD dividends paid

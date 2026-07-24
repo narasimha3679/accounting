@@ -20,7 +20,6 @@ import Expenses from './pages/Expenses';
 import CapitalAssets from './pages/CapitalAssets';
 import Income from './pages/Income';
 import Dividends from './pages/Dividends';
-import SalaryPage from './pages/Salary';
 import OwnerPayments from './pages/OwnerPayments';
 import Reports from './pages/Reports';
 import SettingsLayout from './pages/SettingsLayout';
@@ -310,11 +309,7 @@ function App() {
                   />
                   <Route
                     path="/salary"
-                    element={
-                      <ProtectedRoute>
-                        <SalaryPage />
-                      </ProtectedRoute>
-                    }
+                    element={<Navigate to="/payroll/runs" replace />}
                   />
                   <Route
                     path="/owner-payments"

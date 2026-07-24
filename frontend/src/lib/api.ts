@@ -710,6 +710,26 @@ export interface PayRunItemDeduction {
     created_at: string;
 }
 
+/** Line item for corporate payroll expense from finalized pay runs (replaces legacy salaries ledger). */
+export interface PayrollExpenseLine {
+    id: number;
+    pay_run_id: number;
+    employee_id: number;
+    employee_name: string;
+    pay_date: string;
+    period_start: string;
+    period_end: string;
+    gross_pay: number;
+    net_pay: number;
+    employer_total_cost: number;
+}
+
+export interface PayrollExpenseSummary {
+    totalEmployerCost: number;
+    totalGross: number;
+    lines: PayrollExpenseLine[];
+}
+
 // Payroll Reports Types
 export interface PayrollSummaryReport {
     period_start: string;
@@ -4110,6 +4130,112 @@ class SupabaseApi {
     }
 
     /**
+     * Corporate payroll expense from finalized pay runs in a pay-date range.
+     * Replaces legacy salaries-table totals for Dashboard / Reports / tax views.
+     */
+    async getPayrollExpenseForPeriod(
+        companyId: number,
+        startDate: string,
+        endDate: string
+    ): Promise<PayrollExpenseSummary> {
+        this.ensureCompanyId(companyId);
+
+        const { data, error } = await supabase
+            .from('pay_runs')
+            .select(`
+                id,
+                pay_date,
+                pay_period_start,
+                pay_period_end,
+                total_employer_cost,
+                total_gross,
+                items:pay_run_items (
+                    id,
+                    employee_id,
+                    gross_pay,
+                    net_pay,
+                    employer_total_cost,
+                    employee:employees ( first_name, last_name )
+                )
+            `)
+            .eq('company_id', companyId)
+            .eq('status', 'finalized')
+            .gte('pay_date', startDate)
+            .lte('pay_date', endDate)
+            .order('pay_date', { ascending: false });
+
+        if (error) throw new Error(error.message);
+
+        const lines: PayrollExpenseLine[] = [];
+        let totalEmployerCost = 0;
+        let totalGross = 0;
+
+        for (const run of data || []) {
+            totalEmployerCost += Number(run.total_employer_cost) || 0;
+            totalGross += Number(run.total_gross) || 0;
+
+            for (const item of (run.items as any[]) || []) {
+                const emp = item.employee;
+                const employeeName = emp
+                    ? `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || 'Unknown Employee'
+                    : 'Unknown Employee';
+
+                lines.push({
+                    id: item.id,
+                    pay_run_id: run.id,
+                    employee_id: item.employee_id,
+                    employee_name: employeeName,
+                    pay_date: run.pay_date,
+                    period_start: run.pay_period_start,
+                    period_end: run.pay_period_end,
+                    gross_pay: Number(item.gross_pay) || 0,
+                    net_pay: Number(item.net_pay) || 0,
+                    employer_total_cost: Number(item.employer_total_cost) || 0,
+                });
+            }
+        }
+
+        return {
+            totalEmployerCost: Math.round(totalEmployerCost * 100) / 100,
+            totalGross: Math.round(totalGross * 100) / 100,
+            lines,
+        };
+    }
+
+    /**
+     * Employee YTD gross pay from finalized pay runs (personal income, not employer cost).
+     */
+    async getEmployeePayrollGrossForPeriod(
+        companyId: number,
+        employeeId: number,
+        startDate: string,
+        endDate: string
+    ): Promise<number> {
+        this.ensureCompanyId(companyId);
+
+        const { data, error } = await supabase
+            .from('pay_run_items')
+            .select(`
+                gross_pay,
+                pay_run:pay_runs!inner (
+                    status,
+                    pay_date,
+                    company_id
+                )
+            `)
+            .eq('employee_id', employeeId)
+            .eq('pay_run.company_id', companyId)
+            .eq('pay_run.status', 'finalized')
+            .gte('pay_run.pay_date', startDate)
+            .lte('pay_run.pay_date', endDate);
+
+        if (error) throw new Error(error.message);
+
+        const total = (data || []).reduce((sum, row) => sum + (Number(row.gross_pay) || 0), 0);
+        return Math.round(total * 100) / 100;
+    }
+
+    /**
      * Get single pay run with items
      */
     async getPayRun(id: number): Promise<PayRun & { items: PayRunItem[] }> {
@@ -6697,17 +6823,12 @@ class SupabaseApi {
 
         let ytdSalaries = 0;
         if (employee) {
-            const { data: salaries, error: salariesError } = await supabase
-                .from('salaries')
-                .select('amount')
-                .eq('company_id', companyId)
-                .eq('employee_id', employee.id)
-                .gte('payment_date', startDate)
-                .lte('payment_date', endDate)
-                .in('status', ['paid', 'pending']);
-
-            if (salariesError) throw new Error(salariesError.message);
-            ytdSalaries = (salaries || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+            ytdSalaries = await this.getEmployeePayrollGrossForPeriod(
+                companyId,
+                employee.id,
+                startDate,
+                endDate
+            );
         }
 
         const { data: dividends, error: dividendsError } = await supabase
@@ -6900,11 +7021,15 @@ class SupabaseApi {
         }
         
         // Fetch all required data
-        const [invoicesResponse, incomeEntriesResponse, expensesResponse, salariesResponse] = await Promise.all([
+        const [invoicesResponse, incomeEntriesResponse, expensesResponse, payrollExpense] = await Promise.all([
             this.getInvoices({ company_id: companyId, limit: 10000 }),
             this.getIncomeEntries({ company_id: companyId, limit: 10000 }),
             this.getExpenses({ company_id: companyId, limit: 10000 }),
-            this.getSalaries({ company_id: companyId, limit: 10000 }),
+            this.getPayrollExpenseForPeriod(
+                companyId,
+                fiscalYearStartDate.toISOString().split('T')[0],
+                fiscalYearEndDate.toISOString().split('T')[0]
+            ),
         ]);
 
         // Filter data for the fiscal year
@@ -6924,11 +7049,6 @@ class SupabaseApi {
             return expenseDate >= fiscalYearStartDate && expenseDate <= fiscalYearEndDate;
         });
 
-        const fiscalYearSalaries = salariesResponse.data.filter((salary) => {
-            const paymentDate = new Date(salary.payment_date);
-            return paymentDate >= fiscalYearStartDate && paymentDate <= fiscalYearEndDate;
-        });
-
         // Calculate components
         const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
         const clientIncome = fiscalYearIncomeEntries
@@ -6945,7 +7065,7 @@ class SupabaseApi {
             return sum + expense.amount * deductionPercentage;
         }, 0);
 
-        const totalSalaries = fiscalYearSalaries.reduce((sum, salary) => sum + salary.amount, 0);
+        const totalSalaries = payrollExpense.totalEmployerCost;
 
         // Calculate net income
         const netIncome = totalRevenue + otherIncome - totalDeductibleExpenses - totalSalaries;

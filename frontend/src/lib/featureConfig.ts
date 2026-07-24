@@ -58,7 +58,7 @@ export const DEFAULT_FEATURES_BY_TYPE: Record<BusinessType, EnabledFeatures> = {
         employees: true,
         time_management: true,
         payroll: true,
-        salary: true,
+        salary: false, // Deprecated: use Pay Runs instead
     },
 };
 
@@ -76,11 +76,11 @@ export const FEATURE_LABELS: Record<keyof EnabledFeatures, string> = {
     employees: 'Employee Management',
     time_management: 'Time Management',
     payroll: 'Payroll',
-    salary: 'Salary',
+    salary: 'Salary (deprecated)',
 };
 
 export const FEATURE_GROUPS = {
     financial: ['invoices', 'income', 'expenses', 'capital_assets', 'dividends', 'clients'] as const,
-    payroll: ['employees', 'time_management', 'payroll', 'salary'] as const,
+    payroll: ['employees', 'time_management', 'payroll'] as const,
     tools: ['reports', 'tax_calculator', 'salary_dividend_optimizer', 'owner_reimbursement'] as const,
 } as const;

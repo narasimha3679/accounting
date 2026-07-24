@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentCompany } from '../hooks/useCurrentCompany';
-import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type Salary } from '../lib/api';
+import api, { type Invoice, type Expense, type Dividend, type IncomeEntry, type OwnerPayment, type DepreciationEntry, type PayrollExpenseLine } from '../lib/api';
 import AccessDenied from '../components/AccessDenied';
 import { Calendar, TrendingUp, DollarSign, Receipt, FileSpreadsheet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -187,17 +187,11 @@ const Reports: React.FC = () => {
         enabled: !!user?.company_id,
     });
 
-    // Fetch salaries for the selected fiscal year - use date range filtering in API
-    const { data: salaries } = useQuery({
-        queryKey: ['salaries_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
+    // Payroll expense from finalized pay runs for the selected fiscal year
+    const { data: payrollExpense } = useQuery({
+        queryKey: ['payroll_expense_report', user?.company_id, selectedFiscalYear, startDateStr, endDateStr],
         queryFn: async () => {
-            const result = await api.getSalaries({
-                company_id: user?.company_id,
-                start_date: startDateStr,
-                end_date: endDateStr,
-                limit: 1000
-            });
-            return result.data;
+            return api.getPayrollExpenseForPeriod(user!.company_id!, startDateStr, endDateStr);
         },
         enabled: !!user?.company_id,
     });
@@ -231,7 +225,7 @@ const Reports: React.FC = () => {
 
     // Calculate report data
     const reportData = React.useMemo(() => {
-        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !salaries) return null;
+        if (!invoices || !expenses || !dividends || !incomeEntries || !ownerPayments || !hstPayments || !capitalAssets || !payrollExpense) return null;
 
         const paidInvoices = invoices.filter(inv => inv.status === 'paid');
 
@@ -257,7 +251,7 @@ const Reports: React.FC = () => {
             const deductionPercentage = exp.deduction_percentage ?? 1.0;
             return sum + (exp.amount * deductionPercentage);
         }, 0);
-        const totalSalaries = salaries.reduce((sum, sal) => sum + sal.amount, 0);
+        const totalSalaries = payrollExpense.totalEmployerCost;
 
         // Calculate capital assets and depreciation for the year
         const totalDepreciationForYear = capitalAssets.reduce((sum, asset: any) => {
@@ -367,7 +361,7 @@ const Reports: React.FC = () => {
             clientIncomeEntries,
             otherIncomeEntries,
             expenses,
-            salaries,
+            salaries: payrollExpense.lines,
             dividends,
             ownerPayments,
             hstPayments,
@@ -375,7 +369,7 @@ const Reports: React.FC = () => {
             totalCapitalAssetCost,
             totalAccumulatedDepreciation,
         };
-    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, salaries, user?.company]);
+    }, [invoices, expenses, dividends, incomeEntries, ownerPayments, hstPayments, capitalAssets, payrollExpense, user?.company]);
 
     // Calculate T5 compliance stats
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -468,7 +462,7 @@ const Reports: React.FC = () => {
                 ] : [
                     ['Total Expenses', formatCurrency(data.totalExpenses)],
                 ]),
-                ...(data.totalSalaries > 0 ? [['Total Salaries', formatCurrency(data.totalSalaries)]] : []),
+                ...(data.totalSalaries > 0 ? [['Payroll', formatCurrency(data.totalSalaries)]] : []),
                 ...(data.totalDepreciationForYear > 0 ? [['Depreciation (CCA)', formatCurrency(data.totalDepreciationForYear)]] : []),
                 ['---', '---'],
                 ['Active Business Income', formatCurrency(data.activeBusinessIncome)],
@@ -765,21 +759,21 @@ const Reports: React.FC = () => {
             yPosition += 10;
         }
 
-        // Salaries
+        // Payroll (from finalized pay runs)
         if (data.salaries && data.salaries.length > 0) {
             checkPageBreak(30);
-            addText('SALARY PAYMENTS', 14, true);
-            const salaryRows = data.salaries.map((sal: Salary) => [
-                sal.employee ? `${sal.employee.first_name} ${sal.employee.last_name}` : 'Unknown Employee',
-                formatDate(sal.payment_date),
+            addText('PAYROLL (FINALIZED PAY RUNS)', 14, true);
+            const salaryRows = data.salaries.map((sal: PayrollExpenseLine) => [
+                sal.employee_name,
+                formatDate(sal.pay_date),
                 formatDate(sal.period_start) + ' - ' + formatDate(sal.period_end),
-                formatCurrency(sal.amount),
-                sal.status,
+                formatCurrency(sal.employer_total_cost),
+                'finalized',
             ]);
 
             autoTable(pdf, {
                 startY: yPosition,
-                head: [['Employee', 'Payment Date', 'Period', 'Amount', 'Status']],
+                head: [['Employee', 'Pay Date', 'Period', 'Employer Cost', 'Status']],
                 body: salaryRows,
                 theme: 'striped',
                 headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
@@ -935,7 +929,7 @@ const Reports: React.FC = () => {
                         )}
                         {reportData.totalSalaries > 0 && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-slate-muted">Total Salaries:</span>
+                                <span className="text-sm text-slate-muted">Payroll:</span>
                                 <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(reportData.totalSalaries)}</span>
                             </div>
                         )}
@@ -1374,44 +1368,41 @@ const Reports: React.FC = () => {
                     </div>
                 </Card>
 
-                {/* Salaries */}
+                {/* Payroll from finalized pay runs */}
                 <Card className="overflow-hidden">
                     <div className="p-6 border-b border-white/10">
-                        <h2 className="text-xl font-semibold tracking-tight text-white">Salary Payments</h2>
-                        <p className="text-sm text-slate-muted mt-1">All salary payments for {formatFiscalYear(selectedFiscalYear)}</p>
+                        <h2 className="text-xl font-semibold tracking-tight text-white">Payroll</h2>
+                        <p className="text-sm text-slate-muted mt-1">Finalized pay runs for {formatFiscalYear(selectedFiscalYear)}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-muted/50 text-slate-muted uppercase text-xs font-semibold">
                                 <tr>
                                     <th className="px-6 py-3">Employee</th>
-                                    <th className="px-6 py-3">Payment Date</th>
+                                    <th className="px-6 py-3">Pay Date</th>
                                     <th className="px-6 py-3">Period</th>
-                                    <th className="px-6 py-3 text-right">Amount</th>
+                                    <th className="px-6 py-3 text-right">Employer Cost</th>
                                     <th className="px-6 py-3">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {reportData.salaries && reportData.salaries.length > 0 ? (
-                                    reportData.salaries.map((sal: Salary) => (
+                                    reportData.salaries.map((sal: PayrollExpenseLine) => (
                                         <tr key={sal.id} className="hover:bg-muted/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-white">{sal.employee ? `${sal.employee.first_name} ${sal.employee.last_name}` : 'Unknown Employee'}</td>
-                                            <td className="px-6 py-4 text-slate-muted">{formatDate(sal.payment_date)}</td>
+                                            <td className="px-6 py-4 font-medium text-white">{sal.employee_name}</td>
+                                            <td className="px-6 py-4 text-slate-muted">{formatDate(sal.pay_date)}</td>
                                             <td className="px-6 py-4 text-slate-muted">{formatDate(sal.period_start)} - {formatDate(sal.period_end)}</td>
-                                            <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(sal.amount)}</td>
+                                            <td className="px-6 py-4 text-right font-medium text-white">{formatCurrency(sal.employer_total_cost)}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${sal.status === 'paid'
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                                    }`}>
-                                                    {sal.status}
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                    finalized
                                                 </span>
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-muted">No salaries recorded</td>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-muted">No finalized payroll recorded</td>
                                     </tr>
                                 )}
                             </tbody>

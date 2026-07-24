@@ -127,16 +127,23 @@ router.get('/ytd-income/:companyId/:memberId', async (req, res) => {
 
         let ytdSalaries = 0;
         if (employee) {
-            const { data: salaries } = await supabase
-                .from('salaries')
-                .select('amount')
-                .eq('company_id', companyId)
+            const { data: payItems } = await supabase
+                .from('pay_run_items')
+                .select(`
+                    gross_pay,
+                    pay_run:pay_runs!inner (
+                        status,
+                        pay_date,
+                        company_id
+                    )
+                `)
                 .eq('employee_id', employee.id)
-                .gte('payment_date', startDate)
-                .lte('payment_date', endDate)
-                .in('status', ['paid', 'pending']);
+                .eq('pay_run.company_id', companyId)
+                .eq('pay_run.status', 'finalized')
+                .gte('pay_run.pay_date', startDate)
+                .lte('pay_run.pay_date', endDate);
 
-            ytdSalaries = (salaries || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+            ytdSalaries = (payItems || []).reduce((sum, s) => sum + (s.gross_pay || 0), 0);
         }
 
         const { data: dividends } = await supabase

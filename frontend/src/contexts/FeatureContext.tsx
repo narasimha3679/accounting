@@ -29,9 +29,10 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         const company = user.company;
         
-        // If company has explicit enabled_features, use them
+        // If company has explicit enabled_features, use them.
+        // Force-disable deprecated salary ledger (replaced by Pay Runs).
         if (company.enabled_features) {
-            return company.enabled_features;
+            return { ...company.enabled_features, salary: false };
         }
 
         // Otherwise, use defaults based on business_type

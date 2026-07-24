@@ -146,7 +146,7 @@ async function sendTimesheetNotification(companyId, timesheetData) {
         data: {
             type: 'timesheet',
             id: timesheetData.id,
-            url: '/salary',
+            url: '/time-management',
         },
     };
 
