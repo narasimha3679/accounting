@@ -74,7 +74,17 @@ Configures the testing environment, including:
 
 Coverage reports are generated in the `coverage/` directory. Open `coverage/index.html` in a browser to view detailed coverage information.
 
+## End-to-End (Playwright)
+
+UI E2E lives in the repo-root [`playwright-ui/`](../playwright-ui/) package (not under `frontend/`). See [`playwright-ui/README.md`](../playwright-ui/README.md).
+
+```bash
+# From repo root
+npm run test:ui
+```
+
 ## Resources
 
 - [Vitest Documentation](https://vitest.dev/)
 - [React Testing Library](https://testing-library.com/react)
+- [Playwright Documentation](https://playwright.dev/)

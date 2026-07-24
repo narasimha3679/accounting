@@ -1,4 +1,7 @@
 import { expect, type Page } from '@playwright/test';
+import path from 'path';
+
+export const AUTH_FILE = path.join(__dirname, '../../.auth/user.json');
 
 export function testCredentials() {
   const email = process.env.PLAYWRIGHT_TEST_EMAIL;
@@ -11,7 +14,7 @@ export function testCredentials() {
   return { email, password };
 }
 
-/** Sign in and wait until the app dashboard is ready. */
+/** Sign in and wait until the app dashboard is ready. Setup only — not an auth test. */
 export async function loginAsTestUser(page: Page) {
   const { email, password } = testCredentials();
 
@@ -23,16 +26,12 @@ export async function loginAsTestUser(page: Page) {
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
 }
 
-export async function goToExpenses(page: Page) {
-  await page.goto('/expenses');
-  await expect(page.getByRole('button', { name: 'Add Expense' })).toBeVisible({
-    timeout: 20_000,
-  });
-}
+/** Sign in as an employee (portal). Setup only. */
+export async function loginAsEmployee(page: Page, email: string, password: string) {
+  await page.goto('/login');
+  await page.getByPlaceholder('Email address').fill(email);
+  await page.getByPlaceholder('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
 
-export async function goToReports(page: Page) {
-  await page.goto('/reports');
-  await expect(page.getByRole('heading', { name: 'Profit & Loss' })).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(page).toHaveURL(/\/employee-dashboard/, { timeout: 30_000 });
 }

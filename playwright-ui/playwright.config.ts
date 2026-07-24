@@ -1,10 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
+import { AUTH_FILE } from './tests/helpers/auth';
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
+const backendURL = process.env.PLAYWRIGHT_BACKEND_URL || 'http://localhost:3001';
 
 export default defineConfig({
   testDir: './tests',
@@ -24,15 +26,33 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: AUTH_FILE,
+      },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    cwd: path.resolve(__dirname, '..'),
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      cwd: path.resolve(__dirname, '..'),
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: 'npm start',
+      cwd: path.resolve(__dirname, '../backend'),
+      url: `${backendURL}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });
