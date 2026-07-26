@@ -104,6 +104,8 @@ export interface Employee {
     payrate?: number | null;
     payrate_type?: 'hourly' | 'salary' | 'monthly' | 'biweekly' | null;
     province?: string | null;
+    /** Skip EI employee/employer premiums when CRA treats employment as not insurable */
+    ei_exempt?: boolean;
     created_at: string;
     updated_at: string;
     company?: Company;
@@ -4704,6 +4706,7 @@ class SupabaseApi {
                 hire_date: employee.hire_date || new Date().toISOString(),
                 payrate: employee.payrate || 0,
                 payrate_type: (employee.payrate_type as any) || 'hourly',
+                ei_exempt: !!employee.ei_exempt,
             },
             payPeriod: {
                 start: payRun.pay_period_start,
@@ -4729,6 +4732,7 @@ class SupabaseApi {
                 hire_date: employee.hire_date || new Date().toISOString(),
                 payrate: employee.payrate || 0,
                 payrate_type: (employee.payrate_type as any) || 'hourly',
+                ei_exempt: !!employee.ei_exempt,
             },
             payPeriod: {
                 start: payRun.pay_period_start,
@@ -4772,6 +4776,7 @@ class SupabaseApi {
             total_deductions: result.totalDeductions,
             net_pay: result.netPay,
             cpp_employer: result.cpp.employerContribution,
+            // Employer total includes CPP1 + CPP2 match + EI
             ei_employer: result.ei.employerPremium,
             employer_total_cost: result.employerTotalCost,
             vacation_accrued: result.vacationAccrued,
@@ -4943,11 +4948,14 @@ class SupabaseApi {
             if (!item.employee_id) continue;
 
             const currentYTD = await this.getEmployeeYTD(item.employee_id, taxYear);
+            const employee = await this.getEmployee(item.employee_id);
+            const eiExempt = !!employee.ei_exempt;
+            const insurableThisPeriod = eiExempt ? 0 : item.gross_pay;
 
             await this.updateEmployeeYTD(item.employee_id, taxYear, {
                 gross_earnings: currentYTD.gross_earnings + item.gross_pay,
                 pensionable_earnings: currentYTD.pensionable_earnings + item.gross_pay,
-                insurable_earnings: currentYTD.insurable_earnings + item.gross_pay,
+                insurable_earnings: currentYTD.insurable_earnings + insurableThisPeriod,
                 taxable_earnings: currentYTD.taxable_earnings + item.gross_pay,
                 cpp_contributions: currentYTD.cpp_contributions + item.cpp_employee,
                 cpp2_contributions: currentYTD.cpp2_contributions + item.cpp2_employee,
@@ -4989,11 +4997,14 @@ class SupabaseApi {
             if (!item.employee_id) continue;
 
             const currentYTD = await this.getEmployeeYTD(item.employee_id, taxYear);
+            const employee = await this.getEmployee(item.employee_id);
+            const eiExempt = !!employee.ei_exempt;
+            const insurableThisPeriod = eiExempt ? 0 : item.gross_pay;
 
             await this.updateEmployeeYTD(item.employee_id, taxYear, {
                 gross_earnings: Math.max(0, currentYTD.gross_earnings - item.gross_pay),
                 pensionable_earnings: Math.max(0, currentYTD.pensionable_earnings - item.gross_pay),
-                insurable_earnings: Math.max(0, currentYTD.insurable_earnings - item.gross_pay),
+                insurable_earnings: Math.max(0, currentYTD.insurable_earnings - insurableThisPeriod),
                 taxable_earnings: Math.max(0, currentYTD.taxable_earnings - item.gross_pay),
                 cpp_contributions: Math.max(0, currentYTD.cpp_contributions - item.cpp_employee),
                 cpp2_contributions: Math.max(0, currentYTD.cpp2_contributions - item.cpp2_employee),
@@ -5086,10 +5097,19 @@ class SupabaseApi {
             const newCppEmployee = Number(existingPeriod.cpp_employee) + payRun.total_cpp;
             const newCppEmployer = Number(existingPeriod.cpp_employer) + payRun.total_employer_cpp;
             const newCpp2Employee = Number(existingPeriod.cpp2_employee || 0) + (payRun.total_cpp2 || 0);
+            // Employer matches employee CPP2 1:1 (no separate remittance column yet)
+            const newCpp2Employer = newCpp2Employee;
             const newEiEmployee = Number(existingPeriod.ei_employee) + payRun.total_ei;
             const newEiEmployer = Number(existingPeriod.ei_employer) + payRun.total_employer_ei;
             const newIncomeTax = Number(existingPeriod.income_tax) + payRun.total_federal_tax + payRun.total_provincial_tax;
-            const newTotalOwing = newCppEmployee + newCppEmployer + newCpp2Employee + newEiEmployee + newEiEmployer + newIncomeTax;
+            const newTotalOwing =
+                newCppEmployee +
+                newCppEmployer +
+                newCpp2Employee +
+                newCpp2Employer +
+                newEiEmployee +
+                newEiEmployer +
+                newIncomeTax;
 
             const { data: updated, error } = await supabase
                 .from('remittance_periods')
@@ -5114,10 +5134,12 @@ class SupabaseApi {
             const cppEmployee = payRun.total_cpp;
             const cppEmployer = payRun.total_employer_cpp;
             const cpp2Employee = payRun.total_cpp2 || 0;
+            const cpp2Employer = cpp2Employee; // 1:1 employer match
             const eiEmployee = payRun.total_ei;
             const eiEmployer = payRun.total_employer_ei;
             const incomeTax = payRun.total_federal_tax + payRun.total_provincial_tax;
-            const totalOwing = cppEmployee + cppEmployer + cpp2Employee + eiEmployee + eiEmployer + incomeTax;
+            const totalOwing =
+                cppEmployee + cppEmployer + cpp2Employee + cpp2Employer + eiEmployee + eiEmployer + incomeTax;
 
             const { data: created, error } = await supabase
                 .from('remittance_periods')
@@ -5180,6 +5202,7 @@ class SupabaseApi {
             0,
             Number(existingPeriod.cpp2_employee || 0) - (payRun.total_cpp2 || 0)
         );
+        const newCpp2Employer = newCpp2Employee; // 1:1 employer match
         const newEiEmployee = Math.max(0, Number(existingPeriod.ei_employee) - payRun.total_ei);
         const newEiEmployer = Math.max(
             0,
@@ -5194,6 +5217,7 @@ class SupabaseApi {
             newCppEmployee +
             newCppEmployer +
             newCpp2Employee +
+            newCpp2Employer +
             newEiEmployee +
             newEiEmployer +
             newIncomeTax;
@@ -5274,7 +5298,14 @@ class SupabaseApi {
             cpp_total: deductions.cpp + employer_costs.cpp,
             ei_total: deductions.ei + employer_costs.ei,
             income_tax: deductions.federal_tax + deductions.provincial_tax,
-            total: deductions.cpp + employer_costs.cpp + deductions.cpp2 + deductions.ei + employer_costs.ei + deductions.federal_tax + deductions.provincial_tax,
+            total:
+                deductions.cpp +
+                employer_costs.cpp +
+                deductions.cpp2 * 2 + // employee + employer CPP2 match
+                deductions.ei +
+                employer_costs.ei +
+                deductions.federal_tax +
+                deductions.provincial_tax,
         };
 
         const uniqueEmployeeIds = new Set(allItems.map((item) => item.employee_id));
@@ -6604,15 +6635,17 @@ class SupabaseApi {
 
             const hours =
                 item.regular_hours + item.overtime_hours + item.vacation_hours_used;
-            const earnings = item.gross_pay; // Insurable earnings = gross pay
+            // EI-exempt employment is not insurable — keep ROE totals at zero
+            const earnings = employee.ei_exempt ? 0 : item.gross_pay;
+            const insurableHours = employee.ei_exempt ? 0 : hours;
 
-            totalHours += hours;
+            totalHours += insurableHours;
             totalInsurableEarnings += earnings;
 
             payPeriodEarnings.push({
                 period_end: payRun.pay_period_end,
                 earnings,
-                hours,
+                hours: insurableHours,
             });
         }
 

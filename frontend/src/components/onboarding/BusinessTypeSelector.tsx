@@ -89,7 +89,7 @@ export const BusinessTypeSelector: React.FC<BusinessTypeSelectorProps> = ({ sele
                                         </p>
                                         {isBeta && (
                                             <p className="mt-2 text-xs text-golden-hour">
-                                                Early access — features may change as we refine the experience.
+                                                Early access. Features may change as we refine the experience.
                                             </p>
                                         )}
                                     </div>

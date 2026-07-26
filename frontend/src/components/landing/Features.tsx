@@ -58,7 +58,7 @@ const features = [
   // Payroll & HR
   {
     title: "Time Management & Scheduling",
-    description: "Employees submit timesheets, managers approve with one click, and you schedule shifts effortlessly. Calendar views, approval workflows, and automatic hour calculations—all in one place.",
+    description: "Employees submit timesheets, managers approve with one click, and you schedule shifts effortlessly. Calendar views, approval workflows, and automatic hour calculations, all in one place.",
     icon: Clock,
     color: "text-orange-400",
     category: "Payroll & HR"
@@ -79,7 +79,7 @@ const features = [
   },
   {
     title: "Pay Runs",
-    description: "Process payroll in minutes, not hours. Create pay runs, preview calculations, approve, and finalize—all with automatic tax deductions. Batch processing saves you time every pay period.",
+    description: "Process payroll in minutes, not hours. Create pay runs, preview calculations, approve, and finalize, all with automatic tax deductions. Batch processing saves you time every pay period.",
     icon: DollarSign,
     color: "text-emerald-400",
     category: "Payroll & HR"
@@ -115,14 +115,14 @@ const features = [
   // Tax & Compliance
   {
     title: "HST & Tax Reports",
-    description: "Generate HST reports and financial statements to support your CRA filings. P&L statements, retained earnings, and HST summaries—all formatted for your accountant or direct filing.",
+    description: "Generate HST reports and financial statements to support your CRA filings. P&L statements, retained earnings, and HST summaries, all formatted for your accountant or direct filing.",
     icon: FileText,
     color: "text-violet-400",
     category: "Tax & Compliance"
   },
   {
     title: "Free Income Tax Calculator",
-    description: "Estimate your 2026 Canadian take-home pay for free—no account needed. Ontario federal and provincial brackets, CPP, EI, and the Ontario Health Premium. Try it from the Tax Calculator link in the nav.",
+    description: "Estimate your 2026 Canadian take-home pay for free. No account needed. Ontario federal and provincial brackets, CPP, EI, and the Ontario Health Premium. Try it from the Tax Calculator link in the nav.",
     icon: Calculator,
     color: "text-fuchsia-400",
     category: "Tax & Compliance"
@@ -136,7 +136,7 @@ const features = [
   },
   {
     title: "Dividend Management",
-    description: "Issue dividends with proper documentation. Auto-generate T5 slips and board resolutions—stay compliant without the paperwork. Ideal for incorporated contractors optimizing their tax structure.",
+    description: "Issue dividends with proper documentation. Auto-generate T5 slips and board resolutions, and stay compliant without the paperwork. Ideal for incorporated contractors optimizing their tax structure.",
     icon: PieChart,
     color: "text-golden-hour",
     category: "Tax & Compliance"
@@ -151,14 +151,14 @@ const features = [
   // Business Management
   {
     title: "Financial Reports",
-    description: "Generate comprehensive financial reports on demand. Profit & Loss, Balance Sheet, Cash Flow—all the reports you need to understand your business health and make informed decisions.",
+    description: "Generate comprehensive financial reports on demand. Profit & Loss, Balance Sheet, Cash Flow: all the reports you need to understand your business health and make informed decisions.",
     icon: TrendingUp,
     color: "text-emerald-500",
     category: "Business Management"
   },
   {
     title: "Dashboard Overview",
-    description: "See your business health at a glance. Revenue, expenses, outstanding invoices, HST owed, available dividends—all in one beautiful dashboard. Make decisions faster with real-time insights.",
+    description: "See your business health at a glance. Revenue, expenses, outstanding invoices, HST owed, available dividends: all in one beautiful dashboard. Make decisions faster with real-time insights.",
     icon: TrendingUp,
     color: "text-green-500",
     category: "Business Management"

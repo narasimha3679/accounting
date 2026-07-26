@@ -15,7 +15,7 @@ export const TaxCalculatorPromo = () => {
           </div>
           <div className="flex-1 text-center lg:text-left">
             <p className="text-neon-emerald font-medium text-sm tracking-wide uppercase mb-2">
-              Free tool — no account required
+              Free tool. No account required
             </p>
             <h2
               id="tax-calculator-promo-heading"

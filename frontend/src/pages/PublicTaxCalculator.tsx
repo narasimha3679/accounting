@@ -200,7 +200,7 @@ export default function PublicTaxCalculator() {
         />
         <meta
           property="og:description"
-          content="Estimate your 2026 Ontario take-home pay with federal and provincial tax, CPP, EI, and the Ontario Health Premium. Free — no account required."
+          content="Estimate your 2026 Ontario take-home pay with federal and provincial tax, CPP, EI, and the Ontario Health Premium. Free, no account required."
         />
         <meta property="og:url" content="https://cashual.org/tax-calculator" />
         <meta property="og:image" content="https://cashual.org/og-image.png" />
@@ -440,7 +440,7 @@ export default function PublicTaxCalculator() {
                 </div>
                 {(displayPeriod === 'hourly' || displayPeriod === 'daily') && (
                   <p className="text-xs text-slate-muted -mt-1">
-                    Take-home {displayPeriod === 'hourly' ? 'per hour' : 'per day'} after tax —
+                    Take-home {displayPeriod === 'hourly' ? 'per hour' : 'per day'} after tax,
                     not your gross wage. Gross is {formatCurrency(results.grossIncome)}/
                     {displayPeriod === 'hourly' ? 'hr' : 'day'} at your schedule above.
                   </p>
@@ -466,7 +466,7 @@ export default function PublicTaxCalculator() {
                   href="/onboarding/company"
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-deep-forest disabled:pointer-events-none disabled:opacity-50 bg-gradient-to-r from-neon-emerald to-golden-hour text-deep-forest hover:opacity-90 glow-emerald font-bold h-11 px-8 w-full sm:w-auto"
                 >
-                  Create a Cashual Account — It's Free
+                  Create a Cashual Account (It's Free)
                 </a>
                 <p className="text-xs text-slate-muted mt-4">
                   * Calculations are based on 2026 Ontario tax brackets, CRA payroll deduction

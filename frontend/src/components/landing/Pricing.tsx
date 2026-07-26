@@ -75,7 +75,7 @@ export const Pricing = () => {
                     <span className="ml-3 text-2xl font-normal text-slate-500 line-through">$5/month</span>
                   </h3>
                   <p className="text-slate-400 mb-6">
-                    Free for a limited time. Everything included—no per-employee fees, no hidden costs.
+                    Free for a limited time. Everything included: no per-employee fees, no hidden costs.
                   </p>
                   <div className="flex items-center gap-2 mb-6 text-sm text-slate-400">
                     <Users className="w-4 h-4 text-neon-emerald" aria-hidden="true" />

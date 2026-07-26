@@ -79,11 +79,7 @@ const PayRuns: React.FC = () => {
         })
         .reduce((sum, pr) => sum + pr.total_net, 0);
 
-    const handleView = (id: number) => {
-        navigate(`/payroll/runs/${id}`);
-    };
-
-    const handleEdit = (id: number) => {
+    const handleOpen = (id: number) => {
         navigate(`/payroll/runs/${id}`);
     };
 
@@ -139,7 +135,7 @@ const PayRuns: React.FC = () => {
                             <AlertCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                             <div>
                                 <p className="text-sm text-foreground">
-                                    Default payroll settings applied — review in{' '}
+                                    Default payroll settings applied. Review in{' '}
                                     <Link
                                         to="/settings/payroll"
                                         className="text-primary underline underline-offset-2 hover:opacity-90"
@@ -220,7 +216,7 @@ const PayRuns: React.FC = () => {
 
             {/* Pay Runs Table */}
             <Card className="p-6">
-                <PayRunTable payRuns={payRuns} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
+                <PayRunTable payRuns={payRuns} onOpen={handleOpen} onDelete={handleDelete} />
             </Card>
 
             {showCreateModal && user?.company_id && (

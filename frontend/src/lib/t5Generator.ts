@@ -278,7 +278,7 @@ function buildT5SlipPdf(
     }
 
     if (tableData.length === 0) {
-        tableData.push(['—', 'No dividend income', '$0.00']);
+        tableData.push(['-', 'No dividend income', '$0.00']);
     }
 
     autoTable(pdf, {

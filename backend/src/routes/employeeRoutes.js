@@ -38,6 +38,7 @@ router.post('/', async (req, res) => {
             sin,
             payrate,
             payrate_type,
+            ei_exempt,
             initialPassword,
         } = req.body;
 
@@ -50,6 +51,19 @@ router.post('/', async (req, res) => {
 
         if (!supabaseAdmin) {
             return res.status(500).json({ error: 'Service role key not configured' });
+        }
+
+        if (!hire_date) {
+            return res.status(400).json({ error: 'Hire date is required' });
+        }
+        if (!sin) {
+            return res.status(400).json({ error: 'SIN is required' });
+        }
+        if (payrate === undefined || payrate === null || payrate === '') {
+            return res.status(400).json({ error: 'Pay rate is required' });
+        }
+        if (!payrate_type) {
+            return res.status(400).json({ error: 'Pay rate type is required' });
         }
 
         // Auto-generate employee_id if not provided
@@ -106,6 +120,7 @@ router.post('/', async (req, res) => {
                 sin: sin || null,
                 payrate: payrate || null,
                 payrate_type: payrate_type || null,
+                ei_exempt: ei_exempt === true,
             })
             .select()
             .single();

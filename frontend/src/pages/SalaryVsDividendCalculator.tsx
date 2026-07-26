@@ -32,7 +32,7 @@ const FAQ_ITEMS = [
   {
     question: 'Is the salary vs dividend decision really all-or-nothing?',
     answer:
-      'No — and that is the key insight. The optimal strategy is usually a mix: for example, enough salary to maximize CPP or RRSP room, with the remainder as dividends. The best split depends on your corporate profit, other income, RDTOH balance, and retirement goals, which is exactly what the full Cashual optimizer models.',
+      'No, and that is the key insight. The optimal strategy is usually a mix: for example, enough salary to maximize CPP or RRSP room, with the remainder as dividends. The best split depends on your corporate profit, other income, RDTOH balance, and retirement goals, which is exactly what the full Cashual optimizer models.',
   },
 ];
 
@@ -154,7 +154,7 @@ export default function SalaryVsDividendCalculator() {
         />
         <meta
           property="og:description"
-          content="Compare paying yourself salary vs dividends from your Ontario corporation. Side-by-side take-home cash, taxes, CPP, and RRSP room. Free — no account required."
+          content="Compare paying yourself salary vs dividends from your Ontario corporation. Side-by-side take-home cash, taxes, CPP, and RRSP room. Free, no account required."
         />
         <meta property="og:url" content="https://cashual.org/salary-vs-dividend-calculator" />
         <meta property="og:image" content="https://cashual.org/og-image.png" />
@@ -188,7 +188,7 @@ export default function SalaryVsDividendCalculator() {
             </h1>
             <p className="text-lg text-slate-muted max-w-2xl mx-auto">
               Incorporated in Ontario? See exactly what lands in your pocket in 2026 if you pay
-              yourself all salary vs all non-eligible dividends — from the same corporate profit.
+              yourself all salary vs all non-eligible dividends, from the same corporate profit.
             </p>
           </div>
 
@@ -228,7 +228,7 @@ export default function SalaryVsDividendCalculator() {
               ))}
             </div>
             <p className="text-xs text-slate-muted mt-4">
-              This is your corporation's profit before paying you — the same pot funds either
+              This is your corporation's profit before paying you. The same pot funds either
               route. Assumes you own more than 40% of voting shares (EI-exempt) and this is your
               only personal income.
             </p>
@@ -251,7 +251,7 @@ export default function SalaryVsDividendCalculator() {
                 <span className="font-bold text-neon-emerald tabular-nums">
                   {formatCurrency(advantageAbs)}
                 </span>{' '}
-                more cash in your pocket this year — but that's not the whole story.
+                more cash in your pocket this year, but that's not the whole story.
               </p>
               <p className="text-sm text-slate-muted mt-2">
                 Salary builds {formatCurrency(salary.rrspRoomGenerated)} of RRSP room and{' '}
@@ -331,7 +331,7 @@ export default function SalaryVsDividendCalculator() {
                     <span className="text-white font-medium tabular-nums">
                       {formatCurrency(salary.totalCppContributions)}
                     </span>{' '}
-                    toward CPP — a real, indexed retirement pension
+                    toward CPP, a real, indexed retirement pension
                   </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
@@ -406,20 +406,20 @@ export default function SalaryVsDividendCalculator() {
                 <div className="flex items-start gap-3 text-sm">
                   <Wallet className="w-4 h-4 text-golden-hour mt-0.5 flex-shrink-0" />
                   <span className="text-slate-muted">
-                    No CPP contributions — more cash now, but no pension building
+                    No CPP contributions: more cash now, but no pension building
                   </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <PiggyBank className="w-4 h-4 text-golden-hour mt-0.5 flex-shrink-0" />
                   <span className="text-slate-muted">
-                    Generates <span className="text-white font-medium">$0</span> of RRSP room —
-                    dividends aren't "earned income"
+                    Generates <span className="text-white font-medium">$0</span> of RRSP room.
+                    Dividends aren't "earned income"
                   </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <TrendingUp className="w-4 h-4 text-golden-hour mt-0.5 flex-shrink-0" />
                   <span className="text-slate-muted">
-                    Simpler payroll — no source deductions or remittances
+                    Simpler payroll: no source deductions or remittances
                   </span>
                 </div>
               </div>
@@ -438,7 +438,7 @@ export default function SalaryVsDividendCalculator() {
                 100% of either is almost never optimal
               </h2>
               <p className="text-slate-muted max-w-xl mx-auto mb-6">
-                Cashual's optimizer finds your personalized salary + dividend split — factoring in
+                Cashual's optimizer finds your personalized salary + dividend split, factoring in
                 your other income, RRSP and CPP goals, RDTOH balance, and target take-home cash.
                 Then it handles the payroll, T4s, T5s, and board minutes for you.
               </p>
@@ -446,7 +446,7 @@ export default function SalaryVsDividendCalculator() {
                 href="/onboarding/company"
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-emerald focus-visible:ring-offset-2 focus-visible:ring-offset-deep-forest disabled:pointer-events-none disabled:opacity-50 bg-gradient-to-r from-neon-emerald to-golden-hour text-deep-forest hover:opacity-90 glow-emerald font-bold h-11 px-8 w-full sm:w-auto"
               >
-                Find My Optimal Mix — Free
+                Find My Optimal Mix (Free)
               </a>
               <p className="text-xs text-slate-muted mt-4">
                 Also try our{' '}
@@ -464,7 +464,7 @@ export default function SalaryVsDividendCalculator() {
             small business corporate tax rate, 15% non-eligible dividend gross-up with federal
             (9.0301%) and Ontario (2.9863%) dividend tax credits, CPP/CPP2, and basic personal
             amounts. Assumes no other personal income and EI-exempt owner-manager. For estimation
-            purposes only — not tax advice.
+            purposes only, not tax advice.
           </p>
 
           {/* FAQ */}

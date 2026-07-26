@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { PayRunItem } from '../../lib/api';
 import Button from '../ui/Button';
 import { Eye, X } from 'lucide-react';
+
+/** Save + calc on blur, or after 2s idle — whichever comes first */
+const HOURS_COMMIT_IDLE_MS = 2_000;
 
 interface PayRunItemsTableProps {
     items: PayRunItem[];
@@ -10,6 +13,81 @@ interface PayRunItemsTableProps {
     onViewDetails: (item: PayRunItem) => void;
     onRemove: (itemId: number) => void;
 }
+
+interface EditableNumberCellProps {
+    itemId: number;
+    field: string;
+    committedValue: number;
+    onCommit: (itemId: number, field: string, value: number) => void;
+    title?: string;
+}
+
+const EditableNumberCell: React.FC<EditableNumberCellProps> = ({
+    itemId,
+    field,
+    committedValue,
+    onCommit,
+    title,
+}) => {
+    const [draft, setDraft] = useState(String(committedValue));
+    const [focused, setFocused] = useState(false);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const draftRef = useRef(draft);
+    const committedRef = useRef(committedValue);
+    draftRef.current = draft;
+    committedRef.current = committedValue;
+
+    useEffect(() => {
+        if (!focused) {
+            setDraft(String(committedValue));
+        }
+    }, [committedValue, focused]);
+
+    const clearTimer = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    }, []);
+
+    const commit = useCallback(() => {
+        clearTimer();
+        const parsed = parseFloat(draftRef.current);
+        const value = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+        setDraft(String(value));
+        if (value !== committedRef.current) {
+            onCommit(itemId, field, value);
+        }
+    }, [clearTimer, field, itemId, onCommit]);
+
+    useEffect(() => () => clearTimer(), [clearTimer]);
+
+    return (
+        <input
+            type="number"
+            step="0.01"
+            min="0"
+            title={title}
+            value={draft}
+            onFocus={() => setFocused(true)}
+            onChange={(e) => {
+                const next = e.target.value;
+                draftRef.current = next;
+                setDraft(next);
+                clearTimer();
+                timerRef.current = setTimeout(() => {
+                    timerRef.current = null;
+                    commit();
+                }, HOURS_COMMIT_IDLE_MS);
+            }}
+            onBlur={() => {
+                setFocused(false);
+                commit();
+            }}
+            className="w-20 text-right rounded-md border border-input bg-background px-2 py-1 text-sm"
+        />
+    );
+};
 
 const PayRunItemsTable: React.FC<PayRunItemsTableProps> = ({
     items,
@@ -36,16 +114,14 @@ const PayRunItemsTable: React.FC<PayRunItemsTableProps> = ({
         itemId: number,
         field: string,
         value: number,
-        opts?: { step?: string; title?: string }
+        opts?: { title?: string }
     ) => (
-        <input
-            type="number"
-            step={opts?.step ?? '0.01'}
-            min="0"
+        <EditableNumberCell
+            itemId={itemId}
+            field={field}
+            committedValue={value}
+            onCommit={onHoursChange}
             title={opts?.title}
-            value={value}
-            onChange={(e) => onHoursChange(itemId, field, parseFloat(e.target.value) || 0)}
-            className="w-20 text-right rounded-md border border-input bg-background px-2 py-1 text-sm"
         />
     );
 
@@ -277,7 +353,9 @@ const PayRunItemsTable: React.FC<PayRunItemsTableProps> = ({
             </table>
             {isEditable && (
                 <p className="text-xs text-muted-foreground mt-3">
-                    Sick hours are tracked on the item detail view but unpaid in this version.
+                    Hours save and recalculate when you leave the field, or after 2 seconds of no
+                    typing. Sick hours are tracked on the item detail view but unpaid in this
+                    version.
                 </p>
             )}
         </div>

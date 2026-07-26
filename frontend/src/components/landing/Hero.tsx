@@ -67,7 +67,7 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg md:text-xl text-slate-400 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
             >
-              The only accounting platform built for Canadian contractors. Track time, run payroll, manage expenses, and stay CRA-compliant—all in one place. Free for a limited time.
+              The only accounting platform built for Canadian contractors. Track time, run payroll, manage expenses, and stay CRA-compliant, all in one place. Free for a limited time.
             </motion.p>
 
             <motion.div

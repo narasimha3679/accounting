@@ -375,6 +375,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
         sin: employee?.sin || '',
         payrate: employee?.payrate?.toString() || '',
         payrate_type: (employee?.payrate_type || '') as 'hourly' | 'salary' | 'monthly' | 'biweekly' | '',
+        ei_exempt: employee?.ei_exempt === true,
         initialPassword: '',
     });
 
@@ -406,16 +407,29 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
             company_id: user.company_id,
         };
 
-        // Convert payrate to number if provided
-        if (employeeData.payrate) {
-            employeeData.payrate = parseFloat(employeeData.payrate);
-        } else {
-            employeeData.payrate = null;
+        if (!formData.hire_date?.trim()) {
+            alert('Hire date is required');
+            return;
+        }
+        if (!formData.sin?.trim()) {
+            alert('SIN is required');
+            return;
+        }
+        if (!formData.payrate?.trim() || Number.isNaN(parseFloat(formData.payrate))) {
+            alert('Pay rate is required');
+            return;
+        }
+        if (!formData.payrate_type) {
+            alert('Pay rate type is required');
+            return;
         }
 
-        // Remove empty strings and convert to null for optional fields
-        if (!employeeData.sin) employeeData.sin = null;
-        if (!employeeData.payrate_type) employeeData.payrate_type = null;
+        employeeData.payrate = parseFloat(employeeData.payrate);
+
+        // Empty strings are invalid for Postgres date columns and should be null for optional fields
+        if (!employeeData.phone) employeeData.phone = null;
+        if (!employeeData.position) employeeData.position = null;
+        if (!employeeData.address) employeeData.address = null;
 
         if (employee) {
             const { initialPassword, ...updateData } = employeeData;
@@ -578,7 +592,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
 
                         <div>
                             <label htmlFor="hire_date" className="block text-sm font-medium text-foreground mb-2">
-                                Hire Date
+                                Hire Date *
                             </label>
                             <input
                                 id="hire_date"
@@ -586,6 +600,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                 value={formData.hire_date}
                                 onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                                 className="input"
+                                required
                             />
                         </div>
 
@@ -604,7 +619,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
 
                         <div>
                             <label htmlFor="sin" className="block text-sm font-medium text-foreground mb-2">
-                                SIN (Social Insurance Number)
+                                SIN (Social Insurance Number) *
                             </label>
                             <input
                                 id="sin"
@@ -613,18 +628,20 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                 onChange={(e) => setFormData({ ...formData, sin: e.target.value })}
                                 className="input"
                                 placeholder="123-456-789"
+                                required
                             />
                         </div>
 
                         <div>
                             <label htmlFor="payrate_type" className="block text-sm font-medium text-foreground mb-2">
-                                Pay Rate Type
+                                Pay Rate Type *
                             </label>
                             <select
                                 id="payrate_type"
                                 value={formData.payrate_type}
                                 onChange={(e) => setFormData({ ...formData, payrate_type: e.target.value as any })}
                                 className="input"
+                                required
                             >
                                 <option value="">Select type...</option>
                                 <option value="hourly">Hourly</option>
@@ -636,7 +653,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
 
                         <div>
                             <label htmlFor="payrate" className="block text-sm font-medium text-foreground mb-2">
-                                Pay Rate
+                                Pay Rate *
                             </label>
                             <input
                                 id="payrate"
@@ -647,6 +664,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                 onChange={(e) => setFormData({ ...formData, payrate: e.target.value })}
                                 className="input"
                                 placeholder="0.00"
+                                required
                             />
                             {formData.payrate_type && (
                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -654,7 +672,7 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                     {formData.payrate_type === 'salary' && 'Annual salary'}
                                     {formData.payrate_type === 'monthly' && 'Per month'}
                                     {formData.payrate_type === 'biweekly' && 'Per biweekly period'}
-                                    {' — used by Pay Runs to calculate pay'}
+                                    {' (used by Pay Runs to calculate pay)'}
                                 </p>
                             )}
                             {!formData.payrate_type && (
@@ -662,6 +680,31 @@ function EmployeeModal({ employee, onClose, onSave }: EmployeeModalProps) {
                                     Used by Pay Runs to calculate employee pay each period
                                 </p>
                             )}
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.ei_exempt}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, ei_exempt: e.target.checked })
+                                    }
+                                    className="mt-1 h-4 w-4 rounded border-input"
+                                />
+                                <span>
+                                    <span className="block text-sm font-medium text-foreground">
+                                        EI exempt
+                                    </span>
+                                    <span className="block text-sm text-muted-foreground mt-1">
+                                        Skip Employment Insurance premiums for this person. Typical
+                                        for controlling shareholders (over 40% voting shares) or
+                                        related / non-arm&apos;s-length employment that CRA treats as
+                                        not insurable. Non-arm&apos;s length alone does not always
+                                        mean no EI. Confirm with your accountant.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
 
                         {!employee && (

@@ -73,6 +73,10 @@ const Dashboard: React.FC = () => {
     const loadDashboardData = async () => {
         try {
             const companyId = user?.company_id;
+            if (companyId == null) {
+                setIsLoading(false);
+                return;
+            }
             const fiscalYearEnd = user?.company?.fiscal_year_end;
 
             // Calculate date range based on time period and fiscal year

@@ -158,7 +158,7 @@ const comparisonData = [
   // Pricing
   {
     feature: "Cost (10 employees with payroll)",
-    cashual: { value: "Free", note: "Limited time — everything included, unlimited employees" },
+    cashual: { value: "Free", note: "Limited time. Everything included, unlimited employees" },
     quickbooks: { value: "$150/month", note: "$100 accounting + $50 payroll" },
     wave: { value: "Free", note: "But no payroll available" },
     xero: { value: "$50/month", note: "$40 accounting + $10 payroll add-on" }
@@ -179,7 +179,7 @@ export const Comparison = () => {
     if (typeof value === "string") {
       return <span className="text-white font-semibold text-sm">{value}</span>;
     }
-    return <span className="text-slate-500">—</span>;
+    return <span className="text-slate-500">-</span>;
   };
 
   return (
@@ -216,7 +216,7 @@ export const Comparison = () => {
             transition={{ delay: 0.15 }}
             className="text-slate-500 text-sm"
           >
-            Most platforms require separate tools for accounting and payroll—we offer everything in one integrated platform.
+            Most platforms require separate tools for accounting and payroll. We offer everything in one integrated platform.
           </motion.p>
         </div>
 
@@ -302,8 +302,8 @@ export const Comparison = () => {
                   One Platform, Everything You Need
                 </h3>
                 <p className="text-slate-300 text-sm">
-                  Many businesses use multiple tools to manage their finances. Cashual offers everything—accounting, payroll, 
-                  compliance, and employee management—in one integrated platform, built specifically for Canadian businesses.
+                  Many businesses use multiple tools to manage their finances. Cashual offers everything (accounting, payroll, 
+                  compliance, and employee management) in one integrated platform, built specifically for Canadian businesses.
                 </p>
               </div>
             </Card>

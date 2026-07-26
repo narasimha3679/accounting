@@ -10,7 +10,7 @@ const faqs = [
   },
   {
     question: "Do you offer a free Canadian income tax calculator?",
-    answer: "Yes. Cashual includes a free 2026 Canadian income tax calculator at cashual.org/tax-calculator—no account required. It estimates Ontario take-home pay using federal and provincial brackets, CPP, CPP2, EI, and the Ontario Health Premium. For business tax planning (salary vs dividends, HST, and CRA documents), sign up for Cashual."
+    answer: "Yes. Cashual includes a free 2026 Canadian income tax calculator at cashual.org/tax-calculator. No account required. It estimates Ontario take-home pay using federal and provincial brackets, CPP, CPP2, EI, and the Ontario Health Premium. For business tax planning (salary vs dividends, HST, and CRA documents), sign up for Cashual."
   },
   {
     question: "Can I track employee hours and schedules?",
@@ -18,15 +18,15 @@ const faqs = [
   },
   {
     question: "What features are included?",
-    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included—no add-ons or per-employee fees—and it's free for a limited time."
+    answer: "Cashual includes everything you need: invoice management, income and expense tracking, capital asset management, client management, employee management with self-service portal, salary tracking, time & attendance, pay runs with automatic tax calculations, payroll reports, CRA remittances, T4/T5/ROE generation, dividend management, owner reimbursement tracking, Canadian tax compliance, tax planning calculator, and comprehensive financial reports (P&L, Balance Sheet, Cash Flow). All features are included (no add-ons or per-employee fees), and it's free for a limited time."
   },
   {
     question: "How does pricing work?",
-    answer: "Cashual is free for a limited time. You get full access to all features—accounting, payroll, tax documents, and employee management—with no hidden fees and no per-employee charges. No credit card required to get started."
+    answer: "Cashual is free for a limited time. You get full access to all features (accounting, payroll, tax documents, and employee management) with no hidden fees and no per-employee charges. No credit card required to get started."
   },
   {
     question: "Can I cancel anytime?",
-    answer: "Yes, absolutely! You can cancel at any time with no penalties or fees. Since we offer one simple plan with all features included, there's no need to upgrade or downgrade—everything is available from day one."
+    answer: "Yes, absolutely! You can cancel at any time with no penalties or fees. Since we offer one simple plan with all features included, there's no need to upgrade or downgrade. Everything is available from day one."
   },
   {
     question: "What payment methods do you accept?",
@@ -46,7 +46,7 @@ const faqs = [
   },
   {
     question: "Can I use Cashual for multiple companies?",
-    answer: "Right now, Cashual is focused on managing one company per account, which keeps things simple while we refine the core experience. Multi-company support is on our roadmap so that consultants and contractors with multiple corporations can manage them in one place. If multi-company support is critical for you, please reach out—we’re actively shaping this part of the product based on user feedback."
+    answer: "Right now, Cashual is focused on managing one company per account, which keeps things simple while we refine the core experience. Multi-company support is on our roadmap so that consultants and contractors with multiple corporations can manage them in one place. If multi-company support is critical for you, please reach out. We’re actively shaping this part of the product based on user feedback."
   },
   {
     question: "Do I need accounting knowledge to use Cashual?",

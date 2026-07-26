@@ -11,7 +11,7 @@ const steps = [
   {
     number: "02",
     title: "Add Your Team & Set Up Time Tracking",
-    description: "Add employees with their tax information. Set up salary or hourly rates, benefits, and deductions. Configure time tracking and scheduling—employees can submit timesheets and view their schedules. Employees get secure self-service access to their dashboard.",
+    description: "Add employees with their tax information. Set up salary or hourly rates, benefits, and deductions. Configure time tracking and scheduling. Employees can submit timesheets and view their schedules. Employees get secure self-service access to their dashboard.",
     icon: Settings,
   },
   {

@@ -11,7 +11,7 @@ interface DividendRecipientProfilesCardProps {
 }
 
 const formatSIN = (sin: string | null | undefined): string => {
-    if (!sin) return '—';
+    if (!sin) return '-';
     const cleaned = sin.replace(/\D/g, '');
     if (cleaned.length !== 9) return sin;
     return `${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6, 9)}`;
@@ -180,7 +180,7 @@ const DividendRecipientProfilesCard: React.FC<DividendRecipientProfilesCardProps
                                         <td className="px-3 py-2 text-muted-foreground">
                                             {profile.recipient_type === 'individual'
                                                 ? formatSIN(profile.recipient_sin)
-                                                : profile.business_number || '—'}
+                                                : profile.business_number || '-'}
                                         </td>
                                         <td className="px-3 py-2">
                                             {profile.is_default ? (

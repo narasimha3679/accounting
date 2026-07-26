@@ -292,12 +292,16 @@ export function buildPayrollJournalEntries(input: {
 }): { entries: Array<{ account: string; debit: number; credit: number }>; total_debit: number; total_credit: number } {
     const entries: Array<{ account: string; debit: number; credit: number }> = [
         { account: 'Wages Expense', debit: input.total_gross, credit: 0 },
-        { account: 'CPP Expense (Employer)', debit: input.total_employer_cpp, credit: 0 },
+        {
+            account: 'CPP Expense (Employer)',
+            debit: input.total_employer_cpp + input.total_cpp2,
+            credit: 0,
+        },
         { account: 'EI Expense (Employer)', debit: input.total_employer_ei, credit: 0 },
         {
             account: 'CPP Payable',
             debit: 0,
-            credit: input.total_cpp + input.total_employer_cpp + input.total_cpp2,
+            credit: input.total_cpp + input.total_employer_cpp + input.total_cpp2 * 2,
         },
         {
             account: 'EI Payable',

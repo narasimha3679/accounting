@@ -40,7 +40,7 @@ export const TermsOfService = () => {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">4. Pricing and Billing</h2>
             <p className="text-slate-300 leading-relaxed mb-4">
-              Cashual offers simple, transparent pricing: $5 per month or $50 per year (save 17% with annual billing). All features are included in this price—there are no per-employee fees or hidden costs.
+              Cashual offers simple, transparent pricing: $5 per month or $50 per year (save 17% with annual billing). All features are included in this price. There are no per-employee fees or hidden costs.
             </p>
             <p className="text-slate-300 leading-relaxed mb-4">
               Billing occurs on a monthly or annual basis, depending on your selected plan. Annual plans are billed upfront for the full year. Monthly plans are billed monthly in advance.

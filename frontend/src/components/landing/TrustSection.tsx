@@ -10,7 +10,7 @@ const trustPoints = [
   {
     icon: CreditCard,
     title: "Free for a Limited Time",
-    description: "Full access at no cost for a limited time. All features included—no hidden fees."
+    description: "Full access at no cost for a limited time. All features included, no hidden fees."
   },
   {
     icon: XCircle,
@@ -49,7 +49,7 @@ export const TrustSection = () => {
               Built for Canadian <span className="text-neon-emerald">Business Owners</span>
             </h2>
             <p className="text-slate-400">
-              Whether you're a consultant, contractor, freelancer, or run a small business—Cashual handles your accounting needs. 
+              Whether you're a consultant, contractor, freelancer, or run a small business, Cashual handles your accounting needs. 
               Especially designed for incorporated contractors and small businesses.
             </p>
           </div>

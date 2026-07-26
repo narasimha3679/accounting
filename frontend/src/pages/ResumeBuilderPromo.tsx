@@ -34,7 +34,7 @@ const faqItems = [
   {
     question: 'Is SupaResume really 100% free?',
     answer:
-      'Yes, SupaResume is completely free forever. There are no hidden fees, no premium tiers, and no credit card required. Every feature — including AI resume creation, resume improvement, and job-specific tailoring — is available to all users at no cost.',
+      'Yes, SupaResume is completely free forever. There are no hidden fees, no premium tiers, and no credit card required. Every feature, including AI resume creation, resume improvement, and job-specific tailoring, is available to all users at no cost.',
   },
 ];
 
@@ -119,7 +119,7 @@ const ResumeBuilderPromo = () => {
               100% Free Forever
             </p>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Free AI Resume Builder —{' '}
+              Free AI Resume Builder:{' '}
               <span className="text-neon-emerald">Create Professional Resumes Online</span>
             </h1>
             <p className="text-slate-300 text-lg md:text-xl max-w-3xl mx-auto mb-10 leading-relaxed">
@@ -179,7 +179,7 @@ const ResumeBuilderPromo = () => {
               </p>
               <p>
                 Whether you're a recent graduate building your first resume, a professional updating
-                your career profile, or someone targeting a specific role —{' '}
+                your career profile, or someone targeting a specific role,{' '}
                 <a
                   href={SUPARESUME_URL}
                   target="_blank"
@@ -207,7 +207,7 @@ const ResumeBuilderPromo = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-3">Create a Resume from Scratch</h3>
                 <p className="text-slate-400 mb-6">
-                  Enter your job titles, skills, and a few keywords — the AI resume writer generates
+                  Enter your job titles, skills, and a few keywords. The AI resume writer generates
                   polished content for you. No writing skills needed. Perfect for anyone who wants to
                   build a resume online quickly.
                 </p>
@@ -230,7 +230,7 @@ const ResumeBuilderPromo = () => {
                 <h3 className="text-xl font-bold mb-3">Upload &amp; Improve Your Resume</h3>
                 <p className="text-slate-400 mb-6">
                   Already have a resume? Upload it as PDF or DOCX and let the AI rewrite it for
-                  clarity, stronger wording, and ATS compatibility — while keeping your story intact.
+                  clarity, stronger wording, and ATS compatibility, while keeping your story intact.
                 </p>
                 <a
                   href={`${SUPARESUME_URL}/improve-resume`}
@@ -282,7 +282,7 @@ const ResumeBuilderPromo = () => {
               <p>
                 Unlike generic <strong className="text-white">resume templates</strong> that leave
                 you staring at a blank page, SupaResume's AI does the heavy lifting. You provide the
-                raw ingredients — your job titles, skills, and accomplishments — and the{' '}
+                raw ingredients (your job titles, skills, and accomplishments) and the{' '}
                 <strong className="text-white">resume maker</strong> transforms them into
                 compelling, keyword-rich content that hiring managers want to read.
               </p>
@@ -416,8 +416,8 @@ const ResumeBuilderPromo = () => {
                 className="text-neon-emerald hover:underline"
               >
                 SupaResume
-              </a>{' '}
-              — the free AI resume builder
+              </a>
+              , the free AI resume builder
             </p>
           </section>
         </main>

@@ -55,6 +55,7 @@ export async function createPwEmployee(
   await modal.locator('#last_name').fill(employee.lastName);
   await modal.locator('#email').fill(employee.email);
   await modal.locator('#hire_date').fill('2024-01-15');
+  await modal.locator('#sin').fill('123456782');
   await modal.locator('#payrate_type').selectOption('hourly');
   await modal.locator('#payrate').fill('25');
   await modal.locator('#initialPassword').fill(employee.password);

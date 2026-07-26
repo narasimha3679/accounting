@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { type PayRun, type PayRunItem } from '../lib/api';
@@ -22,9 +22,7 @@ import PayRunItemsTable from '../components/payroll/PayRunItemsTable';
 import AddEmployeeToPayRun from '../components/payroll/AddEmployeeToPayRun';
 import PayRunItemDetail from '../components/payroll/PayRunItemDetail';
 import PayStubsList from '../components/payroll/PayStubsList';
-import { validatePayRun } from '../lib/payrollHelpers';
-
-const HOURS_RECALC_DEBOUNCE_MS = 400;
+import { derivePayPeriodFromStart, validatePayRun } from '../lib/payrollHelpers';
 
 const PayRunDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -44,14 +42,6 @@ const PayRunDetail: React.FC = () => {
     const [actionError, setActionError] = useState('');
     const [showVoidDialog, setShowVoidDialog] = useState(false);
     const [voidReason, setVoidReason] = useState('');
-    const hoursDebounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-    useEffect(() => {
-        return () => {
-            hoursDebounceTimers.current.forEach((timer) => clearTimeout(timer));
-            hoursDebounceTimers.current.clear();
-        };
-    }, []);
 
     const isNew = id === 'new';
 
@@ -262,24 +252,16 @@ const PayRunDetail: React.FC = () => {
         onError: showMutationError,
     });
 
-    const handleHoursChange = (itemId: number, field: string, value: number) => {
-        const key = `${itemId}:${field}`;
-        const existing = hoursDebounceTimers.current.get(key);
-        if (existing) clearTimeout(existing);
-
-        const timer = setTimeout(async () => {
-            hoursDebounceTimers.current.delete(key);
-            try {
-                await updateItemMutation.mutateAsync({ itemId, data: { [field]: value } });
-                if (payRun?.status === 'draft') {
-                    await calculateItemMutation.mutateAsync(itemId);
-                }
-            } catch {
-                // Errors surfaced via mutation onError
+    // Fired by the table on blur or after 2s idle (whichever first)
+    const handleHoursChange = async (itemId: number, field: string, value: number) => {
+        try {
+            await updateItemMutation.mutateAsync({ itemId, data: { [field]: value } });
+            if (payRun?.status === 'draft') {
+                await calculateItemMutation.mutateAsync(itemId);
             }
-        }, HOURS_RECALC_DEBOUNCE_MS);
-
-        hoursDebounceTimers.current.set(key, timer);
+        } catch {
+            // Errors surfaced via mutation onError
+        }
     };
 
     const handleAddEmployee = async (
@@ -293,6 +275,17 @@ const PayRunDetail: React.FC = () => {
         if (confirm('Remove this employee from the pay run?')) {
             removeItemMutation.mutate(itemId);
         }
+    };
+
+    const handlePeriodStartChange = (value: string) => {
+        setPeriodStart(value);
+        setSaveError('');
+        setSaveSuccess('');
+        if (!value) return;
+        const frequency = payrollSettings?.pay_frequency ?? 'biweekly';
+        const derived = derivePayPeriodFromStart(value, frequency);
+        setPeriodEnd(derived.pay_period_end);
+        setPayDate(derived.pay_date);
     };
 
     const handleSaveDates = () => {
@@ -463,11 +456,38 @@ const PayRunDetail: React.FC = () => {
                 </Card>
             )}
 
-            {/* Summary Card */}
-            <PayRunSummaryCard payRun={payRun} />
-
-            {/* Pay Period Info */}
+            {/* Pay period dates — editable while draft */}
             <Card className="p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                            Pay period
+                        </h2>
+                        {isDraft ? (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Change these dates like when you created the run. Changing start
+                                auto-fills end and pay date from your{' '}
+                                {(payrollSettings?.pay_frequency ?? 'biweekly').replace('_', '-')}{' '}
+                                schedule. You can still adjust them. Click Save dates when done.
+                            </p>
+                        ) : (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Dates are locked after the pay run leaves draft.
+                            </p>
+                        )}
+                    </div>
+                    {isDraft && (
+                        <Button
+                            onClick={handleSaveDates}
+                            icon={Save}
+                            size="sm"
+                            disabled={updateMutation.isPending || !datesDirty}
+                            className="shrink-0"
+                        >
+                            {updateMutation.isPending ? 'Saving...' : 'Save dates'}
+                        </Button>
+                    )}
+                </div>
                 {saveError && (
                     <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/40 text-sm text-destructive">
                         {saveError}
@@ -480,7 +500,7 @@ const PayRunDetail: React.FC = () => {
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm text-muted-foreground mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                             Pay Period Start
                         </label>
                         {isDraft ? (
@@ -488,11 +508,7 @@ const PayRunDetail: React.FC = () => {
                                 type="date"
                                 className="input w-full"
                                 value={periodStart}
-                                onChange={(e) => {
-                                    setPeriodStart(e.target.value);
-                                    setSaveError('');
-                                    setSaveSuccess('');
-                                }}
+                                onChange={(e) => handlePeriodStartChange(e.target.value)}
                             />
                         ) : (
                             <p className="text-foreground font-medium">
@@ -501,7 +517,7 @@ const PayRunDetail: React.FC = () => {
                         )}
                     </div>
                     <div>
-                        <label className="block text-sm text-muted-foreground mb-1">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                             Pay Period End
                         </label>
                         {isDraft ? (
@@ -522,7 +538,9 @@ const PayRunDetail: React.FC = () => {
                         )}
                     </div>
                     <div>
-                        <label className="block text-sm text-muted-foreground mb-1">Pay Date</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">
+                            Pay Date
+                        </label>
                         {isDraft ? (
                             <input
                                 type="date"
@@ -542,6 +560,9 @@ const PayRunDetail: React.FC = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* Summary Card */}
+            <PayRunSummaryCard payRun={payRun} />
 
             {/* Employee Table */}
             <Card className="p-6">
@@ -577,14 +598,6 @@ const PayRunDetail: React.FC = () => {
                                 disabled={calculateAllMutation.isPending || items.length === 0}
                             >
                                 {calculateAllMutation.isPending ? 'Calculating...' : 'Calculate All'}
-                            </Button>
-                            <Button
-                                onClick={handleSaveDates}
-                                icon={Save}
-                                variant="outline"
-                                disabled={updateMutation.isPending || !datesDirty}
-                            >
-                                {updateMutation.isPending ? 'Saving...' : 'Save'}
                             </Button>
                             <Button
                                 onClick={() => {

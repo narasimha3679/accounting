@@ -1,8 +1,10 @@
 /**
  * Payroll Calculation Engine
- * 
- * Core payroll calculation library for CRA-compliant payroll processing.
- * Calculates CPP, CPP2, EI, federal income tax, and Ontario provincial income tax.
+ *
+ * CRA T4032-ON aligned withholdings:
+ * - Enhanced CPP (1%) + CPP2 are deductions from taxable income
+ * - Base CPP (4.95%), EI, TD1 claims, and Canada Employment Amount are credits
+ * - Ontario: credits → surtax → tax reduction → health premium
  */
 
 import type {
@@ -15,6 +17,10 @@ import type {
 } from './payrollTypes';
 import { getPayPeriodsPerYear, round } from './payrollConstants';
 import { calculateBracketTax } from './taxTables';
+import { CRA_2026 } from './cra2026Constants';
+
+/** Enhanced CPP share of the combined employee rate (1% of 5.95%). */
+const CPP_ENHANCED_RATE = CRA_2026.cppRate - CRA_2026.cppBaseRate;
 
 export class PayrollCalculator {
     private taxConstants: TaxConstants;
@@ -54,18 +60,19 @@ export class PayrollCalculator {
         const cpp2 = this.calculateCPP2(taxableIncome, input.ytd);
 
         // Step 5: Calculate EI
-        const ei = this.calculateEI(earnings.grossPay, input.ytd);
+        const ei = this.calculateEI(earnings.grossPay, input.ytd, !!input.employee.ei_exempt);
 
-        // Step 6: Calculate income tax
-        const { federalTax, provincialTax, details } = this.calculateIncomeTax(
+        // Step 6: Calculate income tax (T4032-ON style)
+        const { federalTax, provincialTax, ontarioHealthPremium, details } = this.calculateIncomeTax(
             taxableIncome,
-            cpp.contribution + cpp2.contribution,
+            cpp.contribution,
+            cpp2.contribution,
             ei.premium,
             input.taxCredits,
             input.employee.province
         );
 
-        // Step 7: Calculate total deductions
+        // Step 7: Calculate total deductions (provincialTax already includes OHP)
         const totalDeductions =
             cpp.contribution +
             cpp2.contribution +
@@ -82,11 +89,12 @@ export class PayrollCalculator {
         // Step 9: Calculate vacation accrual
         const vacation = this.calculateVacation(earnings.grossPay, input);
 
-        // Step 10: Calculate employer costs
+        // Step 10: Calculate employer costs (CPP + CPP2 match + EI)
+        const employerCppTotal = cpp.employerContribution + cpp2.employerContribution;
         const employerCosts = {
-            cpp: cpp.employerContribution,
+            cpp: employerCppTotal,
             ei: ei.employerPremium,
-            total: earnings.grossPay + cpp.employerContribution + ei.employerPremium,
+            total: earnings.grossPay + employerCppTotal + ei.employerPremium,
         };
 
         return {
@@ -107,6 +115,7 @@ export class PayrollCalculator {
 
             federalTax,
             provincialTax,
+            ontarioHealthPremium,
             totalIncomeTax: federalTax + provincialTax,
 
             preTaxDeductions: input.benefits.preTaxDeductions,
@@ -234,7 +243,7 @@ export class PayrollCalculator {
 
     /**
      * Calculate CPP2 (Second Canada Pension Plan) contribution
-     * Applies to earnings between YMPE and YAMPE
+     * Applies to earnings between YMPE and YAMPE. Employer matches 1:1.
      */
     private calculateCPP2(grossPay: number, ytd: EmployeeYTD) {
         const { cpp2_rate, cpp_ympe, cpp2_yampe, cpp2_max_contribution } = this.taxConstants;
@@ -244,6 +253,7 @@ export class PayrollCalculator {
             return {
                 earnings: 0,
                 contribution: 0,
+                employerContribution: 0,
                 ytdAfter: ytd.cpp2_contributions,
                 maxedOut: true,
             };
@@ -259,6 +269,7 @@ export class PayrollCalculator {
             return {
                 earnings: 0,
                 contribution: 0,
+                employerContribution: 0,
                 ytdAfter: ytd.cpp2_contributions,
                 maxedOut: false,
             };
@@ -273,6 +284,7 @@ export class PayrollCalculator {
         return {
             earnings: round(cpp2Earnings),
             contribution: round(contribution),
+            employerContribution: round(contribution),
             ytdAfter: round(ytd.cpp2_contributions + contribution),
             maxedOut: ytd.cpp2_contributions + contribution >= cpp2_max_contribution,
         };
@@ -281,7 +293,17 @@ export class PayrollCalculator {
     /**
      * Calculate EI (Employment Insurance) premium
      */
-    private calculateEI(grossPay: number, ytd: EmployeeYTD) {
+    private calculateEI(grossPay: number, ytd: EmployeeYTD, eiExempt: boolean) {
+        if (eiExempt) {
+            return {
+                insurableEarnings: 0,
+                premium: 0,
+                employerPremium: 0,
+                ytdAfter: ytd.ei_premiums,
+                maxedOut: false,
+            };
+        }
+
         const {
             ei_employee_rate,
             ei_employer_multiplier,
@@ -322,11 +344,13 @@ export class PayrollCalculator {
     }
 
     /**
-     * Calculate income tax (federal and provincial)
+     * Calculate income tax (federal and provincial) using T4032-ON methodology.
+     * Enhanced CPP + CPP2 reduce taxable income; base CPP, EI, TD1, and CEA are credits.
      */
     private calculateIncomeTax(
         grossPay: number,
-        cppDeduction: number,
+        cppContribution: number,
+        cpp2Contribution: number,
         eiDeduction: number,
         taxCredits: { federal_total_claim: number; provincial_total_claim: number; claim_tax_exempt: boolean },
         province: string
@@ -336,8 +360,10 @@ export class PayrollCalculator {
             return {
                 federalTax: 0,
                 provincialTax: 0,
+                ontarioHealthPremium: 0,
                 details: {
                     annualizedIncome: 0,
+                    annualTaxableIncome: 0,
                     annualFederalTax: 0,
                     annualProvincialTax: 0,
                     federalCreditsUsed: 0,
@@ -346,74 +372,115 @@ export class PayrollCalculator {
             };
         }
 
-        // Step 1: Annualize the income
+        const { cpp_rate } = this.taxConstants;
+        const cppBaseRate = Math.max(0, cpp_rate - CPP_ENHANCED_RATE);
+        const cppBaseShare = cpp_rate > 0 ? cppBaseRate / cpp_rate : 0;
+        const cppEnhancedShare = cpp_rate > 0 ? CPP_ENHANCED_RATE / cpp_rate : 0;
+
+        // Step 1: Annualize period amounts
         const annualGross = grossPay * this.payPeriodsPerYear;
-        const annualCpp = cppDeduction * this.payPeriodsPerYear;
+        const annualCppBase = cppContribution * cppBaseShare * this.payPeriodsPerYear;
+        const annualCppEnhanced = cppContribution * cppEnhancedShare * this.payPeriodsPerYear;
+        const annualCpp2 = cpp2Contribution * this.payPeriodsPerYear;
         const annualEi = eiDeduction * this.payPeriodsPerYear;
 
-        // Step 2: Calculate annual federal tax
-        const federalTaxableIncome = Math.max(0, annualGross - annualCpp - annualEi);
-        const annualFederalTax = calculateBracketTax(federalTaxableIncome, this.federalBrackets);
+        // Step 2: Taxable income — only enhanced CPP + CPP2 are deductions (T4032)
+        const annualTaxableIncome = Math.max(0, annualGross - annualCppEnhanced - annualCpp2);
 
-        // Apply federal tax credits (using lowest bracket rate)
+        // Step 3: Federal tax
+        const annualFederalRaw = calculateBracketTax(annualTaxableIncome, this.federalBrackets);
         const lowestFederalRate = this.federalBrackets[0]?.rate || 0.14;
-        const federalCredits = taxCredits.federal_total_claim * lowestFederalRate;
-        const netFederalTax = Math.max(0, annualFederalTax - federalCredits);
+        const cea = Math.min(this.taxConstants.federal_employment_amount || 0, annualGross);
+        const federalCreditBase =
+            taxCredits.federal_total_claim + annualCppBase + annualEi + cea;
+        const federalCredits = federalCreditBase * lowestFederalRate;
+        const netFederalTax = Math.max(0, annualFederalRaw - federalCredits);
 
-        // Step 3: Calculate annual provincial tax
-        const annualProvincialTax = calculateBracketTax(federalTaxableIncome, this.provincialBrackets);
+        // Step 4: Provincial tax
+        const annualProvincialRaw = calculateBracketTax(annualTaxableIncome, this.provincialBrackets);
+        const lowestProvincialRate = this.provincialBrackets[0]?.rate || 0.0505;
+        const provincialCreditBase =
+            taxCredits.provincial_total_claim + annualCppBase + annualEi;
+        const provincialCredits = provincialCreditBase * lowestProvincialRate;
+        const basicProvincialTax = Math.max(0, annualProvincialRaw - provincialCredits);
 
-        // Apply Ontario surtax if applicable
         let ontarioSurtax = 0;
+        let ontarioTaxReduction = 0;
+        let ontarioHealthPremiumAnnual = 0;
+
         if (province === 'ON') {
-            ontarioSurtax = this.calculateOntarioSurtax(annualProvincialTax);
+            ontarioSurtax = this.calculateOntarioSurtax(basicProvincialTax);
+            const taxWithSurtax = basicProvincialTax + ontarioSurtax;
+            const reductionBase =
+                this.provincialConstants.tax_reduction_base ?? CRA_2026.ontarioTaxReductionBase;
+            ontarioTaxReduction = Math.min(
+                taxWithSurtax,
+                Math.max(0, 2 * reductionBase - taxWithSurtax)
+            );
+
+            if (this.provincialConstants.health_premium_enabled) {
+                ontarioHealthPremiumAnnual = this.calculateOntarioHealthPremium(annualTaxableIncome);
+            }
         }
 
-        const totalProvincialTax = annualProvincialTax + ontarioSurtax;
+        const netProvincialTaxBeforeOhp = Math.max(
+            0,
+            basicProvincialTax + ontarioSurtax - ontarioTaxReduction
+        );
+        const netProvincialTax = netProvincialTaxBeforeOhp + ontarioHealthPremiumAnnual;
 
-        // Apply provincial tax credits (using lowest bracket rate)
-        const lowestProvincialRate = this.provincialBrackets[0]?.rate || 0.0505;
-        const provincialCredits = taxCredits.provincial_total_claim * lowestProvincialRate;
-        const netProvincialTax = Math.max(0, totalProvincialTax - provincialCredits);
-
-        // Step 4: De-annualize back to pay period
+        // Step 5: De-annualize back to pay period
         const federalTax = round(netFederalTax / this.payPeriodsPerYear);
+        const ontarioHealthPremium = round(ontarioHealthPremiumAnnual / this.payPeriodsPerYear);
         const provincialTax = round(netProvincialTax / this.payPeriodsPerYear);
 
         return {
             federalTax,
             provincialTax,
+            ontarioHealthPremium,
             details: {
                 annualizedIncome: round(annualGross),
-                annualFederalTax: round(annualFederalTax),
-                annualProvincialTax: round(annualProvincialTax),
+                annualTaxableIncome: round(annualTaxableIncome),
+                annualFederalTax: round(annualFederalRaw),
+                annualProvincialTax: round(annualProvincialRaw),
                 federalCreditsUsed: round(federalCredits),
                 provincialCreditsUsed: round(provincialCredits),
                 ontarioSurtax: round(ontarioSurtax),
+                ontarioTaxReduction: round(ontarioTaxReduction),
+                ontarioHealthPremium: round(ontarioHealthPremiumAnnual),
             },
         };
     }
 
     /**
-     * Calculate Ontario surtax (2026 thresholds are tax-amount based: $5,818 / $7,446)
+     * Ontario surtax (CRA): 20% of basic tax over threshold1 + 36% over threshold2
      */
-    private calculateOntarioSurtax(baseTax: number): number {
+    private calculateOntarioSurtax(basicTax: number): number {
         const threshold1 = this.provincialConstants.surtax_threshold_1 ?? 5818;
         const threshold2 = this.provincialConstants.surtax_threshold_2 ?? 7446;
         const rate1 = this.provincialConstants.surtax_rate_1 ?? 0.20;
         const rate2 = this.provincialConstants.surtax_rate_2 ?? 0.36;
 
         let surtax = 0;
-
-        if (baseTax > threshold1) {
-            surtax += (Math.min(baseTax, threshold2) - threshold1) * rate1;
+        if (basicTax > threshold1) {
+            surtax += (basicTax - threshold1) * rate1;
         }
-
-        if (baseTax > threshold2) {
-            surtax += (baseTax - threshold2) * rate2;
+        if (basicTax > threshold2) {
+            surtax += (basicTax - threshold2) * rate2;
         }
-
         return surtax;
+    }
+
+    /**
+     * Ontario Health Premium tiers (CRA T4032-ON) based on taxable income
+     */
+    private calculateOntarioHealthPremium(taxableIncome: number): number {
+        if (taxableIncome <= 20000) return 0;
+        if (taxableIncome <= 36000) return Math.min(300, (taxableIncome - 20000) * 0.06);
+        if (taxableIncome <= 48000) return Math.min(450, 300 + (taxableIncome - 36000) * 0.06);
+        if (taxableIncome <= 72000) return Math.min(600, 450 + (taxableIncome - 48000) * 0.25);
+        if (taxableIncome <= 200000) return Math.min(750, 600 + (taxableIncome - 72000) * 0.25);
+        return Math.min(900, 750 + (taxableIncome - 200000) * 0.25);
     }
 
     /**

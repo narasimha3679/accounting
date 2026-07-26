@@ -17,6 +17,8 @@ export interface PayrollInput {
         hire_date: string;
         payrate: number;
         payrate_type: 'hourly' | 'salary' | 'monthly' | 'biweekly';
+        /** When true, EI employee and employer premiums are zero */
+        ei_exempt?: boolean;
     };
     payPeriod: {
         start: string;
@@ -73,6 +75,7 @@ export interface PayrollOutput {
     cpp2: {
         earnings: number;
         contribution: number;
+        employerContribution: number;
         ytdAfter: number;
         maxedOut: boolean;
     };
@@ -84,9 +87,10 @@ export interface PayrollOutput {
         maxedOut: boolean;
     };
     
-    // Income tax
+    // Income tax (provincialTax includes Ontario Health Premium when enabled)
     federalTax: number;
     provincialTax: number;
+    ontarioHealthPremium: number;
     totalIncomeTax: number;
     
     // Other deductions
@@ -111,11 +115,14 @@ export interface PayrollOutput {
     calculationDetails: {
         payPeriodsPerYear: number;
         annualizedIncome: number;
+        annualTaxableIncome: number;
         annualFederalTax: number;
         annualProvincialTax: number;
         federalCreditsUsed: number;
         provincialCreditsUsed: number;
         ontarioSurtax?: number;
+        ontarioTaxReduction?: number;
+        ontarioHealthPremium?: number;
     };
 }
 
@@ -208,6 +215,8 @@ export interface ProvincialTaxConstants {
     surtax_rate_1?: number | null;
     surtax_threshold_2?: number | null;
     surtax_rate_2?: number | null;
+    /** Ontario tax reduction base amount (default $300 for 2026) */
+    tax_reduction_base?: number | null;
     health_premium_enabled: boolean;
 }
 

@@ -292,6 +292,43 @@ describe('PayrollCalculator', () => {
             expect(result.ei.premium).toBe(0);
             expect(result.ei.maxedOut).toBe(true);
         });
+
+        it('returns zero EI when employee is ei_exempt', () => {
+            const calculator = createCalculator('biweekly');
+            const withEi = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2023-01-15',
+                        payrate: 25,
+                        payrate_type: 'hourly',
+                        ei_exempt: false,
+                    },
+                    hours: { regular: 80, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                })
+            );
+            const exempt = calculator.calculate(
+                createPayrollInput({
+                    employee: {
+                        id: 1,
+                        province: 'ON',
+                        hire_date: '2023-01-15',
+                        payrate: 25,
+                        payrate_type: 'hourly',
+                        ei_exempt: true,
+                    },
+                    hours: { regular: 80, overtime: 0, vacation: 0, statutory_holiday: 0, sick: 0 },
+                })
+            );
+
+            expect(exempt.ei.premium).toBe(0);
+            expect(exempt.ei.employerPremium).toBe(0);
+            expect(exempt.ei.insurableEarnings).toBe(0);
+            expect(exempt.ei.ytdAfter).toBe(0);
+            expect(withEi.ei.premium).toBeGreaterThan(0);
+            expect(exempt.netPay).toBeGreaterThan(withEi.netPay);
+        });
     });
 
     describe('Income Tax Calculations', () => {
@@ -532,12 +569,11 @@ describe('PayrollCalculator', () => {
     });
 
     /**
-     * Golden scenarios (Phase 2.2)
+     * Golden scenarios (Phase 2.2 + T4032 alignment)
      *
-     * Source: internal golden — calculated from CRA 2026 seeds after
-     * fix_2026_tax_tables_cra migration (brackets/BPA/CPP max/surtax).
-     * Methodology matches PayrollCalculator (annualize → brackets → credits →
-     * de-annualize). Not full T4032 Formula; see TAX-ENGINE-GAPS.md.
+     * Source: CRA T4032-ON methodology matching canadaTaxEngine /
+     * PayrollCalculator (enhanced CPP + CPP2 as deductions; base CPP, EI,
+     * TD1, CEA as credits; ON surtax → tax reduction → health premium).
      * Replace expecteds with CRA PDOC screenshots when available.
      */
     describe('Golden PDOC-style scenarios (within $1)', () => {
@@ -556,13 +592,14 @@ describe('PayrollCalculator', () => {
                 })
             );
 
-            // Gross 80×$25=$2,000; CPP $110.99; EI $32.60; fed $171.31; ON $68.52; net $1,616.58
+            // Gross $2,000; CPP $110.99; EI $32.60; fed $163.23; ON+OHP $91.60; net $1,601.58
             expectWithinDollar(result.grossPay, 2000, 'gross');
             expectWithinDollar(result.cpp.contribution, 110.99, 'cpp');
             expectWithinDollar(result.ei.premium, 32.6, 'ei');
-            expectWithinDollar(result.federalTax, 171.31, 'federalTax');
-            expectWithinDollar(result.provincialTax, 68.52, 'provincialTax');
-            expectWithinDollar(result.netPay, 1616.58, 'netPay');
+            expectWithinDollar(result.federalTax, 163.23, 'federalTax');
+            expectWithinDollar(result.ontarioHealthPremium, 23.08, 'ohp');
+            expectWithinDollar(result.provincialTax, 91.6, 'provincialTax+ohp');
+            expectWithinDollar(result.netPay, 1601.58, 'netPay');
             expect(result.cpp2.contribution).toBe(0);
         });
 
@@ -607,8 +644,14 @@ describe('PayrollCalculator', () => {
             expectWithinDollar(result.grossPay, 3846.15, 'gross');
             expectWithinDollar(result.cpp.contribution, 162.71, 'cpp');
             expectWithinDollar(result.cpp2.contribution, 16.0, 'cpp2');
+            expectWithinDollar(result.cpp2.employerContribution, 16.0, 'cpp2 employer');
             expectWithinDollar(result.ei.premium, 43.19, 'ei');
+            expectWithinDollar(result.federalTax, 511.6, 'federalTax');
+            expectWithinDollar(result.ontarioHealthPremium, 28.85, 'ohp');
             expect(result.cpp2.contribution).toBeGreaterThan(0);
+            expect(result.employerCpp).toBe(
+                result.cpp.employerContribution + result.cpp2.employerContribution
+            );
         });
 
         it('4. overtime period — gross and 1.5x OT rate', () => {
@@ -654,6 +697,7 @@ describe('PayrollCalculator', () => {
             expect(result.ei.premium).toBe(0);
             expect(result.federalTax).toBe(0);
             expect(result.provincialTax).toBe(0);
+            expect(result.ontarioHealthPremium).toBe(0);
             expect(result.netPay).toBe(0);
         });
     });
