@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import api, { type Dividend, type OwnerPayment } from '../lib/api';
+import { useFeatures } from '../contexts/FeatureContext';
+import { useCurrentCompany } from '../hooks/useCurrentCompany';
+import api, { type Dividend, type OwnerPayment, type PayRun, type RemittancePeriod } from '../lib/api';
 import { loadDashboardPreferences, updateDashboardPreference } from '../lib/preferences';
 import {
     DollarSign,
@@ -22,11 +24,18 @@ import { SafeToSpendWidget } from '../components/dashboard/SafeToSpendWidget';
 import { PayMyselfSlider } from '../components/dashboard/PayMyselfSlider';
 import { ActionCenter } from '../components/dashboard/ActionCenter';
 
+const OPEN_PAY_RUN_STATUSES = new Set(['draft', 'pending_approval', 'approved']);
+
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
+    const { isFeatureEnabled } = useFeatures();
+    const { canManageEmployees } = useCurrentCompany();
+    const payrollEnabled = isFeatureEnabled('payroll') && canManageEmployees;
     const [stats, setStats] = useState({
         totalRevenue: 0,
         totalExpenses: 0,
+        totalSalaries: 0,
+        upcomingPayroll: 0,
         netIncome: 0,
         outstandingInvoices: 0,
         overdueInvoices: 0,
@@ -53,6 +62,12 @@ const Dashboard: React.FC = () => {
         totalAssetCost: 0,
         totalAccumulatedDepreciation: 0,
         totalAssetBookValue: 0,
+        // Payroll action items
+        openPayRunsCount: 0,
+        openPayRunsTotal: 0,
+        remittanceDueCount: 0,
+        remittanceDueTotal: 0,
+        remittanceOverdueCount: 0,
     });
     const [allDividends, setAllDividends] = useState<Dividend[]>([]);
     const [, setOwnerPayments] = useState<OwnerPayment[]>([]);
@@ -68,7 +83,7 @@ const Dashboard: React.FC = () => {
         if (user) {
             loadDashboardData();
         }
-    }, [user, timePeriod, selectedDate]);
+    }, [user, timePeriod, selectedDate, payrollEnabled]);
 
     const loadDashboardData = async () => {
         try {
@@ -113,7 +128,9 @@ const Dashboard: React.FC = () => {
                 dividendsResponse,
                 capitalAssetsResponse,
                 ownerPaymentsResponse,
-                payrollExpense
+                payrollExpense,
+                payRuns,
+                remittancePeriods,
             ] = await Promise.all([
                 // Fetch all invoices once (we'll filter by status and date client-side)
                 api.getInvoices({
@@ -163,7 +180,20 @@ const Dashboard: React.FC = () => {
                     limit: 1000
                 }),
                 // Payroll expense from finalized pay runs
-                api.getPayrollExpenseForPeriod(companyId, startDateStr, endDateStr)
+                api.getPayrollExpenseForPeriod(companyId, startDateStr, endDateStr),
+                // Open pay runs + remittances for Safe-to-Spend / Action Center
+                payrollEnabled
+                    ? api.getPayRuns({ company_id: companyId }).catch((err) => {
+                        console.error('Error loading pay runs for dashboard:', err);
+                        return [] as PayRun[];
+                    })
+                    : Promise.resolve([] as PayRun[]),
+                payrollEnabled
+                    ? api.getRemittancePeriods(companyId).catch((err) => {
+                        console.error('Error loading remittances for dashboard:', err);
+                        return [] as RemittancePeriod[];
+                    })
+                    : Promise.resolve([] as RemittancePeriod[]),
             ]);
 
             // Filter invoices by status and date
@@ -185,6 +215,22 @@ const Dashboard: React.FC = () => {
             const capitalAssets = capitalAssetsResponse.data;
             const ownerPayments = ownerPaymentsResponse.data;
             const totalSalaries = payrollExpense.totalEmployerCost;
+
+            const openPayRuns = payRuns.filter((run) => OPEN_PAY_RUN_STATUSES.has(run.status));
+            const upcomingPayroll = openPayRuns.reduce(
+                (sum, run) => sum + (Number(run.total_employer_cost) || 0),
+                0
+            );
+            const unpaidRemittances = remittancePeriods.filter(
+                (period) => period.status === 'pending' || period.status === 'overdue'
+            );
+            const remittanceDueTotal = unpaidRemittances.reduce(
+                (sum, period) => sum + Math.max(0, (Number(period.total_owing) || 0) - (Number(period.paid_amount) || 0)),
+                0
+            );
+            const remittanceOverdueCount = unpaidRemittances.filter(
+                (period) => period.status === 'overdue'
+            ).length;
 
             // Calculate stats
             const invoiceRevenue = paidInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
@@ -273,6 +319,8 @@ const Dashboard: React.FC = () => {
             setStats({
                 totalRevenue,
                 totalExpenses,
+                totalSalaries,
+                upcomingPayroll: Math.round(upcomingPayroll * 100) / 100,
                 netIncome,
                 outstandingInvoices: outstandingInvoices.length,
                 overdueInvoices: overdueInvoices.length,
@@ -299,6 +347,11 @@ const Dashboard: React.FC = () => {
                 totalAssetCost,
                 totalAccumulatedDepreciation,
                 totalAssetBookValue,
+                openPayRunsCount: openPayRuns.length,
+                openPayRunsTotal: Math.round(upcomingPayroll * 100) / 100,
+                remittanceDueCount: unpaidRemittances.length,
+                remittanceDueTotal: Math.round(remittanceDueTotal * 100) / 100,
+                remittanceOverdueCount,
             });
 
 
@@ -452,7 +505,11 @@ const Dashboard: React.FC = () => {
                     <SafeToSpendWidget
                         hstOwed={stats.hstOwed}
                         corpTaxOwed={stats.smallBusinessTaxOwed}
-                        availableCash={(stats.totalRevenue + stats.totalIncome + stats.hstOwed) - (stats.totalExpenses + stats.ownerPaymentsTotal + stats.smallBusinessTaxPaid)}
+                        upcomingPayroll={stats.upcomingPayroll}
+                        availableCash={
+                            (stats.totalRevenue + stats.totalIncome + stats.hstOwed) -
+                            (stats.totalExpenses + stats.totalSalaries + stats.ownerPaymentsTotal + stats.smallBusinessTaxPaid)
+                        }
                     />
                 </motion.div>
 
@@ -462,6 +519,11 @@ const Dashboard: React.FC = () => {
                         overdueCount={stats.overdueInvoices}
                         overdueTotal={stats.overdueInvoicesTotal}
                         hstFilingDue={user?.company?.hst_filing_period_start ? undefined : undefined} // TODO: Calculate actual deadline
+                        openPayRunsCount={stats.openPayRunsCount}
+                        openPayRunsTotal={stats.openPayRunsTotal}
+                        remittanceDueCount={stats.remittanceDueCount}
+                        remittanceDueTotal={stats.remittanceDueTotal}
+                        remittanceOverdueCount={stats.remittanceOverdueCount}
                     />
                 </motion.div>
 
