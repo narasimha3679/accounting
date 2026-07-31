@@ -9,7 +9,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 interface SafeToSpendProps {
     hstOwed: number;
     corpTaxOwed: number;
-    upcomingPayroll?: number; // Optional V2
+    /** Employer cost of open (non-finalized) pay runs */
+    upcomingPayroll?: number;
     availableCash: number;
 }
 
@@ -79,7 +80,7 @@ export const SafeToSpendWidget: React.FC<SafeToSpendProps> = ({
                                     </div>
                                     {upcomingPayroll > 0 && (
                                         <div className="flex justify-between py-1 text-red-500">
-                                            <span>Est. Payroll:</span>
+                                            <span>Open Pay Runs:</span>
                                             <span>-{formatCurrency(upcomingPayroll)}</span>
                                         </div>
                                     )}
